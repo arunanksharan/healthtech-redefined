@@ -1,0 +1,500 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: healthtech-postgres
+    environment:
+      POSTGRES_DB: healthtech
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: healthtech-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: healthtech-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - healthtech-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: healthtech-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9093,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  # ============================================================================
+  # BACKEND MICROSERVICES - PHASE 1
+  # ============================================================================
+
+  identity-service:
+    build:
+      context: ./backend
+      dockerfile: services/identity-service/Dockerfile
+    container_name: healthtech-identity-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      REDIS_URL: redis://redis:6379
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.identity_service.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - healthtech-network
+
+  fhir-service:
+    build:
+      context: ./backend
+      dockerfile: services/fhir-service/Dockerfile
+    container_name: healthtech-fhir-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      REDIS_URL: redis://redis:6379
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.fhir_service.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - healthtech-network
+
+  consent-service:
+    build:
+      context: ./backend
+      dockerfile: services/consent-service/Dockerfile
+    container_name: healthtech-consent-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      REDIS_URL: redis://redis:6379
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.consent_service.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - healthtech-network
+
+  auth-service:
+    build:
+      context: ./backend
+      dockerfile: services/auth-service/Dockerfile
+    container_name: healthtech-auth-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET_KEY: your-secret-key-change-in-production-please
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.auth_service.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - healthtech-network
+
+  # ============================================================================
+  # BACKEND MICROSERVICES - PHASE 2
+  # ============================================================================
+
+  scheduling-service:
+    build:
+      context: ./backend
+      dockerfile: services/scheduling-service/Dockerfile
+    container_name: healthtech-scheduling-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.scheduling_service.main:app --host 0.0.0.0 --port 8005 --reload
+    networks:
+      - healthtech-network
+
+  encounter-service:
+    build:
+      context: ./backend
+      dockerfile: services/encounter-service/Dockerfile
+    container_name: healthtech-encounter-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8006:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.encounter_service.main:app --host 0.0.0.0 --port 8006 --reload
+    networks:
+      - healthtech-network
+
+  prm-service:
+    build:
+      context: ./backend
+      dockerfile: services/prm-service/Dockerfile
+    container_name: healthtech-prm-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8007:8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.prm_service.main:app --host 0.0.0.0 --port 8007 --reload
+    networks:
+      - healthtech-network
+
+  scribe-service:
+    build:
+      context: ./backend
+      dockerfile: services/scribe-service/Dockerfile
+    container_name: healthtech-scribe-service
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.1}
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.scribe_service.main:app --host 0.0.0.0 --port 8008 --reload
+    networks:
+      - healthtech-network
+
+  # ============================================================================
+  # PHASE 3 SERVICES: IPD + Nursing + Orders + ICU
+  # ============================================================================
+
+  bed-management-service:
+    build:
+      context: ./backend
+      dockerfile: services/bed-management-service/Dockerfile
+    container_name: healthtech-bed-management-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8009:8009"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.bed_management_service.main:app --host 0.0.0.0 --port 8009 --reload
+    networks:
+      - healthtech-network
+
+  admission-service:
+    build:
+      context: ./backend
+      dockerfile: services/admission-service/Dockerfile
+    container_name: healthtech-admission-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8010:8010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.admission_service.main:app --host 0.0.0.0 --port 8010 --reload
+    networks:
+      - healthtech-network
+
+  nursing-service:
+    build:
+      context: ./backend
+      dockerfile: services/nursing-service/Dockerfile
+    container_name: healthtech-nursing-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8011:8011"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.nursing_service.main:app --host 0.0.0.0 --port 8011 --reload
+    networks:
+      - healthtech-network
+
+  orders-service:
+    build:
+      context: ./backend
+      dockerfile: services/orders-service/Dockerfile
+    container_name: healthtech-orders-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8012:8012"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.orders_service.main:app --host 0.0.0.0 --port 8012 --reload
+    networks:
+      - healthtech-network
+
+  icu-service:
+    build:
+      context: ./backend
+      dockerfile: services/icu-service/Dockerfile
+    container_name: healthtech-icu-service
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_ENABLED: "true"
+      ENV: development
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8013:8013"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn services.icu_service.main:app --host 0.0.0.0 --port 8013 --reload
+    networks:
+      - healthtech-network
+
+  # ============================================================================
+  # MONITORING & OBSERVABILITY
+  # ============================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: healthtech-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - healthtech-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: healthtech-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SERVER_ROOT_URL: http://localhost:3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - healthtech-network
+
+  # ============================================================================
+  # DATABASE ADMIN TOOLS
+  # ============================================================================
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: healthtech-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@healthtech.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - healthtech-network
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  kafka_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  healthtech-network:
+    driver: bridge

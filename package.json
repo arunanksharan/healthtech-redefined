@@ -1,0 +1,46 @@
+{
+  "name": "healthtech-platform",
+  "version": "1.0.0",
+  "description": "AI-Native Healthcare Platform - Revolutionary health tech stack",
+  "private": true,
+  "workspaces": [
+    "frontend/apps/*",
+    "frontend/packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "backend:dev": "cd backend && docker-compose up",
+    "backend:test": "cd backend && pytest",
+    "mobile:dev": "cd mobile && flutter run",
+    "setup": "npm install && cd backend && pip install -r requirements.txt"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "prettier": "^3.1.0",
+    "turbo": "^1.11.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/healthtech-platform.git"
+  },
+  "keywords": [
+    "healthcare",
+    "ai-native",
+    "fhir",
+    "ehr",
+    "hospital-management",
+    "telemedicine"
+  ],
+  "author": "Kuzushi Labs",
+  "license": "PROPRIETARY"
+}
