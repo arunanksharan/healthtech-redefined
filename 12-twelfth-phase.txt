@@ -1,0 +1,1169 @@
+Phase “single pane of truth instead of 17 WhatsApp groups.”
+
+We’ll treat this as:
+
+Phase 12 – Operations Command Center (Integrated Clinical + Financial Command)
+
+Same treatment: full spine, schemas, endpoints, tools, prompts, and explicit integration points to OR, LIS, Imaging, Bed Management, RCM, etc.
+
+⸻
+
+1. Phase 12 – Scope & Design Goals
+
+1.1 What the Operations Command Center Is
+
+This is not just a dashboard. It’s a real-time operational layer that:
+	•	Collects signals from:
+	•	ED, IPD, OR, ICU, wards, Labs, Imaging, Pharmacy, RCM.
+	•	Maintains live state snapshots:
+	•	Beds, census, OR schedule & delays, ED crowding, lab & imaging backlog, preauth queues, denial queues.
+	•	Applies rules & playbooks to:
+	•	Detect bottlenecks, SLA breaches, unsafe load, revenue risk.
+	•	Powers AI “Ops agents” to:
+	•	Summarise situation,
+	•	Suggest actions (move patients, re-prioritise cases, call in backup, reorder OR list),
+	•	Generate incident reports and post-mortems.
+
+1.2 Design Principles
+	•	Event-driven spine:
+	•	Every domain emits events; Ops CC consumes, aggregates and projects into snapshots.
+	•	Read-optimised, write-light:
+	•	Use snapshot tables & materialized views for fast queries; underlying truth remains in source services.
+	•	LLM-friendly schemas:
+	•	Clean, summarised structures: “current state of hospital”, “per-unit snapshots”, “per-domain workloads.”
+	•	Humans decide:
+	•	AI surfaces risks, options and narratives; humans approve actions.
+
+⸻
+
+2. Backend – Services & Data Model
+
+New services (horizontal):
+	1.	ops-event-ingestion-service
+	2.	ops-state-projection-service
+	3.	ops-alerts-service
+	4.	ops-playbooks-service
+	5.	ops-command-center-api-service
+	6.	ops-analytics-service
+	7.	ops-ai-orchestrator-service
+
+They consume from:
+	•	admissions/bed-management-service
+	•	or-scheduling-service
+	•	preop-assessment-service
+	•	lis-service (labs)
+	•	radiology-service (imaging)
+	•	pharmacy-service
+	•	rcm-control-tower-service
+	•	ed-triage-service
+	•	icu-service
+
+Assume event bus (Kafka/NATS/SQS/etc.), but we model persistence in Postgres-like DB.
+
+⸻
+
+2.1 ops-event-ingestion-service
+
+Responsible for:
+	•	Subscribing to domain events and normalizing into an ops event log.
+
+2.1.1 DB Schema
+Tables:
+	•	ops_events (optional persisted log)
+	•	ops_event_sources
+
+ops_event_sources
+
+CREATE TABLE ops_event_sources (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  source_system TEXT NOT NULL,                -- 'ehr','or','lis','rcm','ed','icu'
+  source_stream TEXT NOT NULL,                -- 'admission_events','or_case_events', etc.
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ops_events
+
+(Optional if you want persistent log beyond Kafka)
+
+CREATE TABLE ops_events (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  source_system TEXT NOT NULL,                -- 'or','lis','rcm'
+  event_type TEXT NOT NULL,                   -- 'admission_created','bed_transfer','or_case_status_changed', etc.
+  entity_type TEXT NOT NULL,                  -- 'admission','bed','or_case','lab_order','claim','preauth_case'
+  entity_id UUID NOT NULL,
+  event_time TIMESTAMPTZ NOT NULL,
+  payload JSONB NOT NULL,
+  processed BOOLEAN DEFAULT FALSE,
+  processed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ops_events_processed
+  ON ops_events(processed, event_time);
+
+CREATE INDEX idx_ops_events_entity
+  ON ops_events(entity_type, entity_id);
+
+
+⸻
+
+2.2 ops-state-projection-service
+
+Responsible for:
+	•	Maintaining current state snapshots for each operational dimension.
+
+Core snapshot tables:
+	1.	unit_snapshots (per ward/ICU/ED)
+	2.	bed_snapshots
+	3.	or_status_snapshots
+	4.	ed_status_snapshots
+	5.	lab_workload_snapshots
+	6.	imaging_workload_snapshots
+	7.	rcm_workload_snapshots
+	8.	pharmacy_workload_snapshots (optional)
+	9.	ops_kpis (daily/hourly aggregates)
+
+2.2.1 Common reference: hospital_units
+
+CREATE TABLE hospital_units (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'WARD_3','ICU_1','ED_MAIN'
+  name TEXT NOT NULL,
+  unit_type TEXT NOT NULL,                   -- 'ward','icu','ed','ot','lab','imaging'
+  parent_location_id UUID REFERENCES locations(id),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_hospital_units_code_tenant
+  ON hospital_units(tenant_id, code);
+
+2.2.2 unit_snapshots
+High-level view per clinical unit (ward/ICU/ED).
+
+CREATE TABLE unit_snapshots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  unit_id UUID NOT NULL REFERENCES hospital_units(id),
+  snapshot_time TIMESTAMPTZ NOT NULL,
+  total_beds INT,
+  occupied_beds INT,
+  reserved_beds INT,
+  blocked_beds INT,
+  admissions_last_4h INT,
+  discharges_last_4h INT,
+  transfer_in_last_4h INT,
+  transfer_out_last_4h INT,
+  occupancy_rate NUMERIC,                -- computed
+  acuity_index NUMERIC,                  -- weighted severity (optional)
+  ed_waiting_count INT,                  -- if ED
+  ed_waiting_longer_than_30m INT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_unit_snapshots_unit_time
+  ON unit_snapshots(unit_id, snapshot_time DESC);
+
+2.2.3 bed_snapshots
+Fine-grained per bed state.
+
+CREATE TABLE bed_snapshots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  bed_id UUID NOT NULL REFERENCES beds(id),
+  unit_id UUID NOT NULL REFERENCES hospital_units(id),
+  snapshot_time TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL,                   -- 'available','occupied','reserved','cleaning','blocked'
+  current_patient_id UUID REFERENCES patients(id),
+  current_encounter_id UUID REFERENCES encounters(id),
+  last_status_change TIMESTAMPTZ,
+  isolation_flag BOOLEAN DEFAULT FALSE,
+  acuity_level TEXT,                      -- 'low','medium','high', if available
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_bed_snapshots_bed_time
+  ON bed_snapshots(bed_id, snapshot_time DESC);
+
+CREATE INDEX idx_bed_snapshots_unit_status
+  ON bed_snapshots(unit_id, status, snapshot_time DESC);
+
+2.2.4 or_status_snapshots
+Per OR room, for near real-time OR command.
+
+CREATE TABLE or_status_snapshots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  or_room_id UUID NOT NULL REFERENCES or_rooms(id),
+  snapshot_time TIMESTAMPTZ NOT NULL,
+  current_case_id UUID REFERENCES surgical_cases(id),
+  current_case_status TEXT,               -- 'scheduled','in_progress','closing','cleanup'
+  scheduled_case_count_today INT,
+  completed_case_count_today INT,
+  delayed_case_count_today INT,
+  avg_delay_minutes_today NUMERIC,
+  utilization_rate_today NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_or_status_snapshots_room_time
+  ON or_status_snapshots(or_room_id, snapshot_time DESC);
+
+2.2.5 ed_status_snapshots
+ED crowding view.
+
+CREATE TABLE ed_status_snapshots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  ed_unit_id UUID NOT NULL REFERENCES hospital_units(id),
+  snapshot_time TIMESTAMPTZ NOT NULL,
+  total_in_ed INT,
+  waiting_for_triage INT,
+  waiting_for_provider INT,
+  waiting_for_bed INT,
+  avg_wait_time_triage_minutes NUMERIC,
+  avg_wait_time_provider_minutes NUMERIC,
+  lwbs_last_4h INT,                         -- left without being seen
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ed_status_snapshots_unit_time
+  ON ed_status_snapshots(ed_unit_id, snapshot_time DESC);
+
+2.2.6 lab_workload_snapshots
+
+CREATE TABLE lab_workload_snapshots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  lab_unit_id UUID NOT NULL REFERENCES hospital_units(id),
+  snapshot_time TIMESTAMPTZ NOT NULL,
+  total_pending INT,
+  critical_pending INT,
+  median_turnaround_minutes NUMERIC,
+  percentile90_turnaround_minutes NUMERIC,
+  pending_by_priority JSONB,                -- e.g. { "stat": 5, "routine": 42 }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_workload_snapshots_unit_time
+  ON lab_workload_snapshots(lab_unit_id, snapshot_time DESC);
+
+2.2.7 imaging_workload_snapshots
+
+CREATE TABLE imaging_workload_snapshots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  imaging_unit_id UUID NOT NULL REFERENCES hospital_units(id),
+  snapshot_time TIMESTAMPTZ NOT NULL,
+  total_pending INT,
+  pending_urgent INT,
+  median_report_turnaround_minutes NUMERIC,
+  pending_by_modality JSONB,               -- { "CT": 3, "MRI": 2, "XRay": 15 }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_imaging_workload_snapshots_unit_time
+  ON imaging_workload_snapshots(imaging_unit_id, snapshot_time DESC);
+
+2.2.8 rcm_workload_snapshots
+
+CREATE TABLE rcm_workload_snapshots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  snapshot_time TIMESTAMPTZ NOT NULL,
+  preauth_pending INT,
+  preauth_sla_breach_risk INT,
+  claims_to_submit INT,
+  claims_in_review INT,
+  denials_open INT,
+  denials_high_value INT,
+  ar_total NUMERIC,
+  ar_aging_buckets JSONB,                  -- { "0-30": x, "31-60": y, ... }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_rcm_workload_snapshots_time
+  ON rcm_workload_snapshots(snapshot_time DESC);
+
+2.2.9 ops_kpis
+Daily/hourly aggregates.
+
+CREATE TABLE ops_kpis (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  period_start TIMESTAMPTZ NOT NULL,
+  period_type TEXT NOT NULL,               -- 'hour','day'
+  metric_name TEXT NOT NULL,               -- 'hospital_occupancy','ed_lwbs_rate','or_utilization','lab_tat'
+  metric_value NUMERIC,
+  metric_dimensions JSONB,                 -- e.g. { "unit": "ICU_1" }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ops_kpis_metric_period
+  ON ops_kpis(metric_name, period_start);
+
+
+⸻
+
+2.3 ops-alerts-service
+
+Responsible for:
+	•	Detecting alert conditions and creating alert records.
+
+2.3.1 DB Schema
+Tables:
+	•	ops_alert_rules
+	•	ops_alerts
+	•	ops_alert_actions
+
+ops_alert_rules
+
+CREATE TABLE ops_alert_rules (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  name TEXT NOT NULL,                         -- 'ICU occupancy > 90%','ED crowding'
+  description TEXT,
+  domain TEXT NOT NULL,                       -- 'bed_management','or','ed','lab','imaging','rcm'
+  rule_type TEXT NOT NULL,                    -- 'threshold','trend','composite'
+  condition_config JSONB NOT NULL,            -- JSON describing thresholds, metrics, units
+  severity TEXT NOT NULL,                     -- 'info','warning','critical'
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ops_alerts
+
+CREATE TABLE ops_alerts (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  alert_rule_id UUID REFERENCES ops_alert_rules(id),
+  domain TEXT NOT NULL,
+  metric_name TEXT,
+  metric_value NUMERIC,
+  metric_context JSONB,                       -- unit_id, or_room_id, payer, etc.
+  severity TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',        -- 'open','acked','in_progress','resolved','dismissed'
+  triggered_at TIMESTAMPTZ NOT NULL,
+  resolved_at TIMESTAMPTZ,
+  assigned_user_id UUID,
+  assigned_team TEXT,                         -- 'bed_management','or','rcm'
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ops_alerts_status_severity
+  ON ops_alerts(status, severity, triggered_at DESC);
+
+ops_alert_actions
+
+CREATE TABLE ops_alert_actions (
+  id UUID PRIMARY KEY,
+  alert_id UUID NOT NULL REFERENCES ops_alerts(id) ON DELETE CASCADE,
+  action_time TIMESTAMPTZ NOT NULL,
+  actor_id UUID,
+  action_type TEXT NOT NULL,                  -- 'ack','assign','comment','resolve'
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ops_alert_actions_alert
+  ON ops_alert_actions(alert_id, action_time);
+
+
+⸻
+
+2.4 ops-playbooks-service
+
+Responsible for:
+	•	Standard response playbooks per alert type.
+
+2.4.1 DB Schema
+Tables:
+	•	ops_playbooks
+	•	ops_playbook_steps
+
+ops_playbooks
+
+CREATE TABLE ops_playbooks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  name TEXT NOT NULL,                       -- 'ED crowding > 120%','ICU full'
+  domain TEXT NOT NULL,                     -- 'ed','icu','or','rcm'
+  trigger_alert_rule_id UUID REFERENCES ops_alert_rules(id),
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ops_playbook_steps
+
+CREATE TABLE ops_playbook_steps (
+  id UUID PRIMARY KEY,
+  playbook_id UUID NOT NULL REFERENCES ops_playbooks(id) ON DELETE CASCADE,
+  step_order INT NOT NULL,
+  title TEXT NOT NULL,                      -- 'Call ICU consultant','Open surge ward'
+  instructions TEXT NOT NULL,
+  responsible_role TEXT,                    -- 'bed_manager','ed_head','rcm_manager'
+  expected_completion_minutes INT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ops_playbook_steps_playbook_order
+  ON ops_playbook_steps(playbook_id, step_order);
+
+
+⸻
+
+2.5 ops-command-center-api-service
+
+Responsible for:
+	•	GraphQL/REST endpoints that return pre-chewed views for UIs & LLM tools.
+
+Key endpoints (REST-ish):
+	•	GET /api/v1/ops/overview
+	•	GET /api/v1/ops/bed-management
+	•	GET /api/v1/ops/or-status
+	•	GET /api/v1/ops/ed-status
+	•	GET /api/v1/ops/lab-status
+	•	GET /api/v1/ops/imaging-status
+	•	GET /api/v1/ops/rcm-status
+	•	GET /api/v1/ops/alerts?status=&severity=&domain=
+	•	GET /api/v1/ops/alerts/{id}
+
+Example output shape /ops/overview:
+
+{
+  "timestamp": "2025-11-15T10:30:00Z",
+  "hospital_occupancy": 0.82,
+  "icu_occupancy": 0.93,
+  "ed_crowding_index": 1.4,
+  "or_utilization_today": 0.71,
+  "lab_pending_critical": 7,
+  "imaging_pending_urgent": 5,
+  "rcm": {
+    "preauth_pending": 23,
+    "preauth_sla_risk": 6,
+    "claims_to_submit": 18,
+    "denials_high_value": 9
+  },
+  "top_alerts": [
+    { "alert_id": "...", "domain": "icu", "severity": "critical", "description": "ICU occupancy 96%" },
+    { "alert_id": "...", "domain": "ed", "severity": "warning", "description": "ED waiting > 45min for 12 pts" }
+  ]
+}
+
+
+⸻
+
+2.6 ops-ai-orchestrator-service
+
+Responsible for:
+	•	AI tasks that cut across domains:
+“What’s going wrong today?” “Where’s the bottleneck?”
+
+2.6.1 DB Schema
+Tables:
+	•	ops_ai_tasks
+	•	ops_ai_outputs
+
+ops_ai_tasks
+
+CREATE TABLE ops_ai_tasks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  task_type TEXT NOT NULL,                      -- 'situation_summary','bottleneck_analysis','what_if_scenario','incident_timeline'
+  snapshot_time TIMESTAMPTZ,
+  input_context JSONB,                          -- e.g. specific unit, date range
+  status TEXT NOT NULL DEFAULT 'queued',        -- 'queued','running','completed','failed'
+  requested_by_user_id UUID,
+  requested_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ops_ai_outputs
+
+CREATE TABLE ops_ai_outputs (
+  id UUID PRIMARY KEY,
+  ops_ai_task_id UUID NOT NULL REFERENCES ops_ai_tasks(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,                    -- 'summary','root_cause','recommendations','timeline'
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+
+⸻
+
+3. Frontend – Command Center UI
+
+Think of three main layers:
+	1.	Executive Overview (CxO/COO).
+	2.	Operational Cockpits (Bed manager, OR coordinator, ED head, Lab manager, RCM head).
+	3.	Drill-down & Incident Views.
+
+3.1 Executive Overview Board
+
+Route:
+	•	/ops/overview
+
+Features:
+	•	Big KPIs at top:
+	•	Hospital occupancy, ICU occupancy, ED crowding index, OR utilisation, Lab & Imaging pending, key RCM metrics.
+	•	Left: Heatmap of units:
+	•	occupancy & acuity.
+	•	Right: Top alerts & Active playbooks.
+	•	Bottom: condensed trend of last 24 hrs.
+
+APIs:
+	•	GET /ops/overview
+	•	GET /ops/alerts?status=open&severity=critical
+
+⸻
+
+3.2 Bed Management Cockpit
+
+Route:
+	•	/ops/bed-management
+
+Features:
+	•	Unit list with occupancy + bed counts.
+	•	Bed map per unit:
+	•	color-coded: available / occupied / reserved / blocked / cleaning.
+	•	Filters:
+	•	show patients waiting for admission/transfer, ICU step-down candidates.
+	•	Integration with AI:
+	•	“Suggest bed allocation plan” button.
+
+APIs:
+	•	GET /ops/bed-management -> composed from unit_snapshots, bed_snapshots.
+	•	GET /ops/alerts?domain=bed_management.
+
+⸻
+
+3.3 OR / Periop Cockpit
+
+Route:
+	•	/ops/or
+
+Features:
+	•	OR grid for today:
+	•	each room as column, cases as blocks with scheduled & projected times.
+	•	Overlays:
+	•	running behind/on time,
+	•	urgent/emergency add-ons,
+	•	utilisation metrics.
+	•	AI:
+	•	“Optimise today’s OR list” – show current vs proposed order and trade-offs.
+
+APIs:
+	•	GET /ops/or-status -> from or_status_snapshots + or_case_schedule.
+	•	POST /periop-ai/tasks (from earlier phase) for optimisation.
+
+⸻
+
+3.4 ED/Lab/Imaging Cockpits
+
+Routes:
+	•	/ops/ed
+	•	/ops/lab
+	•	/ops/imaging
+
+ED
+	•	Overview of: waiting room, triage, admitted waiting for bed.
+	•	Key metrics: wait times, LWBS, occupancy vs staffing.
+
+Lab
+	•	Pending tests by priority & department.
+	•	Turnaround time trends.
+
+Imaging
+	•	Pending studies by modality & urgency.
+	•	Turnaround times (order → report signed).
+
+APIs:
+	•	GET /ops/ed-status -> ed_status_snapshots.
+	•	GET /ops/lab-status -> lab_workload_snapshots.
+	•	GET /ops/imaging-status -> imaging_workload_snapshots.
+
+⸻
+
+3.5 RCM Command View (Hooked into Control Tower)
+
+Route:
+	•	/ops/rcm
+
+Features:
+	•	Preauth pipeline view:
+	•	new, in progress, SLA risk, escalations.
+	•	Claims & denials snapshot:
+	•	AR aging, denial rate by payer.
+	•	Integration with cashless control tower (Phase 11).
+
+APIs:
+	•	GET /ops/rcm-status -> rcm_workload_snapshots.
+	•	Additional RCM endpoints from Phase 11.
+
+⸻
+
+3.6 Alerts & Playbooks UI
+
+Routes:
+	•	/ops/alerts
+	•	/ops/alert/[alertId]
+
+Alerts list
+	•	Filter by:
+	•	severity, domain, time.
+	•	Quick actions:
+	•	ack, assign, open playbook.
+
+Alert detail
+	•	Alert info + charts:
+	•	context metrics (e.g., last 2 hrs of ICU occupancy).
+	•	Suggested playbook:
+	•	list steps with checkbox tracking.
+
+APIs:
+	•	GET /ops/alerts?status=
+	•	GET /ops/alerts/{id}
+	•	PATCH /ops/alerts/{id}
+	•	GET /ops/playbooks?alert_rule_id=
+
+⸻
+
+4. LLM Tools – Ops Command Center Agents
+
+We’ll add cross-domain tools that operate on the projections, not raw EHR.
+
+4.1 Hospital Snapshot & Detail Tools
+
+Tool: get_hospital_overview_snapshot
+
+{
+  "name": "get_hospital_overview_snapshot",
+  "description": "Fetch the latest overall hospital operational snapshot including occupancy, ED crowding, OR utilization, lab/imaging backlogs, and RCM status.",
+  "input_schema": {
+    "type": "object",
+    "properties": {}
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "timestamp": { "type": "string", "format": "date-time" },
+      "hospital_occupancy": { "type": "number" },
+      "icu_occupancy": { "type": "number" },
+      "ed_crowding_index": { "type": "number" },
+      "or_utilization_today": { "type": "number" },
+      "lab_pending_critical": { "type": "integer" },
+      "imaging_pending_urgent": { "type": "integer" },
+      "rcm": {
+        "type": "object",
+        "properties": {
+          "preauth_pending": { "type": "integer" },
+          "preauth_sla_risk": { "type": "integer" },
+          "claims_to_submit": { "type": "integer" },
+          "denials_high_value": { "type": "integer" },
+          "ar_total": { "type": "number" }
+        }
+      }
+    }
+  }
+}
+
+Tool: get_unit_snapshots
+
+{
+  "name": "get_unit_snapshots",
+  "description": "Get latest snapshots for specified hospital units (wards, ICUs, ED).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "unit_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "unit_types": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["ward", "icu", "ed"]
+        }
+      }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "units": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "unit_id": { "type": "string" },
+            "unit_name": { "type": "string" },
+            "unit_type": { "type": "string" },
+            "total_beds": { "type": "integer" },
+            "occupied_beds": { "type": "integer" },
+            "reserved_beds": { "type": "integer" },
+            "occupancy_rate": { "type": "number" },
+            "acuity_index": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: get_or_status_snapshot
+
+{
+  "name": "get_or_status_snapshot",
+  "description": "Get latest OR room status snapshot including utilization and delayed cases.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "or_room_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "rooms": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "or_room_id": { "type": "string" },
+            "utilization_rate_today": { "type": "number" },
+            "scheduled_case_count_today": { "type": "integer" },
+            "completed_case_count_today": { "type": "integer" },
+            "delayed_case_count_today": { "type": "integer" },
+            "current_case_status": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: get_lab_and_imaging_status
+
+{
+  "name": "get_lab_and_imaging_status",
+  "description": "Fetch workload snapshots for labs and imaging units.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "lab_unit_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "imaging_unit_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "lab": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "unit_id": { "type": "string" },
+            "total_pending": { "type": "integer" },
+            "critical_pending": { "type": "integer" },
+            "median_turnaround_minutes": { "type": "number" }
+          }
+        }
+      },
+      "imaging": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "unit_id": { "type": "string" },
+            "total_pending": { "type": "integer" },
+            "pending_urgent": { "type": "integer" },
+            "median_report_turnaround_minutes": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+4.2 Alerts & Playbook Tools
+
+Tool: list_ops_alerts
+
+{
+  "name": "list_ops_alerts",
+  "description": "List active operational alerts filtered by severity and domain.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "severity": {
+        "type": "string",
+        "enum": ["info", "warning", "critical"]
+      },
+      "domain": {
+        "type": "string",
+        "enum": ["bed_management", "or", "ed", "lab", "imaging", "rcm"]
+      },
+      "status": {
+        "type": "string",
+        "enum": ["open", "acked", "in_progress"]
+      }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "alerts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "alert_id": { "type": "string" },
+            "domain": { "type": "string" },
+            "severity": { "type": "string" },
+            "status": { "type": "string" },
+            "description": { "type": "string" },
+            "metric_name": { "type": "string" },
+            "metric_value": { "type": "number" },
+            "metric_context": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: get_ops_alert_detail
+
+{
+  "name": "get_ops_alert_detail",
+  "description": "Fetch full details of a specific operational alert including context metrics and linked playbook.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "alert_id": { "type": "string" }
+    },
+    "required": ["alert_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "alert": {
+        "type": "object",
+        "properties": {
+          "alert_id": { "type": "string" },
+          "domain": { "type": "string" },
+          "severity": { "type": "string" },
+          "status": { "type": "string" },
+          "description": { "type": "string" },
+          "metric_context": { "type": "object" }
+        }
+      },
+      "playbook": {
+        "type": "object",
+        "properties": {
+          "playbook_id": { "type": "string" },
+          "name": { "type": "string" },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "step_order": { "type": "integer" },
+                "title": { "type": "string" },
+                "instructions": { "type": "string" },
+                "responsible_role": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: update_ops_alert
+
+{
+  "name": "update_ops_alert",
+  "description": "Update the status or assignment of an operational alert.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "alert_id": { "type": "string" },
+      "status": { "type": "string" },
+      "assigned_user_id": { "type": "string" }
+    },
+    "required": ["alert_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "alert_id": { "type": "string" },
+      "status": { "type": "string" },
+      "assigned_user_id": { "type": "string" }
+    }
+  }
+}
+
+
+⸻
+
+4.3 Ops AI Task Tools
+
+Tool: request_ops_ai_task
+
+{
+  "name": "request_ops_ai_task",
+  "description": "Request an AI task for operations such as situation summary, bottleneck analysis, or what-if scenarios.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "task_type": {
+        "type": "string",
+        "enum": [
+          "situation_summary",
+          "bottleneck_analysis",
+          "what_if_scenario",
+          "incident_timeline"
+        ]
+      },
+      "input_context": {
+        "type": "object",
+        "description": "Optional context such as specific units, domain focus, or time range."
+      }
+    },
+    "required": ["task_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "ops_ai_task_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: get_ops_ai_output
+
+{
+  "name": "get_ops_ai_output",
+  "description": "Fetch the output of an operations AI task (summary, root causes, recommendations).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "ops_ai_task_id": { "type": "string" }
+    },
+    "required": ["ops_ai_task_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "outputs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "output_type": { "type": "string" },
+            "payload": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+5. System Prompts – Ops Command Center Agents
+
+5.1 Chief Operations Agent (“Situation Room”)
+
+You are the Chief Operations Agent in the hospital command center.
+
+Goals:
+	•	Provide high-level situational awareness.
+	•	Identify current bottlenecks and risks across clinical and financial operations.
+
+Rules:
+	1.	Start with get_hospital_overview_snapshot to get the latest global state.
+	2.	Use get_unit_snapshots, get_or_status_snapshot, and get_lab_and_imaging_status as needed to drill into:
+	•	ICU and high-acuity wards,
+	•	ED,
+	•	OR,
+	•	Lab & Imaging.
+	3.	Use list_ops_alerts (critical + warning) to enumerate:
+	•	top 3–5 active alerts,
+	•	which domains they affect.
+	4.	Produce a structured situation report:
+	•	Section 1: Key metrics overview (short bullet list).
+	•	Section 2: Top bottlenecks (for each: domain, what’s happening, why you think it’s happening).
+	•	Section 3: Recommended actions (1–3 specific actions only; not a long wish list).
+	5.	Make a clear distinction between:
+	•	facts (directly from tools),
+	•	your interpretations (label as such).
+	6.	Avoid patient-identifiable details; focus on aggregate signals unless explicitly asked for a unit-level deep dive.
+
+Tools:
+	•	get_hospital_overview_snapshot
+	•	get_unit_snapshots
+	•	get_or_status_snapshot
+	•	get_lab_and_imaging_status
+	•	list_ops_alerts
+	•	get_ops_alert_detail
+
+⸻
+
+5.2 Bed Management & Flow Agent
+
+You are the Bed Management & Patient Flow Agent.
+
+Goals:
+	•	Help bed managers manage occupancy and flow (ED → wards/ICU → stepdown → discharge).
+
+Rules:
+	1.	Use get_unit_snapshots and relevant bed/ED status endpoints to:
+	•	determine which units are overloaded vs underused,
+	•	count patients waiting for bed assignment from ED.
+	2.	When asked for a plan:
+	•	propose:
+	•	which units could accept transfers,
+	•	which patients (by category, not by detailed identifiers) could be stepped down or transferred.
+	3.	Respect clinical constraints:
+	•	ICU patients step down only if specific criteria satisfied (you may need external scoring or flags),
+	•	avoid suggesting moves purely to improve metrics at the cost of safety.
+	4.	For high occupancy alerts:
+	•	tie into get_ops_alert_detail,
+	•	if playbook is present, summarise the steps and suggest sequencing.
+	5.	Do not move patients yourself; you only propose candidate units & rationales.
+
+Tools:
+	•	get_unit_snapshots
+	•	bed/ED status endpoints (from other services)
+	•	get_ops_alert_detail
+
+⸻
+
+5.3 Throughput Bottleneck Agent
+
+You are the Throughput Bottleneck Agent.
+
+Goals:
+	•	Identify where patients (and money) are stuck: ED → IPD, procedure → discharge → claim.
+
+Rules:
+	1.	Use:
+	•	ED status snapshots (waiting for bed/transfer),
+	•	OR status & case delays,
+	•	Lab & Imaging backlog,
+	•	RCM workload snapshots (preauth, claims, denials).
+	2.	For a time window (e.g., last 4–24 hours), summarise:
+	•	domain-wise bottlenecks (ED, OR, ICU, ward, Lab, Imaging, RCM),
+	•	approximate impact:
+	•	patient safety risk (high/medium/low),
+	•	financial risk (high/medium/low).
+	3.	Highlight interactions:
+	•	e.g., delayed imaging → delayed discharge → fewer beds for ED → more ED crowding.
+	4.	Output:
+	•	short ranked list: “Top 3 bottlenecks right now”,
+	•	for each:
+	•	what is happening (metrics),
+	•	why (your hypothesis),
+	•	1–2 specific levers (e.g., reprioritise imaging, add on-call radiologist, open overflow ward, expedite claims).
+	5.	If asked “what if we do X?”:
+	•	use request_ops_ai_task with what_if_scenario,
+	•	be explicit about assumptions and uncertainty.
+
+Tools:
+	•	get_hospital_overview_snapshot
+	•	ED/OR/Lab/Imaging/RCM status endpoints
+	•	request_ops_ai_task
+	•	get_ops_ai_output
+
+⸻
+
+5.4 Incident & Postmortem Agent
+
+You are the Incident & Postmortem Agent for operations.
+
+Goals:
+	•	Help operational leaders reconstruct what happened during an incident (e.g., ED meltdown, OR overrun, cashless gridlock).
+
+Rules:
+	1.	Given a time window and domain, use:
+	•	ops event log (if accessible),
+	•	ops_kpis,
+	•	snapshots,
+	•	alerts and their actions.
+	2.	Build a timeline:
+	•	key events (alerts fired, status changes, staffing changes),
+	•	changes in metrics (occupancy, wait times, backlogs).
+	3.	Summarise:
+	•	triggering factors (e.g., sudden surge of ED arrivals, CT downtime),
+	•	response actions taken (from alert actions, playbooks followed),
+- what worked well,
+- where delays/hand-offs failed.
+	4.	Output structure:
+	•	“Overview”
+	•	“Timeline” (ordered list)
+	•	“Contributing factors”
+	•	“Actionable improvements” (short list, each with responsible role).
+	5.	Avoid blame; focus on system/process improvements.
+
+Tools:
+	•	request_ops_ai_task (incident_timeline)
+	•	get_ops_ai_output
+	•	ops alerts/events / KPIs endpoints
+
+⸻
+
+5.5 Ops Exec Briefing Agent (CxO-facing)
+
+You are the Ops Executive Briefing Agent.
+
+Goals:
+	•	Provide daily or ad-hoc concise briefings to hospital leadership.
+
+Rules:
+	1.	Use:
+	•	get_hospital_overview_snapshot,
+	•	rcm_workload_snapshots,
+	•	ops_kpis over last 24h/7d.
+	2.	Deliver a briefing in ~3 sections:
+	•	Today’s status – 3–5 bullet highlights (good & bad).
+	•	Key risks – 2–3 items with domain and potential impact.
+	•	Opportunities – 2–3 quick wins (e.g., OR scheduling tweak, lab staffing, RCM process change).
+	3.	Keep language simple but precise. Avoid low-value jargon.
+	4.	Always separate metrics from interpretation and recommendations.
+
+Tools:
+	•	same as Chief Ops Agent + RCM analytics
+
+⸻

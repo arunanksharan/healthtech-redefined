@@ -1,0 +1,982 @@
+Alright Suri, spinning up Phase 7. Let’s turn imaging from “oh yeah we store PDFs of reports” into a first-class, AI-native diagnostics platform.
+
+I’ll treat this as:
+
+Phase 7 – Imaging, PACS & Diagnostics Platform
+
+With the same style as earlier phases:
+	1.	Scope & design goals
+	2.	Backend services
+	•	services list
+	•	DB schemas
+	•	endpoints
+	•	FHIR mappings
+	3.	Frontend routes & workflows
+	4.	LLM tools (for agents)
+	5.	System prompts for imaging agents
+
+Then in future messages we can do LIS/Path, Pharmacy, OR, RCM, etc. one by one in the same style.
+
+⸻
+
+1. Phase 7 – Scope & Design Goals
+
+1.1 What Phase 7 Adds
+
+On top of existing EHR/PRM:
+	•	Imaging Order → Acquisition → Reporting lifecycle:
+	•	Radiology, cardiology, ultrasound, CT, MR, interventional, etc.
+	•	PACS/VNA abstraction:
+	•	Studies, series, instances,
+	•	links to DICOM servers / cloud PACS / vendor-neutral archive.
+	•	Radiologist workflow:
+	•	Worklists (per modality/urgency/location),
+	•	Reporting with structured templates,
+	•	Addenda & critical alert workflows.
+	•	AI-native features:
+	•	AI triage (flag critical cases),
+	•	Pre-read suggestions or “report skeletons”,
+	•	Quality checks (wrong laterality, incomplete coverage, motion artifacts),
+	•	Comparison with priors.
+	•	Tight EHR + PRM integration:
+	•	Orders from OPD/IPD/ED,
+	•	Result delivery to clinicians & patients,
+	•	Automated patient comms (“Your MRI is scheduled…”, “Result is ready…”).
+
+1.2 Design Principles
+	•	PACS as a pluggable backend:
+	•	We don’t replace every hospital’s PACS.
+	•	We build a PACS connector & study spine that can talk to:
+	•	local DICOM PACS,
+	•	cloud PACS,
+	•	VNA.
+	•	FHIR-first:
+	•	Use ImagingStudy, DiagnosticReport, Observation, ServiceRequest.
+	•	AI-in-the-loop, not AI-in-charge:
+	•	All AI output = suggestions, never final diagnosis.
+	•	Radiologist always reviews & signs.
+	•	Cross-phase integration:
+	•	Feeds:
+	•	Phase 3 (clinical workflows & ICU),
+	•	Phase 4 (outcomes & QI),
+	•	Phase 6 (registries, trials, guideline CDS).
+
+⸻
+
+2. Backend – Services & Data Model
+
+New services:
+	1.	imaging-order-service
+	2.	pacs-connector-service
+	3.	radiology-worklist-service
+	4.	radiology-reporting-service
+	5.	imaging-ai-orchestrator-service
+
+We’ll assume we already have:
+	•	identity-service (patients, practitioners, orgs, locations),
+	•	orders-service / procedures-service (from earlier phases),
+	•	fhir-service (FHIR resources),
+	•	event bus.
+
+⸻
+
+2.1 imaging-order-service
+
+Responsible for:
+	•	Imaging request side:
+	•	Create & track imaging orders (ServiceRequest in FHIR).
+	•	Link to existing order catalog (CT Brain w/ contrast, etc.).
+	•	Status transitions: requested → scheduled → performed.
+
+2.1.1 DB Schema
+Tables:
+	•	imaging_modalities
+	•	imaging_procedures
+	•	imaging_orders
+
+imaging_modalities
+
+CREATE TABLE imaging_modalities (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'CR','CT','MR','US','DX','MG','XA','NM','PT'
+  name TEXT NOT NULL,
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_imaging_modality_code_tenant
+  ON imaging_modalities(tenant_id, code);
+
+imaging_procedures – imaging-specific procedure catalog.
+
+CREATE TABLE imaging_procedures (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'CT_BRAIN_WO_CONTRAST','US_ABD_COMPLETE'
+  name TEXT NOT NULL,                        -- human readable
+  description TEXT,
+  modality_id UUID NOT NULL REFERENCES imaging_modalities(id),
+  body_part TEXT,                            -- optional free text or coded
+  snomed_code TEXT,                          -- optional
+  loinc_code TEXT,                           -- optional for result mapping
+  default_duration_minutes INT,
+  preparation_instructions TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_imaging_procedure_code_tenant
+  ON imaging_procedures(tenant_id, code);
+
+imaging_orders
+
+CREATE TABLE imaging_orders (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  episode_id UUID REFERENCES episodes(id),
+  ordering_practitioner_id UUID REFERENCES practitioners(id),
+  ordering_department_id UUID REFERENCES departments(id),
+  imaging_procedure_id UUID NOT NULL REFERENCES imaging_procedures(id),
+  indication TEXT NOT NULL,
+  priority TEXT NOT NULL DEFAULT 'routine',  -- 'routine','urgent','stat'
+  status TEXT NOT NULL DEFAULT 'requested',  -- 'requested','scheduled','in_progress','completed','cancelled'
+  requested_at TIMESTAMPTZ NOT NULL,
+  scheduled_slot_id UUID,                    -- link to scheduling if present
+  performed_start_at TIMESTAMPTZ,
+  performed_end_at TIMESTAMPTZ,
+  fhir_service_request_id TEXT,              -- FHIR ServiceRequest.id
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_imaging_orders_patient
+  ON imaging_orders(patient_id, requested_at DESC);
+
+CREATE INDEX idx_imaging_orders_status
+  ON imaging_orders(status, priority, requested_at DESC);
+
+2.1.2 FHIR Mapping
+	•	imaging_procedures ↔ FHIR ServiceRequest.code (CodeableConcept).
+	•	imaging_orders ↔ FHIR ServiceRequest:
+	•	status (draft/active/completed/cancelled),
+	•	category = imaging,
+	•	intent = order,
+	•	reasonCode or reasonReference = indication,
+	•	subject = patient.
+
+2.1.3 Endpoints
+Base: /api/v1/imaging-orders
+	•	POST /
+	•	request body: patient, encounter, procedure_code, indication, priority.
+	•	GET /?patient_id=&status=&modality_code=&priority=&from=&to=
+	•	GET /{id}
+	•	PATCH /{id}
+	•	update status (cancel, etc.), link scheduling info.
+
+⸻
+
+2.2 pacs-connector-service
+
+Responsible for:
+	•	Integration with PACS/VNA & DICOM world.
+	•	Study metadata (not pixel storage itself, but links & identifiers).
+	•	Mapping between imaging orders and ImagingStudy.
+
+2.2.1 DB Schema
+Tables:
+	•	pacs_endpoints
+	•	imaging_studies
+	•	imaging_series
+	•	imaging_instances
+
+pacs_endpoints
+
+CREATE TABLE pacs_endpoints (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                       -- 'MAIN_PACS','CLOUD_PACS'
+  name TEXT NOT NULL,
+  description TEXT,
+  ae_title TEXT,                            -- DICOM AE title
+  host TEXT,
+  port INT,
+  protocol TEXT NOT NULL,                   -- 'DICOM','DICOMWeb','WADO_RS'
+  auth_config JSONB,                        -- tokens, basic auth, etc.
+  viewer_launch_url TEXT,                   -- template URL for embedding viewer
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_pacs_endpoint_code_tenant
+  ON pacs_endpoints(tenant_id, code);
+
+imaging_studies
+
+CREATE TABLE imaging_studies (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  imaging_order_id UUID REFERENCES imaging_orders(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  pacs_endpoint_id UUID NOT NULL REFERENCES pacs_endpoints(id),
+  study_instance_uid TEXT NOT NULL,
+  accession_number TEXT,
+  modality_code TEXT NOT NULL,              -- 'CT','MR','US', etc.
+  description TEXT,
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ,
+  number_of_series INT,
+  number_of_instances INT,
+  fhir_imaging_study_id TEXT,
+  viewer_url TEXT,                          -- pre-built URL with token
+  status TEXT NOT NULL DEFAULT 'available', -- 'available','archived','unavailable'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_imaging_study_uid_tenant
+  ON imaging_studies(tenant_id, study_instance_uid);
+
+CREATE INDEX idx_imaging_studies_patient
+  ON imaging_studies(patient_id, started_at DESC);
+
+imaging_series
+
+CREATE TABLE imaging_series (
+  id UUID PRIMARY KEY,
+  imaging_study_id UUID NOT NULL REFERENCES imaging_studies(id) ON DELETE CASCADE,
+  series_instance_uid TEXT NOT NULL,
+  series_number INT,
+  body_part TEXT,
+  modality_code TEXT,
+  number_of_instances INT,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_imaging_series_uid
+  ON imaging_series(imaging_study_id, series_instance_uid);
+
+imaging_instances
+
+We usually don’t need full row-per-instance, but for completeness:
+
+CREATE TABLE imaging_instances (
+  id UUID PRIMARY KEY,
+  imaging_series_id UUID NOT NULL REFERENCES imaging_series(id) ON DELETE CASCADE,
+  sop_instance_uid TEXT NOT NULL,
+  instance_number INT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_imaging_instance_uid
+  ON imaging_instances(imaging_series_id, sop_instance_uid);
+
+2.2.2 FHIR Mapping
+	•	imaging_studies ↔ FHIR ImagingStudy with:
+	•	identifier (StudyInstanceUID, Accession),
+	•	series & instance bits.
+	•	Links to:
+	•	basedOn → ServiceRequest (imaging order),
+	•	subject → patient.
+
+2.2.3 Endpoints
+Base: /api/v1/pacs
+
+Endpoints
+	•	POST /studies/sync
+	•	For PACS integration to push new studies (webhook) or for polling tasks to upsert:
+	•	study_instance_uid, patient, modality, accession, etc.
+	•	GET /studies?patient_id=&modality_code=&from=&to=
+	•	GET /studies/{id}
+	•	GET /studies/{id}/viewer-launch
+	•	returns viewer_url with signed token (single-use or time-bound).
+
+⸻
+
+2.3 radiology-worklist-service
+
+Responsible for:
+	•	Worklist generation & assignment.
+	•	Radiologist workload balancing.
+
+2.3.1 DB Schema
+Tables:
+	•	radiology_reading_profiles
+	•	radiology_worklist_items
+
+radiology_reading_profiles
+
+CREATE TABLE radiology_reading_profiles (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  practitioner_id UUID NOT NULL REFERENCES practitioners(id),
+  allowed_modalities TEXT[],          -- e.g. ['CT','MR','US']
+  allowed_body_parts TEXT[],          -- e.g. ['BRAIN','CHEST']
+  max_concurrent_cases INT DEFAULT 5,
+  reading_locations TEXT[],           -- e.g. ['MAIN_RAD_DEPT','REMOTE']
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_radiology_reading_profile
+  ON radiology_reading_profiles(tenant_id, practitioner_id);
+
+radiology_worklist_items
+
+CREATE TABLE radiology_worklist_items (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  imaging_study_id UUID NOT NULL REFERENCES imaging_studies(id),
+  imaging_order_id UUID REFERENCES imaging_orders(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  modality_code TEXT NOT NULL,
+  body_part TEXT,
+  priority TEXT NOT NULL,                 -- 'routine','urgent','stat'
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending','claimed','in_progress','reported'
+  assigned_radiologist_id UUID REFERENCES practitioners(id),
+  claimed_at TIMESTAMPTZ,
+  last_activity_at TIMESTAMPTZ,
+  ai_triage_score NUMERIC,                -- e.g. probability of critical finding
+  ai_triage_flags JSONB,                  -- e.g. ['ICH_suspected','PE_suspected']
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_radiology_worklist_status_priority
+  ON radiology_worklist_items(status, priority, created_at);
+
+CREATE INDEX idx_radiology_worklist_assigned
+  ON radiology_worklist_items(assigned_radiologist_id, status);
+
+2.3.2 Endpoints
+Base: /api/v1/radiology-worklist
+	•	GET /items?modality=&body_part=&status=&priority=&assigned=me
+	•	returns list for logged-in radiologist.
+	•	POST /items/{id}/claim
+	•	assign to current user if unclaimed.
+	•	POST /items/{id}/release
+	•	unassign and put back to pool.
+	•	PATCH /items/{id}
+	•	update status to in_progress / reported.
+
+Worklist is updated whenever:
+	•	new imaging_study created,
+	•	imaging_order enters “completed” (i.e., images ready),
+	•	AI triage updates ai_triage_score.
+
+⸻
+
+2.4 radiology-reporting-service
+
+Responsible for:
+	•	Drafting, editing, signing reports.
+	•	Structured reporting templates.
+	•	Addenda.
+	•	Linking to ImagingStudy & EHR.
+
+2.4.1 DB Schema
+Tables:
+	•	radiology_report_templates
+	•	radiology_reports
+	•	radiology_report_sections
+	•	radiology_report_addenda
+
+radiology_report_templates
+
+CREATE TABLE radiology_report_templates (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                       -- 'CT_HEAD_STROKE','US_ABD_GENERAL'
+  name TEXT NOT NULL,
+  modality_code TEXT,
+  body_part TEXT,
+  description TEXT,
+  template_type TEXT NOT NULL,              -- 'free_text','structured','hybrid'
+  schema JSONB,                             -- for structured fields
+  default_text TEXT,                        -- base narrative template
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_radiology_report_template_code
+  ON radiology_report_templates(tenant_id, code);
+
+radiology_reports
+
+CREATE TABLE radiology_reports (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  imaging_study_id UUID NOT NULL REFERENCES imaging_studies(id),
+  imaging_order_id UUID REFERENCES imaging_orders(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  radiologist_id UUID REFERENCES practitioners(id),
+  template_id UUID REFERENCES radiology_report_templates(id),
+  status TEXT NOT NULL DEFAULT 'draft',      -- 'draft','preliminary','final','corrected','cancelled'
+  clinical_history TEXT,
+  technique TEXT,
+  findings TEXT,
+  impression TEXT,
+  structured_data JSONB,                     -- for structured findings (e.g. BI-RADS)
+  ai_assist_summary JSONB,                   -- AI suggestions used in draft
+  critical_result BOOLEAN DEFAULT FALSE,
+  critical_communication_logged BOOLEAN DEFAULT FALSE,
+  critical_communication_details TEXT,
+  signed_at TIMESTAMPTZ,
+  signed_by_radiologist_id UUID,
+  fhir_diagnostic_report_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_radiology_reports_patient
+  ON radiology_reports(patient_id, created_at DESC);
+
+CREATE INDEX idx_radiology_reports_study
+  ON radiology_reports(imaging_study_id);
+
+radiology_report_sections (optional, for more granular editing)
+
+CREATE TABLE radiology_report_sections (
+  id UUID PRIMARY KEY,
+  radiology_report_id UUID NOT NULL REFERENCES radiology_reports(id) ON DELETE CASCADE,
+  section_code TEXT NOT NULL,                -- 'FINDINGS','IMPRESSION','TECHNIQUE'
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+radiology_report_addenda
+
+CREATE TABLE radiology_report_addenda (
+  id UUID PRIMARY KEY,
+  radiology_report_id UUID NOT NULL REFERENCES radiology_reports(id) ON DELETE CASCADE,
+  added_by_radiologist_id UUID REFERENCES practitioners(id),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.4.2 FHIR Mapping
+	•	radiology_reports ↔ FHIR DiagnosticReport:
+	•	category = imaging,
+	•	status (preliminary/final/corrected),
+	•	code = imaging procedure,
+	•	imagingStudy reference,
+	•	conclusion = impression,
+	•	conclusionCode / result referencing Observations if structured.
+	•	Additional Observations (e.g., size of lesion, stroke scores) stored separately.
+
+2.4.3 Endpoints
+Base: /api/v1/radiology-reports
+	•	POST /
+	•	create draft:
+	•	imaging_study_id,
+	•	template selection,
+	•	prefilled with clinical history & AI suggestions if available.
+	•	GET /{id}
+	•	PATCH /{id}
+	•	save edits (findings, impression, structured_data).
+	•	POST /{id}/sign
+	•	mark as final/preliminary, generate FHIR DiagnosticReport.
+	•	POST /{id}/addenda
+	•	GET /{id}/addenda
+
+⸻
+
+2.5 imaging-ai-orchestrator-service
+
+Responsible for:
+	•	Orchestrating AI workflows on imaging:
+	•	triage,
+	•	quality checks,
+	•	lesion detection,
+	•	comparison with priors,
+	•	report-skeleton generation.
+
+2.5.1 DB Schema
+Tables:
+	•	imaging_ai_models
+	•	imaging_ai_tasks
+	•	imaging_ai_outputs
+
+imaging_ai_models
+
+CREATE TABLE imaging_ai_models (
+  id UUID PRIMARY KEY,
+  tenant_id UUID,
+  code TEXT NOT NULL,                     -- 'CT_HEAD_ICH_TRIAGE','CXR_PNEUMONIA_DET'
+  name TEXT NOT NULL,
+  description TEXT,
+  modality_code TEXT,
+  body_part TEXT,
+  capabilities JSONB,                     -- e.g. { "triage": true, "segmentation": false }
+  vendor TEXT,
+  version TEXT,
+  endpoint_config JSONB,                  -- inference endpoint details
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_imaging_ai_model_code
+  ON imaging_ai_models(code);
+
+imaging_ai_tasks
+
+CREATE TABLE imaging_ai_tasks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  imaging_study_id UUID NOT NULL REFERENCES imaging_studies(id),
+  ai_model_id UUID NOT NULL REFERENCES imaging_ai_models(id),
+  task_type TEXT NOT NULL,                -- 'triage','quality','pre_report','comparison'
+  status TEXT NOT NULL DEFAULT 'queued',  -- 'queued','running','completed','failed'
+  requested_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_imaging_ai_tasks_study
+  ON imaging_ai_tasks(imaging_study_id, task_type);
+
+imaging_ai_outputs
+
+CREATE TABLE imaging_ai_outputs (
+  id UUID PRIMARY KEY,
+  imaging_ai_task_id UUID NOT NULL REFERENCES imaging_ai_tasks(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,             -- 'triage','finding_list','bbox','suggested_report'
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.5.2 How it integrates
+	•	On new imaging_studies:
+	•	create one or more imaging_ai_tasks based on modality & rules.
+	•	When triage result comes back:
+	•	update radiology_worklist_items.ai_triage_score & flags.
+	•	When pre-report suggestion is ready:
+	•	attach to radiology_reports.ai_assist_summary for the radiologist to review.
+
+No FHIR direct mapping here; it influences DiagnosticReport & Observations.
+
+⸻
+
+3. Frontend – Imaging Workflows
+
+We add:
+	•	Radiology worklist views, reporting UI, imaging timeline in chart, and viewer launcher.
+
+3.1 Routes
+	•	/imaging/orders
+	•	/imaging/orders/new
+	•	/imaging/studies
+	•	/imaging/studies/[studyId]
+	•	/radiology/worklist
+	•	/radiology/reports/[reportId]
+
+Plus embed imaging in:
+	•	/patient/[patientId]/imaging (chart tab).
+
+3.2 Key Screens
+
+1. Imaging Order Entry (clinician)
+
+Route: /imaging/orders/new?patientId=...
+
+Flow:
+	1.	Select patient (pre-populated).
+	2.	Select visit/encounter.
+	3.	Select imaging procedure (modality + body part).
+	4.	Enter indication + priority.
+	5.	See prep instructions & any contrast warnings (from allergies / renal function).
+	6.	Submit → POST /api/v1/imaging-orders.
+
+2. Radiology Worklist (radiologist)
+
+Route: /radiology/worklist
+	•	Table with:
+	•	patient initials / ID,
+	•	modality,
+	•	study description,
+	•	priority,
+	•	location,
+	•	AI triage badges (“ICH?”, “PE?”).
+	•	Filters: modality, body part, location, priority, assigned/unassigned.
+
+Actions:
+	•	Claim case → POST /radiology-worklist/items/{id}/claim.
+	•	Open viewer via GET /pacs/studies/{id}/viewer-launch.
+	•	Open report editor /radiology/reports/[reportId] (create if absent).
+
+3. Report Editor
+
+Route: /radiology/reports/[reportId]
+
+Layout:
+	•	Left: small patient + prior imaging summary.
+	•	Center:
+	•	Sections:
+	•	history, technique, findings, impression.
+	•	AI suggestions panel with:
+	•	triage flags,
+	•	pre-drafted impression,
+	•	box of “possible key phrases”.
+	•	Right: prior reports list + quick compare.
+
+Actions:
+	•	Save draft.
+	•	View AI suggestions (accept/reject into text).
+	•	Sign as preliminary/final.
+
+4. Patient Imaging Timeline
+
+Route: /patient/[patientId]/imaging
+	•	Timeline of imaging studies:
+	•	date, modality, body region, key conclusion.
+	•	Each item opens:
+	•	report summary,
+	•	viewer launcher.
+
+⸻
+
+4. LLM Tools for Imaging Agents
+
+We define concrete tools with schemas.
+
+4.1 Imaging Order Helper Tools
+
+Tool: list_imaging_procedures
+
+{
+  "name": "list_imaging_procedures",
+  "description": "List available imaging procedures for the tenant, optionally filtered by modality or body part.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "modality_code": { "type": "string" },
+      "body_part": { "type": "string" },
+      "search_text": { "type": "string" }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "procedures": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "code": { "type": "string" },
+            "name": { "type": "string" },
+            "modality_code": { "type": "string" },
+            "body_part": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps to: GET /imaging-procedures.
+
+⸻
+
+Tool: create_imaging_order
+
+{
+  "name": "create_imaging_order",
+  "description": "Create an imaging order for a patient with indication and priority.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "imaging_procedure_id": { "type": "string" },
+      "indication": { "type": "string" },
+      "priority": {
+        "type": "string",
+        "enum": ["routine", "urgent", "stat"],
+        "default": "routine"
+      }
+    },
+    "required": ["patient_id", "imaging_procedure_id", "indication"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "imaging_order_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to: POST /imaging-orders.
+
+⸻
+
+4.2 Radiology Worklist & Report Tools
+
+Tool: fetch_radiology_worklist
+
+{
+  "name": "fetch_radiology_worklist",
+  "description": "Fetch radiology worklist items for the current radiologist with optional filters.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "modality_code": { "type": "string" },
+      "status": { "type": "string" },
+      "priority": { "type": "string" },
+      "assigned_to_me": { "type": "boolean", "default": true }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "worklist_item_id": { "type": "string" },
+            "imaging_study_id": { "type": "string" },
+            "patient_id": { "type": "string" },
+            "modality_code": { "type": "string" },
+            "body_part": { "type": "string" },
+            "priority": { "type": "string" },
+            "status": { "type": "string" },
+            "ai_triage_score": { "type": "number" },
+            "ai_triage_flags": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+Tool: create_or_update_radiology_report
+
+{
+  "name": "create_or_update_radiology_report",
+  "description": "Create or update a radiology report for a given imaging study.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "imaging_study_id": { "type": "string" },
+      "radiology_report_id": { "type": "string" },
+      "findings": { "type": "string" },
+      "impression": { "type": "string" },
+      "structured_data": { "type": "object" }
+    },
+    "required": ["imaging_study_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "radiology_report_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to: POST /radiology-reports or PATCH /radiology-reports/{id} depending on input.
+
+⸻
+
+Tool: sign_radiology_report
+
+{
+  "name": "sign_radiology_report",
+  "description": "Mark a radiology report as signed (preliminary or final).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "radiology_report_id": { "type": "string" },
+      "final": { "type": "boolean", "default": true }
+    },
+    "required": ["radiology_report_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "radiology_report_id": { "type": "string" },
+      "status": { "type": "string" },
+      "signed_at": { "type": "string", "format": "date-time" }
+    }
+  }
+}
+
+
+⸻
+
+4.3 Imaging AI Tools
+
+Tool: request_imaging_ai_analysis
+
+{
+  "name": "request_imaging_ai_analysis",
+  "description": "Request AI analysis for an imaging study (triage, quality, or pre-report suggestions).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "imaging_study_id": { "type": "string" },
+      "task_type": {
+        "type": "string",
+        "enum": ["triage", "quality", "pre_report", "comparison"]
+      },
+      "model_code": { "type": "string" }
+    },
+    "required": ["imaging_study_id", "task_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "imaging_ai_task_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: get_imaging_ai_output
+
+{
+  "name": "get_imaging_ai_output",
+  "description": "Fetch AI analysis output for a specific imaging AI task.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "imaging_ai_task_id": { "type": "string" }
+    },
+    "required": ["imaging_ai_task_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "outputs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "output_type": { "type": "string" },
+            "payload": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}
+
+The LLM can then:
+	•	Convert triage output into:
+	•	updates on worklist item,
+	•	comments in AI assist panel.
+	•	Convert pre_report suggestion into draft narrative, but always keep it editable.
+
+⸻
+
+5. System Prompts for Imaging Agents
+
+5.1 Imaging Order Support Agent (for clinicians)
+
+You are the Imaging Order Support Agent.
+
+Goals:
+	•	Help clinicians order appropriate imaging studies.
+	•	Reduce unnecessary or duplicate imaging while ensuring they get the right exam.
+
+Rules:
+	1.	When a clinician asks whether to order an imaging study:
+	•	summarise the clinical question in 1–2 lines,
+	•	suggest 1–3 appropriate procedures (modality + region) using list_imaging_procedures,
+	•	explicitly call out if guidelines suggest imaging vs conservative management.
+	2.	Before calling create_imaging_order:
+	•	check for recent relevant imaging for this patient:
+	•	same modality & region within a clinically reasonable window.
+	•	if recent imaging exists, surface this and ask whether they still want a repeat.
+	3.	When creating an order:
+	•	ensure indication is specific and answerable (e.g., “rule out PE” instead of just “chest pain”),
+	•	set priority to urgent or stat only if the description clearly indicates it.
+	4.	Never make the final call; always phrase your suggestions as “recommended options” and ask the clinician to choose.
+
+Tools:
+	•	list_imaging_procedures
+	•	create_imaging_order
+
+⸻
+
+5.2 Radiology Co-Pilot Agent
+
+You are the Radiology Co-Pilot Agent.
+
+Goals:
+	•	Help radiologists manage their worklist and draft reports faster, without ever replacing their judgement.
+
+Rules:
+	1.	Use fetch_radiology_worklist to show the radiologist:
+	•	a prioritised list of unread studies,
+	•	AI triage flags when available.
+	2.	For each case:
+	•	pull clinical context from the EHR (history, prior imaging, labs),
+	•	summarise the relevant context in 2–3 bullet points.
+	3.	When asked to “draft a report”:
+	•	use AI outputs if present (triage, findings) as suggestions,
+	•	construct a well-structured draft with clearly separated:
+	•	technique,
+	•	findings,
+	•	impression,
+	•	be conservative and avoid over-certain language.
+	4.	Update the report via create_or_update_radiology_report, but:
+	•	never auto-sign; always leave final acceptance and signing to the radiologist.
+	5.	When the radiologist confirms the final text:
+	•	call sign_radiology_report with final=true if they say it’s final.
+	6.	Always keep a clear boundary:
+	•	“This is a suggested draft; please review and edit as you see fit.”
+
+Tools:
+	•	fetch_radiology_worklist
+	•	create_or_update_radiology_report
+	•	sign_radiology_report
+	•	request_imaging_ai_analysis
+	•	get_imaging_ai_output
+
+⸻
+
+5.3 Imaging Patient Explainer Agent
+
+You are the Imaging Patient Explainer Agent.
+
+Goals:
+	•	Translate imaging results into clear, non-alarming explanations for patients.
+
+Rules:
+	1.	You must base your explanation on the signed radiology report, not on raw AI output.
+	2.	When explaining:
+	•	avoid medical jargon where possible,
+	•	use analogies sparingly and carefully,
+	•	distinguish between:
+	•	definite findings,
+	•	uncertainties,
+	•	recommendations for follow-up.
+	3.	Always encourage the patient to discuss the report with their treating doctor:
+	•	“This explanation does not replace your doctor’s advice.”
+	4.	If a finding is potentially serious:
+	•	stay calm and factual,
+	•	emphasise follow-up steps, not probabilities of doom.
+
+Tools:
+	•	read-only wrappers around /radiology-reports & /imaging-studies (no creation tools)
+
+⸻

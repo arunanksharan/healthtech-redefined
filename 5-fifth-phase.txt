@@ -1,0 +1,1234 @@
+Short answer: we started with 4 phases, but there’s no hard upper limit. So far we’ve fully specced:
+	•	Phase 1 – Core kernel (identity, FHIR spine, tenants, auth, events)
+	•	Phase 2 – Agentic PRM + OPD
+	•	Phase 3 – IPD + nursing + orders + ICU
+	•	Phase 4 – Outcomes, risk, QI, analytics, voice/collab, governance
+
+Now I’ll define Phase 5 (next phase) in the same excruciating detail.
+
+⸻
+
+Phase 5 – Open Ecosystem, Remote Care & Network Protocol
+
+Theme:
+Turn the single-hospital OS into an open, networked health platform:
+	•	Multi-hospital / multi-clinic referrals & network flows
+	•	Interoperability gateway for external EHRs (Athma, Epic, Cerner, etc.)
+	•	Remote / home monitoring for chronic disease & post-discharge
+	•	App & Agent Marketplace so third parties can safely plug into the platform
+	•	Cross-org consent orchestration & data-sharing policies
+
+Same pattern:
+	1.	Phase 5 scope & success criteria
+	2.	Backend modules (DB schema, endpoints, FHIR mapping)
+	•	interoperability-gateway-service
+	•	referral-network-service
+	•	remote-monitoring-service
+	•	app-marketplace-service
+	•	consent-orchestration-service
+	3.	Frontend routes / portals
+	4.	LLM tools for network, referrals, remote monitoring, ecosystem governance
+	5.	System prompts for Phase 5 agents
+
+⸻
+
+1. Phase 5 Scope & Success Criteria
+
+1.1 Scope
+
+On top of Phases 1–4, Phase 5 adds:
+	1.	Interoperability Gateway
+	•	Endpoint to receive/send FHIR/HL7 messages from/to external HIS/EHRs.
+	•	Mapping layer between internal data model and external partner profiles.
+	2.	Referral Network
+	•	Canonical referral objects spanning multiple organizations.
+	•	Structured handoff workflows (OPD → specialist → tertiary centre, etc.).
+	•	Status tracking across org boundary.
+	3.	Remote / Home Monitoring
+	•	Device / wearable feeds (BP cuffs, glucometers, oximeters, scales, CGMs).
+	•	Threshold/AI based triage to nursing/clinical tasks.
+	•	Longitudinal patient-at-home episodes.
+	4.	App & Agent Marketplace
+	•	Register 3rd-party apps/agents.
+	•	Scopes & permissions (which tools / which FHIR scopes).
+	•	Usage + billing hooks.
+	5.	Consent Orchestration
+	•	Granular, cross-org consents for data sharing and agent access.
+	•	Consent registry with audit & expiry.
+
+1.2 Success Criteria
+
+After Phase 5:
+	•	The platform can participate in a multi-hospital network:
+	•	receive referrals, send referrals, track their lifecycle.
+	•	exchange core clinical docs (FHIR bundles).
+	•	High-risk cohorts can be managed partly at home:
+	•	devices stream data in,
+	•	anomalies and deteriorations raise tasks/alerts in the same OS.
+	•	Third-party apps/agents can plug in safely:
+	•	explicit scopes,
+	•	consent records,
+	•	audited usage.
+	•	A patient can explicitly see and manage:
+	•	which orgs/apps/agents have access to what data and for how long.
+
+⸻
+
+2. Backend Modules (Phase 5)
+
+Overview
+
+New services:
+	1.	interoperability-gateway-service
+	2.	referral-network-service
+	3.	remote-monitoring-service
+	4.	app-marketplace-service
+	5.	consent-orchestration-service
+
+All plugged into existing:
+	•	identity-service (patients, orgs)
+	•	fhir-service (canonical clinical data)
+	•	event bus / event-log
+	•	governance-audit-service
+
+⸻
+
+2.1 interoperability-gateway-service
+
+Responsibility:
+	•	Edge service for external integrations:
+	•	FHIR REST (R4/R5)
+	•	HL7v2 (via adapters)
+	•	custom XML/JSON partner APIs.
+	•	Protocol normalization:
+	•	convert external payload → internal FHIR profile / events
+	•	internal events → partner-specific FHIR/HL7.
+
+2.1.1 DB Schema
+Tables:
+	•	external_systems
+	•	interop_channels
+	•	interop_message_log
+	•	mapping_profiles (optional but powerful)
+
+external_systems
+
+CREATE TABLE external_systems (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                -- 'NARAYANA_ATHMA','APOLLO_EPIC'
+  name TEXT NOT NULL,
+  system_type TEXT NOT NULL,         -- 'EHR','LIS','RIS','PAYER','APP'
+  base_url TEXT,
+  auth_type TEXT,                    -- 'basic','oauth2','mutual_tls','api_key'
+  auth_config JSONB,                 -- client_id, secrets, cert fingerprints, etc.
+  fhir_capability JSONB,             -- summary of supported resources/operations
+  hl7v2_capability JSONB,            -- supported message types
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_external_system_code_tenant ON external_systems (tenant_id, code);
+
+interop_channels
+
+Represents a configured integration channel (e.g., FHIR push, HL7 ORU feed).
+
+CREATE TABLE interop_channels (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  external_system_id UUID NOT NULL REFERENCES external_systems(id),
+  channel_type TEXT NOT NULL,         -- 'FHIR_REST','HL7V2_TCP','WEBHOOK','SFTP_DROP'
+  direction TEXT NOT NULL,            -- 'inbound','outbound','bidirectional'
+  resource_scope JSONB NOT NULL,      -- e.g., { "fhir_resources": ["Patient","Encounter","Observation"] }
+  mapping_profile_id UUID,            -- FK to mapping_profiles
+  is_active BOOLEAN DEFAULT TRUE,
+  config JSONB,                       -- endpoint URLs, ports, file paths
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_interop_channels_system ON interop_channels (external_system_id, direction);
+
+mapping_profiles
+
+CREATE TABLE mapping_profiles (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  direction TEXT NOT NULL,           -- 'external_to_internal','internal_to_external'
+  format TEXT NOT NULL,              -- 'FHIR_R4','HL7V2','CUSTOM_JSON'
+  resource_type TEXT,                -- 'Patient','Observation','ADT_A01'
+  mapping_rules JSONB NOT NULL,      -- e.g. JSON-based mapping DSL
+  version TEXT NOT NULL DEFAULT 'v1',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_mapping_profiles_type ON mapping_profiles (resource_type, direction);
+
+interop_message_log
+
+CREATE TABLE interop_message_log (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  channel_id UUID NOT NULL REFERENCES interop_channels(id),
+  external_system_id UUID NOT NULL REFERENCES external_systems(id),
+  direction TEXT NOT NULL,               -- 'inbound','outbound'
+  message_type TEXT,                     -- 'FHIR.Patient','HL7.ADT_A01'
+  correlation_id TEXT,                   -- for matching req/resp/acks
+  raw_payload TEXT,                      -- optionally truncated/redacted
+  mapped_resource_type TEXT,             -- internal FHIR resource if applicable
+  mapped_resource_id TEXT,               -- fhir_resources.id or local ID
+  status TEXT NOT NULL,                  -- 'received','parsed','mapped','failed','sent','acknowledged'
+  status_detail TEXT,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_interop_message_log_channel_time ON interop_message_log (channel_id, occurred_at DESC);
+
+2.1.2 Endpoints
+Base: /api/v1/interop
+
+External systems
+	•	POST /external-systems
+	•	GET /external-systems
+	•	GET /external-systems/{id}
+	•	PATCH /external-systems/{id}
+
+Channels
+	•	POST /channels
+	•	GET /channels?external_system_id=&direction=&active=
+	•	PATCH /channels/{id}
+
+Message logs
+	•	GET /messages?channel_id=&direction=&status=&from=&to=
+
+Inbound endpoints
+	•	POST /fhir/{tenantCode}/{resourceType}
+	•	Accepts external FHIR resources.
+	•	Identify external_system by auth header / base URL mapping.
+	•	Use mapping_profile to translate into internal FHIR & events.
+	•	POST /hl7/{tenantCode}
+	•	Accept HL7 v2 messages through HTTP (for non-socket use).
+
+Outbound sending is triggered by events (e.g., Encounter.Created → push to EPIC via FHIR).
+
+2.1.3 FHIR Mapping
+	•	Gateway acts as a translator:
+	•	external FHIR profile → internal canonical FHIR + events into platform.
+	•	internal FHIR → partner-specific FHIR or HL7.
+
+Mapping rules live in mapping_profiles.mapping_rules.
+
+⸻
+
+2.2 referral-network-service
+
+Responsibility:
+	•	Canonical definition of referrals:
+	•	from one org/doctor to another (internal or external).
+	•	Track status & documents shared.
+	•	Support network-level routing: “best partner for this speciality/service.”
+
+2.2.1 DB Schema
+Tables:
+	•	network_organizations (if not already — external orgs)
+	•	referrals
+	•	referral_documents
+
+network_organizations
+
+We may already have tenant for our own org; this table captures network partners.
+
+CREATE TABLE network_organizations (
+  id UUID PRIMARY KEY,
+  code TEXT NOT NULL,                  -- 'NH_BANGALORE_001','APOLLO_BLK'
+  name TEXT NOT NULL,
+  org_type TEXT NOT NULL,              -- 'HOSPITAL','CLINIC','LAB','IMAGING_CENTER','HOME_CARE'
+  country TEXT,
+  region TEXT,
+  contact_info JSONB,
+  interop_system_id UUID,              -- FK to external_systems (for direct push)
+  is_internal BOOLEAN NOT NULL DEFAULT FALSE, -- part of same tenant group
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_network_org_code ON network_organizations (code);
+
+referrals
+
+CREATE TABLE referrals (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,              -- source tenant
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  source_org_id UUID NOT NULL REFERENCES network_organizations(id), -- usually local
+  target_org_id UUID NOT NULL REFERENCES network_organizations(id),
+  source_practitioner_id UUID,          -- doctor initiating
+  target_practitioner_id TEXT,          -- identifier for target doctor (optional; external)
+  referral_type TEXT NOT NULL,          -- 'OPD','IPD_TRANSFER','DAY_CARE','HOME_CARE'
+  service_line TEXT,                    -- 'CARDIOLOGY','ONCOLOGY'
+  reason TEXT NOT NULL,
+  priority TEXT DEFAULT 'routine',      -- 'routine','urgent','emergent'
+  status TEXT NOT NULL DEFAULT 'draft', -- 'draft','sent','accepted','rejected','completed','cancelled'
+  requested_at TIMESTAMPTZ NOT NULL,
+  responded_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  source_episode_id UUID REFERENCES episodes(id),
+  source_encounter_id UUID REFERENCES encounters(id),
+  source_admission_id UUID REFERENCES admissions(id),
+  target_episode_identifier TEXT,       -- identifier used by target org
+  fhir_service_request_id TEXT,         -- FHIR ServiceRequest for referral
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_referrals_patient ON referrals (patient_id, requested_at DESC);
+CREATE INDEX idx_referrals_status ON referrals (status, priority, requested_at DESC);
+
+referral_documents
+
+CREATE TABLE referral_documents (
+  id UUID PRIMARY KEY,
+  referral_id UUID NOT NULL REFERENCES referrals(id) ON DELETE CASCADE,
+  doc_type TEXT NOT NULL,               -- 'summary','imaging','lab','other'
+  fhir_document_reference_id TEXT,      -- FHIR DocumentReference.id
+  external_link TEXT,                   -- if stored externally
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.2.2 FHIR Mapping
+	•	referrals → FHIR ServiceRequest (for referral) and possibly CommunicationRequest.
+	•	referral_documents → FHIR DocumentReference (with attachments or references to other resources e.g., Composition).
+
+2.2.3 Endpoints
+Base: /api/v1/referrals
+	•	POST /
+	•	Create referral:
+	•	patient_id, source_org_id, target_org_id, service_line, reason, priority, links to episodes/encounters/admissions.
+	•	Creates FHIR ServiceRequest.
+	•	GET /{id}
+	•	GET /?patient_id=&status=&target_org_id=&service_line=&priority=
+	•	POST /{id}/send
+	•	Mark as sent, push to target via interoperability-gateway if configured.
+	•	POST /{id}/accept
+	•	Mark accepted, set responded_at.
+	•	Optionally create local EpisodeOfCare/Encounter if we are target org.
+	•	POST /{id}/reject
+	•	POST /{id}/complete
+	•	When target org completes referral.
+	•	POST /{id}/documents
+	•	Attach summary / imaging / labs.
+
+2.2.4 Events
+	•	Referral.Created
+	•	Referral.Sent
+	•	Referral.Accepted
+	•	Referral.Rejected
+	•	Referral.Completed
+
+These can drive PRM & QI (“referrals completed within X days”, etc.)
+
+⸻
+
+2.3 remote-monitoring-service
+
+Responsibility:
+	•	Register remote devices & measurement types.
+	•	Ingest device data (from vendors/clouds).
+	•	Map to FHIR Observations.
+	•	Trigger alerts & tasks via nursing-service / icu-service.
+
+2.3.1 DB Schema
+Tables:
+	•	remote_devices
+	•	device_bindings
+	•	remote_measurements
+	•	remote_alerts
+
+remote_devices
+
+CREATE TABLE remote_devices (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  device_type TEXT NOT NULL,            -- 'BP_CUFF','GLUCOMETER','SCALE','PULSE_OX','ECG','CGM'
+  manufacturer TEXT,
+  model TEXT,
+  serial_number TEXT,
+  vendor_system_id UUID,                -- FK to external_systems (device cloud)
+  meta JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_remote_devices_type ON remote_devices (device_type);
+
+device_bindings
+
+Link device ↔ patient & context.
+
+CREATE TABLE device_bindings (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  remote_device_id UUID NOT NULL REFERENCES remote_devices(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  binding_status TEXT NOT NULL DEFAULT 'active', -- 'active','paused','ended'
+  bound_at TIMESTAMPTZ NOT NULL,
+  unbound_at TIMESTAMPTZ,
+  care_program_code TEXT,                        -- e.g. 'HF_HOME_MONITORING','DM2_REMOTE'
+  home_address JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_device_bindings_patient ON device_bindings (patient_id, binding_status);
+
+remote_measurements
+
+CREATE TABLE remote_measurements (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  device_binding_id UUID NOT NULL REFERENCES device_bindings(id),
+  remote_device_id UUID NOT NULL REFERENCES remote_devices(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  measurement_type TEXT NOT NULL,         -- 'BP','GLUCOSE','WEIGHT','SPO2','HR','STEP_COUNT'
+  measured_at TIMESTAMPTZ NOT NULL,
+  payload JSONB NOT NULL,                 -- e.g., { "systolic": 150, "diastolic": 95 }
+  fhir_observation_id TEXT,
+  ingestion_source TEXT,                  -- 'vendor_webhook','manual','file'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_remote_measurements_patient_time ON remote_measurements (patient_id, measured_at DESC);
+CREATE INDEX idx_remote_measurements_type_time ON remote_measurements (measurement_type, measured_at DESC);
+
+remote_alerts
+
+CREATE TABLE remote_alerts (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  device_binding_id UUID NOT NULL REFERENCES device_bindings(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  alert_type TEXT NOT NULL,             -- 'threshold','trend','adherence'
+  message TEXT NOT NULL,
+  severity TEXT NOT NULL,               -- 'info','warning','critical'
+  status TEXT NOT NULL DEFAULT 'open',  -- 'open','acknowledged','resolved'
+  triggered_at TIMESTAMPTZ NOT NULL,
+  resolved_at TIMESTAMPTZ,
+  resolved_by_user_id UUID,
+  linked_task_id UUID,                  -- nursing task if created
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_remote_alerts_patient ON remote_alerts (patient_id, status, triggered_at DESC);
+
+2.3.2 FHIR Mapping
+	•	remote_measurements → FHIR Observation
+	•	category = 'vital-signs' or social-history etc.
+	•	Possibly group into FHIR Device and DeviceMetric to represent devices.
+
+2.3.3 Endpoints
+Base: /api/v1/remote-monitoring
+
+Devices
+	•	POST /devices
+	•	GET /devices?device_type=&vendor_system_id=
+
+Bindings
+	•	POST /device-bindings
+	•	Bind device to patient.
+	•	GET /device-bindings?patient_id=&status=
+	•	PATCH /device-bindings/{id}
+
+Measurement Ingest
+	•	POST /measurements
+	•	Provided either directly or via vendor webhook.
+	•	GET /measurements?patient_id=&measurement_type=&from=&to=
+
+Alerts
+	•	GET /alerts?patient_id=&status=&severity=
+	•	PATCH /alerts/{id}
+	•	status update, linked_task_id attach.
+
+2.3.4 Events
+	•	RemoteMeasurement.Received
+	•	RemoteAlert.Created
+	•	RemoteAlert.Resolved
+
+These can trigger:
+	•	nursing-service (create tasks),
+	•	risk-stratification-service (update risk),
+	•	PRM (auto follow-up messaging).
+
+⸻
+
+2.4 app-marketplace-service
+
+Responsibility:
+	•	Register external apps/agents.
+	•	Manage their permissions to tools & scopes.
+	•	Track usage and cost metrics.
+
+2.4.1 DB Schema
+Tables:
+	•	apps
+	•	app_keys
+	•	app_scopes
+	•	app_usage_log
+
+apps
+
+CREATE TABLE apps (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,                -- the tenant that owns this app config (or 'platform' for global)
+  code TEXT NOT NULL,                     -- 'ZOOM_INTEGRATION','NLP_TRIAGE_AGENT'
+  name TEXT NOT NULL,
+  description TEXT,
+  app_type TEXT NOT NULL,                 -- 'web_app','agent','mobile','integration'
+  callback_url TEXT,
+  owner_org_id UUID,                      -- network_organizations.id
+  is_platform_app BOOLEAN DEFAULT FALSE,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_app_code_tenant ON apps (tenant_id, code);
+
+app_keys
+
+CREATE TABLE app_keys (
+  id UUID PRIMARY KEY,
+  app_id UUID NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  key_hash TEXT NOT NULL,                 -- hashed API key
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  last_used_at TIMESTAMPTZ,
+  is_revoked BOOLEAN DEFAULT FALSE
+);
+
+CREATE INDEX idx_app_keys_app ON app_keys (app_id);
+
+app_scopes
+
+Define what data & tools app can access.
+
+CREATE TABLE app_scopes (
+  id UUID PRIMARY KEY,
+  app_id UUID NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  scope_type TEXT NOT NULL,           -- 'FHIR','TOOL','EVENT','PATIENT'
+  scope_code TEXT NOT NULL,           -- e.g., 'fhir.Patient.read','tool.book_appointment','event.Admission.Created'
+  restrictions JSONB,                 -- e.g., { "tenant_id": "...", "org_type": "HOSPITAL" }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_app_scopes_app ON app_scopes (app_id, scope_type);
+
+app_usage_log
+
+CREATE TABLE app_usage_log (
+  id UUID PRIMARY KEY,
+  app_id UUID NOT NULL REFERENCES apps(id),
+  usage_type TEXT NOT NULL,              -- 'api_call','event_delivery','tool_invocation'
+  scope_code TEXT,
+  resource_type TEXT,
+  resource_id TEXT,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_app_usage_app_time ON app_usage_log (app_id, occurred_at DESC);
+
+2.4.2 Endpoints
+Base: /api/v1/apps
+	•	POST /
+	•	GET /
+	•	GET /{id}
+	•	PATCH /{id}
+
+Keys
+	•	POST /{id}/keys
+	•	generate API key.
+	•	PATCH /keys/{keyId} (revoke or rotate)
+
+Scopes
+	•	POST /{id}/scopes
+	•	GET /{id}/scopes
+
+Usage
+	•	GET /{id}/usage?from=&to=&usage_type=
+
+⸻
+
+2.5 consent-orchestration-service
+
+Responsibility:
+	•	Central consent registry:
+	•	what data can flow from whom to whom, for what purpose, for how long.
+	•	Enforce consents across:
+	•	interop gateway,
+	•	remote monitoring,
+	•	marketplace apps,
+	•	LLM agents.
+
+2.5.1 DB Schema
+Tables:
+	•	consent_policies
+	•	consent_records
+
+consent_policies
+
+Organisation-level policy templates.
+
+CREATE TABLE consent_policies (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                 -- 'DEFAULT_OPD','REMOTE_MONITORING_DM2','RESEARCH_REGISTRY'
+  name TEXT NOT NULL,
+  description TEXT,
+  data_categories JSONB NOT NULL,     -- e.g. ["demographics","labs","imaging","notes"]
+  permitted_use_cases JSONB NOT NULL, -- e.g. ["treatment","payment","operations","research"]
+  default_duration_days INT,          -- default validity
+  can_be_withdrawn BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_consent_policy_code_tenant ON consent_policies (tenant_id, code);
+
+consent_records
+
+Actual patient consents.
+
+CREATE TABLE consent_records (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  policy_id UUID NOT NULL REFERENCES consent_policies(id),
+  data_controller_org_id UUID NOT NULL REFERENCES network_organizations(id),
+  data_processor_org_id UUID REFERENCES network_organizations(id), -- app, lab, partner
+  app_id UUID REFERENCES apps(id),                                -- optional for app-based
+  granted_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ,
+  revoked_by_user_id UUID,
+  scope_overrides JSONB,                -- allow/deny for specific data categories
+  purpose_override JSONB,
+  status TEXT NOT NULL DEFAULT 'active', -- 'active','expired','revoked'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_consent_patient ON consent_records (patient_id, status, granted_at DESC);
+CREATE INDEX idx_consent_orgs ON consent_records (data_controller_org_id, data_processor_org_id);
+
+2.5.2 Endpoints
+Base: /api/v1/consent
+
+Policies
+	•	POST /policies
+	•	GET /policies
+	•	GET /policies/{id}
+	•	PATCH /policies/{id}
+
+Records
+	•	POST /records
+	•	Create consent record for patient & policy.
+	•	Called when patient approves sharing (UI or agent).
+	•	GET /records?patient_id=&status=&data_processor_org_id=&app_id=
+	•	PATCH /records/{id}/revoke
+	•	set status='revoked', revoked_at.
+
+Evaluation helper
+	•	POST /evaluate
+	•	Input:
+	•	patient_id,
+	•	data_controller_org_id,
+	•	data_processor_org_id / app_id,
+	•	requested_data_categories,
+	•	purpose.
+	•	Output:
+	•	allowed (true/false),
+	•	effective_record_ids.
+
+This endpoint will be called by:
+	•	interoperability-gateway before sending data,
+	•	app-marketplace-service before delivering resources,
+	•	LLM agent orchestrator before answering cross-org queries.
+
+⸻
+
+3. Frontend – Phase 5
+
+We add:
+	•	Network / referral portals
+	•	Remote monitoring dashboards (clinical + patient view)
+	•	App marketplace UI
+	•	Consent management for patients & admins
+
+3.1 Network & Referrals
+
+Routes:
+	•	/network/organizations
+	•	/referrals
+	•	/referrals/new
+	•	/referrals/[referralId]
+
+/network/organizations
+	•	List of connected organizations:
+	•	name, type, connectivity status, interop capabilities.
+
+APIs:
+	•	GET /api/v1/referrals/network-organizations
+	•	GET /api/v1/interop/external-systems
+
+Components:
+	•	NetworkOrgCard
+	•	InteropStatusBadge
+
+/referrals
+	•	Filterable list:
+	•	my outgoing referrals,
+	•	incoming referrals (if multi-org view),
+	•	by status, service line, org.
+
+APIs:
+	•	GET /api/v1/referrals?status=&target_org_id=&source_org_id=
+
+Components:
+	•	ReferralListTable
+	•	ReferralStatusBadge
+
+/referrals/new
+	•	Stepper:
+	1.	Select patient.
+	2.	Select target org + service line.
+	3.	Compose reason + attach summary docs.
+	4.	Review & send.
+
+APIs:
+	•	GET /api/v1/identity/patients?search=
+	•	GET /api/v1/referrals/network-organizations?service_line=
+	•	POST /api/v1/referrals
+	•	POST /api/v1/referrals/{id}/documents
+	•	POST /api/v1/referrals/{id}/send
+
+Components:
+	•	PatientSelector
+	•	OrgServiceSelector
+	•	ReferralSummaryEditor
+
+/referrals/[referralId]
+	•	Show:
+	•	timeline (created, sent, accepted, completed),
+	•	attached docs,
+	•	comments/collab thread.
+
+⸻
+
+3.2 Remote Monitoring UI
+
+Routes:
+	•	/remote/patients
+	•	/remote/patients/[patientId]
+	•	/remote/alerts
+	•	/remote/devices
+
+/remote/patients
+	•	Panel for remote programs:
+	•	filter by program code (HF, DM2, COPD).
+	•	columns: patient, program, latest measurement summary, open alerts.
+
+APIs:
+	•	GET /api/v1/remote-monitoring/device-bindings?status=active
+	•	For each: some aggregated metrics (backend can provide summarised view).
+
+Components:
+	•	RemotePatientRow
+	•	ProgramTag
+	•	AlertIndicator
+
+/remote/patients/[patientId]
+	•	Tabs:
+	•	Overview,
+	•	Measurements (charts),
+	•	Alerts,
+	•	Notes/tasks.
+
+APIs:
+	•	GET /api/v1/remote-monitoring/device-bindings?patient_id=
+	•	GET /api/v1/remote-monitoring/measurements?patient_id=&from=&to=
+	•	GET /api/v1/remote-monitoring/alerts?patient_id=&status=
+
+Components:
+	•	VitalsTrendChart
+	•	MeasurementTimeline
+	•	RemoteAlertList
+
+/remote/alerts
+	•	Central triage view:
+	•	filter by severity, program.
+	•	Quick actions:
+	•	open patient chart,
+	•	create nursing task.
+
+APIs:
+	•	GET /api/v1/remote-monitoring/alerts?status=open&severity=
+
+⸻
+
+3.3 App Marketplace UI
+
+Routes:
+	•	/apps
+	•	/apps/[appId]
+	•	/apps/[appId]/scopes
+
+/apps
+	•	List of apps available to this tenant:
+	•	platform apps, tenant-specific apps, third-party.
+
+APIs:
+	•	GET /api/v1/apps?tenant_scope=current
+
+Components:
+	•	AppCard
+	•	AppTypeBadge
+
+/apps/[appId]
+	•	Show:
+	•	description,
+	•	scopes,
+	•	owner,
+	•	usage summary.
+
+APIs:
+	•	GET /api/v1/apps/{id}
+	•	GET /api/v1/apps/{id}/scopes
+	•	GET /api/v1/apps/{id}/usage?from=&to=
+
+/apps/[appId]/scopes
+	•	Admin can:
+	•	enable/disable scopes,
+	•	set restrictions.
+
+APIs:
+	•	POST /api/v1/apps/{id}/scopes
+	•	PATCH /api/v1/apps/scopes/{scopeId}
+
+⸻
+
+3.4 Consent Management UI
+
+Patient-facing (portal)
+
+Routes:
+	•	/patient/me/consents
+	•	Show:
+	•	list of consents:
+	•	which org/app,
+	•	what data categories,
+	•	for what purpose,
+	•	until when.
+	•	Actions:
+	•	revoke.
+
+APIs:
+	•	GET /api/v1/consent/records?patient_id=me
+	•	PATCH /api/v1/consent/records/{id}/revoke
+
+Components:
+	•	ConsentRecordCard
+	•	PurposeTag
+
+Admin-facing
+
+Routes:
+	•	/consent/policies
+	•	/consent/records
+
+⸻
+
+4. LLM Tools – Phase 5
+
+New tools for:
+	•	Referrals
+	•	Remote monitoring triage
+	•	Consent + access decisions
+	•	App governance
+
+4.1 Referral Tools
+
+Tool: create_referral
+
+{
+  "name": "create_referral",
+  "description": "Create a referral from the current organization to a target organization for a specific patient and service line.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "source_org_id": { "type": "string" },
+      "target_org_id": { "type": "string" },
+      "source_practitioner_id": { "type": "string" },
+      "referral_type": { "type": "string", "enum": ["OPD","IPD_TRANSFER","DAY_CARE","HOME_CARE"] },
+      "service_line": { "type": "string" },
+      "reason": { "type": "string" },
+      "priority": { "type": "string", "enum": ["routine","urgent","emergent"], "default": "routine" },
+      "source_episode_id": { "type": "string" },
+      "source_encounter_id": { "type": "string" },
+      "source_admission_id": { "type": "string" }
+    },
+    "required": ["patient_id", "source_org_id", "target_org_id", "referral_type", "reason"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "referral_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /api/v1/referrals.
+
+⸻
+
+Tool: attach_referral_documents
+
+{
+  "name": "attach_referral_documents",
+  "description": "Attach clinical documents such as summaries, imaging, and labs to a referral.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "referral_id": { "type": "string" },
+      "documents": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "doc_type": { "type": "string", "enum": ["summary","imaging","lab","other"] },
+            "fhir_document_reference_id": { "type": "string" }
+          },
+          "required": ["doc_type", "fhir_document_reference_id"]
+        }
+      }
+    },
+    "required": ["referral_id", "documents"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "referral_id": { "type": "string" },
+      "attached_count": { "type": "integer" }
+    }
+  }
+}
+
+Maps → POST /referrals/{id}/documents.
+
+⸻
+
+Tool: send_referral
+
+{
+  "name": "send_referral",
+  "description": "Send a prepared referral to the target organization through the configured interoperability channel.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "referral_id": { "type": "string" }
+    },
+    "required": ["referral_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "referral_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /referrals/{id}/send.
+
+⸻
+
+4.2 Remote Monitoring Tools
+
+Tool: record_remote_measurement
+
+{
+  "name": "record_remote_measurement",
+  "description": "Record a remote/home measurement for a patient from a bound device, mapping it into FHIR Observations.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "device_binding_id": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "measurement_type": { "type": "string", "enum": ["BP","GLUCOSE","WEIGHT","SPO2","HR","STEP_COUNT"] },
+      "measured_at": { "type": "string", "format": "date-time" },
+      "payload": {
+        "type": "object",
+        "description": "Key-value pairs representing the measurement, e.g., {\"systolic\":150,\"diastolic\":95}"
+      }
+    },
+    "required": ["device_binding_id", "patient_id", "measurement_type", "measured_at", "payload"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "measurement_id": { "type": "string" },
+      "fhir_observation_id": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /remote-monitoring/measurements.
+
+⸻
+
+Tool: create_remote_alert_and_task
+
+{
+  "name": "create_remote_alert_and_task",
+  "description": "Create a remote-monitoring alert and, if needed, a nursing task for follow-up.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "device_binding_id": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "alert_type": { "type": "string", "enum": ["threshold","trend","adherence"] },
+      "message": { "type": "string" },
+      "severity": { "type": "string", "enum": ["info","warning","critical"] },
+      "create_task": { "type": "boolean", "default": true },
+      "task_description": { "type": "string" }
+    },
+    "required": ["device_binding_id", "patient_id", "alert_type", "message", "severity"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "remote_alert_id": { "type": "string" },
+      "task_id": { "type": "string" }
+    }
+  }
+}
+
+	•	Primary mapping: POST /remote-monitoring/alerts (+ call to nursing-service for task).
+
+⸻
+
+4.3 Consent & Apps Tools
+
+Tool: check_data_access_consent
+
+{
+  "name": "check_data_access_consent",
+  "description": "Check whether data sharing from one organization or app to another for a patient is allowed under current consents.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "data_controller_org_id": { "type": "string" },
+      "data_processor_org_id": { "type": "string" },
+      "app_id": { "type": "string" },
+      "requested_data_categories": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "purpose": { "type": "string" }
+    },
+    "required": ["patient_id", "data_controller_org_id", "requested_data_categories", "purpose"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "allowed": { "type": "boolean" },
+      "consent_record_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "reason": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /consent/evaluate.
+
+⸻
+
+Tool: create_consent_record
+
+{
+  "name": "create_consent_record",
+  "description": "Create a consent record for a patient to allow data processing by a specific organization or app under a policy.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "policy_code": { "type": "string" },
+      "data_controller_org_id": { "type": "string" },
+      "data_processor_org_id": { "type": "string" },
+      "app_id": { "type": "string" },
+      "custom_expiry_date": { "type": "string", "format": "date" }
+    },
+    "required": ["patient_id", "policy_code", "data_controller_org_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "consent_record_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /consent/records (policy resolved by policy_code).
+
+⸻
+
+5. System Prompts for Phase 5 Agents
+
+5.1 Referral Coordination Agent
+
+You are the Referral Coordination Agent for a multi-hospital network.
+
+Goals:
+	•	Help clinicians generate high-quality referrals with all necessary context.
+	•	Minimise bounced referrals and incomplete information.
+
+Rules:
+	1.	When asked to “refer” a patient:
+	•	confirm patient identity using existing search tools,
+	•	clarify destination:
+	•	target organization,
+	•	service line/specialty,
+	•	referral type (OPD vs IPD transfer vs home care).
+	2.	Before calling create_referral:
+	•	summarise the clinical context from existing encounters:
+	•	primary diagnosis/problem,
+	•	key recent investigations,
+	•	current treatment.
+	•	use concise, clinical language.
+	3.	Once the referral is created:
+	•	attach relevant documents via attach_referral_documents:
+	•	encounter summary,
+	•	key labs/imaging,
+	•	discharge summary if applicable.
+	4.	Call send_referral only when:
+	•	the human confirms the target org + service line,
+	•	you have attached a minimal acceptable document set.
+	5.	Clearly state:
+	•	what you sent,
+	•	to whom,
+	•	and any expectations (e.g. “for pre-surgical assessment within 7 days”).
+
+Tools:
+	•	create_referral
+	•	attach_referral_documents
+	•	send_referral
+
+⸻
+
+5.2 Remote Monitoring Triage Agent
+
+You are the Remote Monitoring Triage Agent.
+
+Goals:
+	•	Continuously monitor incoming remote measurements.
+	•	Raise sensible alerts and tasks without overwhelming clinicians.
+
+Rules:
+	1.	You will receive new measurements via record_remote_measurement or from event streams.
+	2.	For each measurement:
+	•	interpret it in context:
+	•	patient’s diagnosis and program,
+	•	recent trend (e.g., last 7 days),
+	•	existing alerts.
+	3.	Only create create_remote_alert_and_task when:
+	•	value crosses a clinically meaningful threshold or
+	•	there is a worrying trend (rapid weight gain, repeated high BP, etc.).
+	4.	Tailor alert messages to:
+	•	be short and actionable,
+	•	specify which parameter is concerning,
+	•	suggest an appropriate level of response (e.g. “same-day nurse call”).
+	5.	Avoid “alert fatigue”:
+	•	do not repeat alerts for the same unchanged abnormal value within a short time window unless escalation is warranted.
+	6.	Always assume a human clinician will review; you are not making treatment decisions.
+
+Tools:
+	•	record_remote_measurement
+	•	create_remote_alert_and_task
+
+⸻
+
+5.3 Ecosystem Consent & Access Agent
+
+You are the Ecosystem Consent & Access Agent.
+
+Goals:
+	•	Ensure that any cross-organisation or app-mediated data access is allowed under existing consents.
+	•	Help users obtain and document new consents when necessary.
+
+Rules:
+	1.	When a user or app requests data that crosses org boundaries or involves a third-party app:
+	•	call check_data_access_consent with:
+	•	patient_id,
+	•	data_controller_org_id,
+	•	data_processor_org_id or app_id,
+	•	requested data categories,
+	•	purpose.
+	2.	If allowed = false:
+	•	explain why in plain language,
+	•	outline what consent would be required to allow it.
+	3.	If a user is authorised to obtain consent:
+	•	present the relevant policy summary,
+	•	ask for explicit confirmation,
+	•	then call create_consent_record.
+	4.	Log important consent decisions in governance/audit where appropriate.
+	5.	When in doubt, default to denying access and escalating to a human privacy officer.
+
+Tools:
+	•	check_data_access_consent
+	•	create_consent_record
+
+⸻
+
+5.4 App Governance Agent
+
+You are the App Governance Agent.
+
+Goals:
+	•	Help administrators manage third-party apps and agents.
+	•	Understand which apps have which scopes and how they use them.
+
+Rules:
+	1.	When admins ask “What can this app access?”:
+	•	read the app’s scopes via app APIs,
+	•	summarise them grouped by:
+	•	FHIR data categories,
+	•	tools,
+	•	events.
+	2.	When they ask about usage:
+	•	use app_usage_log data via APIs to:
+	•	identify frequent usage patterns,
+	•	flag unusual spikes or concerning access.
+	3.	Never grant or expand scopes on your own; always present suggested changes for explicit human approval.
+	4.	Use clear, non-technical language when explaining risks and scopes to non-technical admins.
+
+Tools:
+	•	read-only wrappers around /apps, /apps/{id}/scopes, /apps/{id}/usage
+	•	check_data_access_consent as needed
+
+⸻

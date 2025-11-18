@@ -1,0 +1,864 @@
+Alright Suri, let’s turn Phase 1 into something you can literally feed to Cursor and a junior team and have a working spine in a few sprints.
+
+I’ll do:
+	1.	Assumptions & tech stack
+	2.	Phase 1 goals & boundaries
+	3.	Backend architecture & services (with endpoints + DB + FHIR mapping)
+	4.	Frontend (Admin Console + Minimal Clinical View)
+	5.	LLM tools & prompts (for Phase 1 agents)
+	6.	Brief but concrete look-ahead for Phase 2 & 3 in the same style
+
+⸻
+
+1. Assumptions & Tech Stack
+
+You can adapt, but I’ll assume:
+	•	Backend
+	•	API: Python FastAPI
+	•	DB: PostgreSQL (FHIR stored mostly as JSONB + some relational indexes)
+	•	Message Bus: Kafka (conceptual; any stream is fine)
+	•	Auth: JWT-based, with RBAC on top; ABAC skeleton
+	•	FHIR: R4, custom FHIR service
+	•	Frontend
+	•	Next.js / React, TypeScript
+	•	UI libs: Tailwind + shadcn or similar
+	•	Deployment
+	•	Docker, K8s or ECS (not detailing infra here, focusing on software shape)
+
+⸻
+
+2. Phase 1 – Goals & Boundaries
+
+Goal of Phase 1:
+
+Stand up the core platform & FHIR backbone with:
+	•	a working clinical data store (FHIR R4),
+	•	patient & identity management,
+	•	consent & basic RBAC,
+	•	event bus + internal event schema,
+	•	admin console for tenants, orgs, users,
+	•	minimal LLM tools (for identity search & consent explanation) for future phases.
+
+Intentionally NOT in Phase 1:
+	•	No OPD/IPD workflows, no scribing, no complex scheduling.
+	•	No RCM/insurance business logic.
+	•	No full-blown agents orchestrating flows yet – just basic tools that later agents will use.
+
+Phase 1 is the “kernel + filesystem” before we build the OS and applications.
+
+⸻
+
+3. Backend Architecture & Services
+
+3.1 High-Level Service Layout
+
+Monorepo or multi-repo, but conceptually:
+	1.	identity-service
+	2.	fhir-service
+	3.	consent-service
+	4.	auth-rbac-service
+	5.	event-bus-service (or event library + Kafka schema registry)
+	6.	admin-service (tenant/org/user management API)
+	7.	api-gateway (optional in Phase 1; could just be FastAPI monolith with routers)
+
+We’ll define each with:
+	•	service responsibilities
+	•	endpoints
+	•	DB tables
+	•	FHIR mapping (where relevant)
+
+⸻
+
+3.2 identity-service
+
+Responsibility:
+	•	Master data for people & organizations:
+	•	Patients, Practitioners, Organizations, Locations
+	•	Multiple identifiers per entity (ABHA, national ID, MRN, etc.)
+	•	Basic CRUD + search
+	•	Identity resolution (merge candidates)
+
+DB Schema (Postgres) – suggest these core tables:
+	•	patients
+	•	patient_identifiers
+	•	practitioners
+	•	practitioner_identifiers
+	•	organizations
+	•	organization_identifiers
+	•	locations
+	•	location_identifiers
+
+Example: patients
+
+CREATE TABLE patients (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Core demographics
+  first_name TEXT,
+  last_name TEXT,
+  middle_name TEXT,
+  date_of_birth DATE,
+  gender TEXT, -- map to FHIR AdministrativeGender
+  phone_primary TEXT,
+  email_primary TEXT,
+  address_line1 TEXT,
+  address_line2 TEXT,
+  city TEXT,
+  state TEXT,
+  postal_code TEXT,
+  country TEXT,
+  is_deceased BOOLEAN DEFAULT FALSE,
+  deceased_date TIMESTAMPTZ,
+  -- FHIR representation
+  fhir_resource JSONB NOT NULL
+);
+
+CREATE INDEX idx_patients_tenant ON patients (tenant_id);
+CREATE INDEX idx_patients_name ON patients USING GIN (to_tsvector('simple', first_name || ' ' || last_name));
+CREATE INDEX idx_patients_phone ON patients (phone_primary);
+
+patient_identifiers
+
+CREATE TABLE patient_identifiers (
+  id UUID PRIMARY KEY,
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  system TEXT NOT NULL, -- e.g. "ABHA", "MRN", "NATIONAL_ID"
+  value TEXT NOT NULL,
+  is_primary BOOLEAN DEFAULT FALSE
+);
+
+CREATE UNIQUE INDEX uniq_patient_identifier ON patient_identifiers (system, value);
+CREATE INDEX idx_patient_identifiers_patient ON patient_identifiers (patient_id);
+
+Same pattern for practitioners, organizations, locations.
+
+FHIR Mapping:
+	•	patients.fhir_resource stores full FHIR Patient resource.
+	•	Synchronization rules:
+	•	When you create/update via API, you:
+	•	normalize key fields into columns,
+	•	also maintain a full FHIR JSON repr.
+	•	FHIR server (fhir-service) later uses the same table or a separate schema; for Phase 1, keep it simple and share.
+
+Endpoints (REST, FastAPI)
+
+Base path: /api/v1/identity
+	•	Patients
+	•	POST /patients
+	•	Body: partial patient DTO or FHIR Patient JSON
+	•	Creates row + patient_identifiers
+	•	GET /patients/{id}
+	•	PATCH /patients/{id}
+	•	GET /patients?search=...
+	•	search by name, phone, identifier.
+	•	POST /patients/{id}/merge
+	•	inputs: source_patient_ids, target_patient_id, merge rationale
+	•	Identifiers
+	•	GET /patients/by-identifier?system=ABHA&value=...
+	•	Practitioners, Organizations, Locations
+	•	Similar CRUD endpoints with fhir_resource field mirroring FHIR resources.
+
+Identity Resolution Logic:
+	•	Expose an internal endpoint (later a tool):
+
+POST /patients/resolve-candidates
+	•	Input: name, date_of_birth, phone/email, identifiers if any.
+	•	Output: list of candidate patients with confidence scores.
+	•	Implementation: simple rules + ML later.
+
+⸻
+
+3.3 fhir-service
+
+Responsibility:
+	•	FHIR CRUD and search for core clinical resources.
+	•	Make everything FHIR-native so later modules (encounters, observations, etc.) plug in.
+
+Approach:
+	•	Implement a thin FHIR layer atop the existing tables for Patient/Practitioner/Organization/Location.
+	•	For other entities (Encounter, EpisodeOfCare, Condition, Observation, etc.), create dedicated tables or a generic resources table.
+
+For Phase 1, we must support:
+	•	Patient
+	•	Practitioner
+	•	Organization
+	•	Location
+	•	Consent
+	•	Encounter
+	•	EpisodeOfCare
+	•	Communication
+	•	CareTeam (optional but good)
+	•	Task
+
+DB Option A (recommended for Phase 1):
+Generic fhir_resources table for non-identity resources.
+
+CREATE TABLE fhir_resources (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  resource_type TEXT NOT NULL, -- e.g. "Encounter", "EpisodeOfCare"
+  resource_id TEXT NOT NULL, -- FHIR logical id
+  version INT NOT NULL DEFAULT 1,
+  is_current BOOLEAN NOT NULL DEFAULT TRUE,
+  resource JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_fhir_resources_tenant_type ON fhir_resources (tenant_id, resource_type);
+CREATE INDEX idx_fhir_resources_id_type ON fhir_resources (resource_type, resource_id, is_current);
+CREATE INDEX idx_fhir_resources_gin ON fhir_resources USING GIN (resource);
+
+Endpoints (FHIR-style)
+
+Base path: /fhir/R4
+	•	Generic:
+	•	GET /fhir/R4/{resourceType}/{id}
+	•	POST /fhir/R4/{resourceType} (create)
+	•	PUT /fhir/R4/{resourceType}/{id} (update)
+	•	PATCH /fhir/R4/{resourceType}/{id} (optional)
+	•	DELETE /fhir/R4/{resourceType}/{id}
+	•	GET /fhir/R4/{resourceType}?searchParams=... (implement minimal search)
+
+Internally:
+	•	Identity-service endpoints call fhir-service or share DB access.
+	•	For now, treat patient/practitioner as “special” resources with their own tables, but the FHIR endpoints still read/write them.
+
+Example: FHIR Encounter
+	•	Stored in fhir_resources with resource_type = 'Encounter'.
+	•	When created, we validate:
+	•	patient reference is valid (exists),
+	•	status/given fields conform to FHIR.
+
+Later phases will use this to represent OPD/IPD visits.
+
+⸻
+
+3.4 consent-service
+
+Responsibility:
+	•	Manage patient consent in FHIR Consent resources.
+	•	Track consents by:
+	•	purpose (treatment, research, marketing),
+	•	data category,
+	•	channel.
+
+DB Schema:
+
+Either use fhir_resources with resource_type = 'Consent' or dedicated:
+
+CREATE TABLE consents (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  consent_fhir JSONB NOT NULL,
+  status TEXT NOT NULL, -- active, inactive, draft
+  category TEXT, -- e.g. "treatment", "research", "marketing"
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_consents_patient ON consents (patient_id, status);
+
+Endpoints:
+
+Base path: /api/v1/consents
+	•	POST /
+	•	Body: FHIR Consent or internal Consent DTO.
+	•	GET /{id}
+	•	GET /?patient_id=...&status=...&category=...
+	•	PATCH /{id}
+	•	update status, scope.
+	•	POST /validate
+	•	Input: patient_id, purpose, data_types, channel.
+	•	Output: allowed/denied + explanation (used by policy engine later).
+
+⸻
+
+3.5 auth-rbac-service
+
+Responsibility:
+	•	Authentication (JWT issuance & verification).
+	•	Role-based + attribute-based access control.
+
+DB Schema:
+	•	tenants
+	•	users
+	•	roles
+	•	permissions
+	•	user_roles
+	•	role_permissions
+
+tenants
+
+CREATE TABLE tenants (
+  id UUID PRIMARY KEY,
+  name TEXT NOT NULL,
+  code TEXT UNIQUE NOT NULL,
+  domain TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+users
+
+CREATE TABLE users (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  email TEXT NOT NULL,
+  hashed_password TEXT NOT NULL,
+  full_name TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_users_email_tenant ON users (tenant_id, email);
+
+roles, permissions, user_roles, role_permissions are standard RBAC tables.
+
+Endpoints:
+
+Base path: /api/v1/auth
+	•	POST /login
+	•	Returns JWT with:
+	•	user_id, tenant_id, roles.
+	•	POST /refresh
+	•	GET /me
+	•	GET /me/permissions
+
+The RBAC engine should be a Python library that other services call:
+	•	check_permission(user, action, resource_type, resource_id)
+	•	Later extended to ABAC with attributes (department, specialty, patient relationship, etc.).
+
+⸻
+
+3.6 event-bus-service (or library)
+
+Responsibility:
+	•	Standard way to publish/consume domain events.
+	•	Define canonical event schemas.
+
+Event Types for Phase 1:
+	•	Tenant.Created
+	•	User.Created
+	•	Patient.Created
+	•	Patient.Updated
+	•	Patient.Merged
+	•	Consent.Created
+	•	Consent.Updated
+	•	Encounter.Created
+	•	Encounter.Updated
+
+Schema Example (JSON):
+
+{
+  "event_type": "Patient.Created",
+  "event_id": "uuid",
+  "occurred_at": "2025-11-14T10:00:00Z",
+  "tenant_id": "uuid",
+  "actor": {
+    "user_id": "uuid",
+    "system": "identity-service"
+  },
+  "payload": {
+    "patient_id": "uuid",
+    "identifier_list": [
+      { "system": "MRN", "value": "12345" }
+    ],
+    "basic_demographics": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "date_of_birth": "1980-01-01",
+      "gender": "male"
+    }
+  }
+}
+
+Implementation:
+	•	Provide a Python library:
+	•	publish_event(event_type, payload, tenant_id, actor)
+	•	Use Kafka topics:
+	•	patient-events, consent-events, tenant-events.
+
+Phase 1 consumers may just log; later, agents subscribe.
+
+⸻
+
+3.7 admin-service
+
+Responsibility:
+	•	Tenant, org, user & configuration management.
+
+Endpoints: /api/v1/admin
+	•	Tenants:
+	•	POST /tenants
+	•	GET /tenants
+	•	GET /tenants/{id}
+	•	Organizations (FHIR Organization + business entity):
+	•	POST /organizations
+	•	GET /organizations
+	•	Users:
+	•	POST /users
+	•	GET /users
+	•	PATCH /users/{id}
+	•	Roles:
+	•	GET /roles
+	•	POST /roles
+	•	POST /users/{id}/roles
+
+⸻
+
+3.8 api-gateway (optional in Phase 1)
+	•	Single entry point for frontends.
+	•	Routes requests to identity/fhir/consent/admin.
+	•	Handles auth, rate limiting, logging.
+
+If you keep it monolithic now:
+	•	Keep separate routers in FastAPI:
+	•	/identity, /admin, /fhir, /auth, /consents.
+
+⸻
+
+4. Frontend – Admin Console & Minimal Clinical View
+
+Frontends in Phase 1 are mostly for administrators & internal developers. Clinical UIs come Phase 2.
+
+4.1 Next.js App Structure
+
+/apps/admin-console
+
+Key routes:
+	•	/login
+	•	/tenants
+	•	/tenants/[tenantId]
+	•	/organizations
+	•	/users
+	•	/roles
+	•	/patients
+	•	/patients/[patientId]
+	•	/fhir/resources (generic viewer)
+	•	/consents
+	•	/consents/[consentId]
+
+4.2 Pages & Components
+
+1. /login
+	•	Simple login form:
+	•	email, password
+	•	Calls POST /api/v1/auth/login → stores JWT.
+
+2. /tenants
+	•	List tenants, create new tenant, view tenant details.
+
+Components:
+	•	TenantListTable
+	•	TenantFormModal
+
+3. /users
+	•	User management:
+	•	create user,
+	•	assign roles,
+	•	link to practitioner (later).
+
+Components:
+	•	UserListTable
+	•	UserFormModal
+	•	UserRoleAssignmentPanel
+
+4. /patients
+	•	Minimal patient search & view:
+	•	search by name, phone, identifier.
+	•	PatientSearchForm
+	•	PatientListTable
+	•	PatientDetail:
+	•	Basic demographics from columns
+	•	FHIR JSON viewer (expand/collapse)
+	•	Identifiers list.
+
+5. /consents
+	•	List consents by patient.
+	•	View Consent in structured & JSON forms.
+
+Components:
+	•	ConsentListTable
+	•	ConsentDetail
+	•	ConsentCreateForm (simple template to quickly create common consents).
+
+6. /fhir/resources
+	•	Developer-oriented:
+	•	type dropdown (Patient, Encounter, Consent…),
+	•	ID search,
+	•	JSON viewer.
+
+This page is invaluable for debugging while you build.
+
+⸻
+
+5. LLM Tools & Prompts for Phase 1
+
+Even in Phase 1, we can define LLM tool contracts that later agents will use. In Phase 1, you can also use these with a simple dev-only “playground” UI.
+
+5.1 Tools to Define
+
+At minimum:
+	1.	search_patient
+	2.	create_or_update_patient
+	3.	get_patient_consents
+	4.	create_consent
+	5.	check_consent_for_use
+
+These are wrappers over identity-service & consent-service.
+
+⸻
+
+5.2 Tool Schemas (Conceptual JSON)
+
+Tool 1: search_patient
+
+{
+  "name": "search_patient",
+  "description": "Search for existing patients by name, phone, email or identifier. Use this before creating a new patient.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "description": "Full or partial name of the patient." },
+      "date_of_birth": { "type": "string", "format": "date", "description": "Date of birth if known." },
+      "phone": { "type": "string", "description": "Phone number, digits only." },
+      "identifier_system": { "type": "string", "description": "Identifier system such as 'MRN', 'ABHA', 'NATIONAL_ID'." },
+      "identifier_value": { "type": "string", "description": "Identifier value." },
+      "max_results": { "type": "integer", "default": 10 }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "patients": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "patient_id": { "type": "string" },
+            "display_name": { "type": "string" },
+            "date_of_birth": { "type": "string", "format": "date" },
+            "gender": { "type": "string" },
+            "primary_identifier": {
+              "type": "object",
+              "properties": {
+                "system": { "type": "string" },
+                "value": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+Implementation mapping:
+	•	Calls GET /api/v1/identity/patients?search=... + GET /.../by-identifier as needed.
+
+⸻
+
+Tool 2: create_or_update_patient
+
+{
+  "name": "create_or_update_patient",
+  "description": "Create a new patient or update an existing patient based on provided demographics and identifiers.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string", "description": "Existing patient id if updating. Omit to create new." },
+      "first_name": { "type": "string" },
+      "last_name": { "type": "string" },
+      "date_of_birth": { "type": "string", "format": "date" },
+      "gender": { "type": "string", "enum": ["male", "female", "other", "unknown"] },
+      "phone_primary": { "type": "string" },
+      "email_primary": { "type": "string" },
+      "address": {
+        "type": "object",
+        "properties": {
+          "line1": { "type": "string" },
+          "line2": { "type": "string" },
+          "city": { "type": "string" },
+          "state": { "type": "string" },
+          "postal_code": { "type": "string" },
+          "country": { "type": "string" }
+        }
+      },
+      "identifiers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "system": { "type": "string" },
+            "value": { "type": "string" },
+            "is_primary": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "required": ["first_name", "last_name"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "status": { "type": "string", "enum": ["created", "updated"] }
+    }
+  }
+}
+
+Implementation mapping:
+	•	If patient_id present → PATCH /api/v1/identity/patients/{id}.
+	•	Else POST /api/v1/identity/patients.
+
+⸻
+
+Tool 3: get_patient_consents
+
+{
+  "name": "get_patient_consents",
+  "description": "Fetch all active consents for a patient, optionally filtered by category.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "category": { "type": "string", "description": "Optional consent category filter, e.g. 'treatment', 'research', 'marketing'." }
+    },
+    "required": ["patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "consents": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "consent_id": { "type": "string" },
+            "category": { "type": "string" },
+            "status": { "type": "string" },
+            "period": {
+              "type": "object",
+              "properties": {
+                "start": { "type": "string", "format": "date-time" },
+                "end": { "type": "string", "format": "date-time" }
+              }
+            },
+            "scope": { "type": "string" },
+            "provision": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps to GET /api/v1/consents?patient_id=....
+
+⸻
+
+Tool 4: create_consent
+
+{
+  "name": "create_consent",
+  "description": "Create a new Consent for a patient after explaining it and obtaining confirmation.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "category": { "type": "string" },
+      "scope": { "type": "string" },
+      "purpose": { "type": "string" },
+      "valid_from": { "type": "string", "format": "date-time" },
+      "valid_until": { "type": "string", "format": "date-time" },
+      "channel": { "type": "string", "description": "Channel via which consent was obtained, e.g., 'whatsapp', 'phone', 'web'." },
+      "note": { "type": "string" }
+    },
+    "required": ["patient_id", "category", "scope", "purpose"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "consent_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/consents.
+
+⸻
+
+Tool 5: check_consent_for_use
+
+{
+  "name": "check_consent_for_use",
+  "description": "Check whether a planned use of patient data is allowed by existing consents.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "purpose": { "type": "string", "description": "Intended purpose, e.g. 'care', 'billing', 'research', 'marketing'." },
+      "data_categories": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of data categories, e.g., 'clinical_notes', 'labs', 'imaging', 'demographics'."
+      },
+      "channel": { "type": "string", "description": "Channel through which data would be used or communicated." }
+    },
+    "required": ["patient_id", "purpose", "data_categories"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "allowed": { "type": "boolean" },
+      "reason": { "type": "string" },
+      "applicable_consent_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}
+
+Maps to POST /api/v1/consents/validate.
+
+⸻
+
+5.3 Example System Prompts for Phase 1 Agents
+
+A. Identity Resolution Agent – System Prompt (v1)
+
+You are the “Identity Resolution Agent” for a hospital’s master patient index.
+
+Your job is to:
+	1.	Given partial patient information (name, date of birth, phone, identifiers), first search for existing patients using the search_patient tool.
+	2.	If you find high-confidence matches, present them to the human user as options instead of creating a new record.
+	3.	Only call create_or_update_patient to create a new patient when:
+	•	there is no plausible match, or
+	•	the human user explicitly confirms creation of a new patient.
+	4.	Never merge patients on your own. Merging will be done by humans using separate tools.
+	5.	Always minimise duplicate patient creation.
+
+Follow this flow:
+	•	ALWAYS call search_patient first.
+	•	If there is a strong match (same identifier or same name+dob+phone), summarise the result and ask the human user for confirmation before proceeding.
+	•	Only after explicit confirmation, call create_or_update_patient if needed.
+
+You must not invent identifiers. If an identifier is unknown, omit it.
+
+B. Consent Advisor Agent – System Prompt (v1)
+
+You are the “Consent Advisor Agent” in a healthcare system.
+
+Rules:
+	•	Your job is to explain consent options to a patient in clear, simple language and then record consent decisions using the create_consent tool.
+	•	Always check existing consents with get_patient_consents before suggesting new ones.
+	•	Differentiate clearly between purposes: treatment, billing, research, and marketing.
+	•	Never infer consent; it must be explicit. Do not create a consent unless the human confirms.
+	•	When checking if a particular data use is allowed, always call check_consent_for_use.
+
+Flow:
+	1.	When asked “can we use this patient’s data for X?”, call check_consent_for_use.
+	2.	If not allowed, explain what kind of consent is needed and ask if the patient wishes to provide it.
+	3.	If the patient agrees, call create_consent with appropriate category, scope, and purpose.
+	4.	Summarise the final consent state back to the user.
+
+These are only used in dev or in simple flows now; they become core building blocks in later phases.
+
+⸻
+
+6. Look-Ahead: Phase 2 & 3 in Same Style (Brief but Concrete)
+
+You asked to “then go on doing this for additional and next phases”. Fully excruciating detail for all phases would be a small book, but here’s a concrete continuation you can extend in the same pattern.
+
+Phase 2 – Agentic PRM + Outpatient MVP (Outline)
+
+Backend modules to add:
+	1.	scheduling-service
+	•	Tables: providers, schedules, time_slots, appointments
+	•	Endpoints:
+	•	GET /providers/{id}/slots?from=...&to=...
+	•	POST /appointments
+	•	PATCH /appointments/{id} (reschedule/cancel)
+	•	FHIR mapping: Appointment, Schedule, Slot.
+	2.	encounter-service
+	•	Tables: either FHIR Encounter in fhir_resources or dedicated table.
+	•	Endpoints:
+	•	POST /encounters (open)
+	•	PATCH /encounters/{id} (update)
+	•	POST /encounters/{id}/close
+	•	Events: Encounter.Created, Encounter.Closed.
+	3.	prm-service
+	•	Tables: contacts, journeys, journey_stages, journey_instances, communications, tickets.
+	•	Endpoints:
+	•	POST /journeys, POST /journey-instances
+	•	POST /communications (log outbound/inbound)
+	•	FHIR mapping: Communication, CarePlan (for programmatic journeys).
+	4.	scribe-service (basic text)
+	•	Endpoints:
+	•	POST /scribe/draft-note (input: transcript; output: structured SOAP + FHIR bundle)
+	•	Uses LLM + FHIR builder to generate Composition, Condition, Observation, MedicationRequest, ServiceRequest (drafts).
+
+Frontend additions:
+	•	Patient Portal
+	•	/appointments
+	•	/appointments/new
+	•	/records (basic)
+	•	Doctor Portal
+	•	/worklist
+	•	/patients/[id]/encounters/[encounterId]
+	•	Note editor component with AI Suggest button (calls /scribe/draft-note).
+
+LLM tools for Phase 2:
+	•	find_appointment_slots
+	•	book_appointment
+	•	open_encounter
+	•	draft_clinical_note (wraps scribe-service)
+	•	create_journey_instance (for PRM flows)
+
+⸻
+
+Phase 3 – IPD, Nursing, Orders, ICU (Outline)
+
+Backend modules:
+	1.	bed-management-service
+	•	Tables: beds, wards, bed_assignments.
+	•	Endpoints:
+	•	GET /beds?status=...
+	•	POST /admissions (assign bed, create Encounter IPD).
+	2.	nursing-service
+	•	Tables: tasks (nurse tasks), nursing_observations.
+	•	Endpoints:
+	•	GET /tasks?assignee=...
+	•	POST /tasks
+	•	PATCH /tasks/{id} (complete, reassign)
+	•	FHIR mapping: Task, Observation.
+	3.	orders-service
+	•	Lab & imaging orders:
+	•	POST /orders/lab
+	•	POST /orders/imaging
+	•	FHIR mapping: ServiceRequest, DiagnosticReport.
+	4.	icu-service
+	•	ICU-specific Observations, scores, device integrations.
+	•	Expose streams via event bus.
+
+Frontend:
+	•	Nursing dashboard
+	•	/wards
+	•	/wards/[wardId]/beds
+	•	Task board per bed.
+	•	ICU dashboard
+	•	Live vitals, scores.
+
+LLM tools:
+	•	create_nursing_task
+	•	suggest_daily_progress_note
+	•	propose_orders_for_condition
+	•	detect_early_warning_signals (operating mostly from events)
+
+⸻

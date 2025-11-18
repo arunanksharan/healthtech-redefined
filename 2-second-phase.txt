@@ -1,0 +1,1071 @@
+Nice, we’re now building the “first real thing” on top of the kernel.
+
+I’ll treat Phase 2 – Agentic PRM + Outpatient MVP as if a team + Cursor can start coding tomorrow.
+
+Structure:
+	1.	Phase 2 scope & success criteria
+	2.	Backend modules
+	•	scheduling-service
+	•	encounter-service
+	•	prm-service (journeys, comms, tickets)
+	•	scribe-service (text-based)
+	•	optional: comms-channel-adapter-service
+	3.	Frontend (patient portal, doctor portal, basic contact-centre)
+	4.	LLM tools for OPD + PRM
+	5.	Example system prompts for core agents
+
+⸻
+
+1. Phase 2 Scope & Success Criteria
+
+1.1 Scope (Functional)
+
+Build an Agentic Outpatient + PRM layer on top of Phase 1 core:
+	•	Patients can:
+	•	register,
+	•	book/cancel/reschedule OPD appointments,
+	•	receive reminders & follow-ups.
+	•	Doctors can:
+	•	see a worklist of OPD patients,
+	•	open encounters,
+	•	get AI-drafted notes from transcripts (text-based),
+	•	quickly review past history.
+	•	PRM can:
+	•	define “journeys” (e.g. New Cardiology OPD, Diabetes Review),
+	•	automatically move patients along journey stages based on events,
+	•	send outbound communications (e.g. reminders).
+
+1.2 Not in Scope (Yet)
+	•	Full IPD workflows, nursing, ICU, OT.
+	•	Billing/RCM logic beyond minimal “Appointments exist” (no invoices yet).
+	•	Voice scribing (we do text transcripts first).
+	•	Heavy analytics; we only log events.
+
+1.3 Success Criteria
+
+At end of Phase 2:
+	•	Users can manage OPD appointments for selected specialties 100% within our system.
+	•	Doctors can use the AI scribe to generate structured SOAP notes and draft FHIR resources.
+	•	Patients in those specialties automatically get journey-based reminders & follow-ups.
+	•	All this is event-driven and uses FHIR as the clinical spine.
+
+⸻
+
+2. Backend Modules (Deep Dive)
+
+We’ll assume all services are FastAPI microservices (or modular monolith with clear routers).
+
+2.1 scheduling-service
+
+Responsibility:
+	•	Manage provider schedules & slots.
+	•	Book/reschedule/cancel appointments.
+	•	FHIR mapping: Schedule, Slot, Appointment.
+
+2.1.1 DB Schema
+Tables:
+	•	provider_profiles (if not already in identity-service; or just reference practitioners)
+	•	provider_schedules
+	•	time_slots
+	•	appointments
+
+provider_schedules
+
+CREATE TABLE provider_schedules (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  practitioner_id UUID NOT NULL, -- FK to practitioners.id
+  location_id UUID NOT NULL,     -- FK to locations.id
+  specialty_code TEXT,           -- SNOMED/LOINC or internal
+  valid_from DATE NOT NULL,
+  valid_to DATE,
+  -- e.g. recurring template
+  day_of_week SMALLINT NOT NULL,      -- 1=Mon ... 7=Sun
+  start_time TIME NOT NULL,           -- daily start
+  end_time TIME NOT NULL,             -- daily end
+  slot_duration_minutes INT NOT NULL, -- 10, 15, etc.
+  max_patients_per_slot INT NOT NULL DEFAULT 1,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_schedules_practitioner ON provider_schedules (practitioner_id, is_active);
+CREATE INDEX idx_schedules_location ON provider_schedules (location_id);
+
+time_slots
+
+We can either materialise slots or compute on-the-fly. For Phase 2, materialise.
+
+CREATE TABLE time_slots (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  practitioner_id UUID NOT NULL,
+  location_id UUID NOT NULL,
+  schedule_id UUID NOT NULL REFERENCES provider_schedules(id) ON DELETE CASCADE,
+  start_datetime TIMESTAMPTZ NOT NULL,
+  end_datetime TIMESTAMPTZ NOT NULL,
+  capacity INT NOT NULL DEFAULT 1,
+  booked_count INT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'available', -- 'available','full','blocked'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_timeslots_practitioner_time ON time_slots (practitioner_id, start_datetime, end_datetime);
+CREATE INDEX idx_timeslots_location_time ON time_slots (location_id, start_datetime, end_datetime);
+
+appointments
+
+CREATE TABLE appointments (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  practitioner_id UUID NOT NULL,          -- to practitioners
+  location_id UUID NOT NULL,              -- to locations
+  time_slot_id UUID NOT NULL REFERENCES time_slots(id),
+  appointment_type TEXT,                  -- 'new','followup','procedure'
+  status TEXT NOT NULL,                   -- 'booked','checked_in','cancelled','no_show','completed'
+  reason_text TEXT,
+  source_channel TEXT,                    -- 'web','whatsapp','callcenter'
+  encounter_id UUID,                      -- link to Encounter when created
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_appointments_patient ON appointments (patient_id, created_at DESC);
+CREATE INDEX idx_appointments_practitioner_time ON appointments (practitioner_id, status, time_slot_id);
+
+2.1.2 FHIR Mapping
+	•	provider_schedules → FHIR Schedule
+	•	time_slots → FHIR Slot
+	•	appointments → FHIR Appointment
+
+We can maintain fhir_resources entries for them:
+	•	On create/update, create/update FHIR Appointment resource in fhir_resources.
+	•	For now, FHIR representation can be derived on-the-fly.
+
+2.1.3 Endpoints
+Base: /api/v1/scheduling
+
+Provider schedules
+	•	POST /schedules
+	•	Create a recurring schedule for a practitioner.
+	•	GET /schedules?practitioner_id=&location_id=&active=
+	•	PATCH /schedules/{id} (change validity, slot duration)
+
+Slots
+	•	POST /schedules/{schedule_id}/materialize
+	•	Generate time_slots for a date range: from=YYYY-MM-DD, to=YYYY-MM-DD.
+	•	GET /slots
+	•	Query by practitioner, location, date range, status (available/full).
+
+Appointments
+	•	POST /appointments
+	•	Body:
+	•	patient_id
+	•	practitioner_id
+	•	location_id
+	•	time_slot_id or desired_time_range
+	•	appointment_type
+	•	reason_text
+	•	source_channel
+	•	Logic:
+	•	Validate timeslot capacity and status.
+	•	If desired_time_range given, find nearest available slot.
+	•	GET /appointments/{id}
+	•	GET /appointments?patient_id=&from=&to=&status=
+	•	GET /appointments?practitioner_id=&from=&to=&status=
+	•	PATCH /appointments/{id}
+	•	For reschedule/cancel.
+	•	POST /appointments/{id}/check-in
+	•	POST /appointments/{id}/no-show
+	•	POST /appointments/{id}/complete
+
+2.1.4 Events
+On key changes, publish:
+	•	Appointment.Created
+	•	Appointment.Updated
+	•	Appointment.Cancelled
+	•	Appointment.CheckedIn
+	•	Appointment.NoShow
+	•	Appointment.Completed
+
+These events power PRM journeys and doctor worklists.
+
+⸻
+
+2.2 encounter-service
+
+Responsibility:
+	•	Manage clinical encounters for OPD.
+	•	FHIR mapping: Encounter, linking to Appointment, Patient, Practitioner.
+
+2.2.1 DB Schema
+Store in fhir_resources or dedicated table. I’d do both eventually; for Phase 2:
+
+CREATE TABLE encounters (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  encounter_fhir_id TEXT NOT NULL, -- FHIR Encounter.id
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  practitioner_id UUID NOT NULL,
+  appointment_id UUID REFERENCES appointments(id),
+  status TEXT NOT NULL,   -- 'planned','in-progress','completed','cancelled'
+  class_code TEXT NOT NULL DEFAULT 'AMB', -- outpatient
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_encounter_fhir ON encounters (tenant_id, encounter_fhir_id);
+CREATE INDEX idx_encounters_patient ON encounters (patient_id, started_at DESC);
+CREATE INDEX idx_encounters_practitioner ON encounters (practitioner_id, started_at DESC);
+
+Also keep the FHIR resource in fhir_resources (resource_type = 'Encounter').
+
+2.2.2 Endpoints
+Base: /api/v1/encounters
+	•	POST /
+	•	Create Encounter for an Appointment or ad-hoc:
+	•	input: patient_id, practitioner_id, appointment_id?
+	•	sets status = in-progress, class = AMB.
+	•	GET /{id}
+	•	GET /?patient_id=&status=&from=&to=
+	•	GET /?practitioner_id=&status=&from=&to=
+	•	PATCH /{id}
+	•	Update status, timestamps.
+	•	POST /{id}/complete
+	•	sets status completed, ended_at = now().
+
+When created/updated:
+	•	Write FHIR Encounter resource into fhir_resources.
+	•	Emit events:
+	•	Encounter.Created
+	•	Encounter.Updated
+	•	Encounter.Completed
+
+⸻
+
+2.3 prm-service (Journeys, Communications, Tickets)
+
+Responsibility:
+	•	Manage patient journeys (PRM programs).
+	•	Store communications.
+	•	Handle simple issue/ticket tracking.
+
+2.3.1 DB Schema
+Tables:
+	•	journeys
+	•	journey_stages
+	•	journey_instances
+	•	journey_instance_stage_status
+	•	communications
+	•	tickets
+
+journeys
+
+CREATE TABLE journeys (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,            -- e.g. 'CARDIO_NEW_OPD'
+  name TEXT NOT NULL,            -- "New Cardiology First Visit"
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_journey_code_tenant ON journeys (tenant_id, code);
+
+journey_stages
+
+CREATE TABLE journey_stages (
+  id UUID PRIMARY KEY,
+  journey_id UUID NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+  sequence INT NOT NULL,
+  code TEXT NOT NULL,            -- 'PRE_VISIT', 'DAY_OF_VISIT', 'POST_VISIT'
+  name TEXT NOT NULL,
+  description TEXT,
+  entry_event_type TEXT,         -- e.g. 'Appointment.Created'
+  exit_event_type TEXT,          -- optional
+  auto_advance BOOLEAN DEFAULT FALSE,
+  config JSONB,                  -- e.g. days_before_visit, templates
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_journey_stages_journey ON journey_stages (journey_id, sequence);
+
+journey_instances
+
+CREATE TABLE journey_instances (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  journey_id UUID NOT NULL REFERENCES journeys(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  episode_of_care_fhir_id TEXT,     -- optional link to EpisodeOfCare
+  current_stage_id UUID REFERENCES journey_stages(id),
+  status TEXT NOT NULL DEFAULT 'active', -- 'active','completed','cancelled'
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_journey_instances_patient ON journey_instances (patient_id, status);
+
+journey_instance_stage_status
+
+Tracks each stage per instance.
+
+CREATE TABLE journey_instance_stage_status (
+  id UUID PRIMARY KEY,
+  journey_instance_id UUID NOT NULL REFERENCES journey_instances(id) ON DELETE CASCADE,
+  stage_id UUID NOT NULL REFERENCES journey_stages(id),
+  status TEXT NOT NULL,             -- 'pending','in_progress','completed','skipped'
+  entered_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  metadata JSONB
+);
+
+CREATE INDEX idx_jiss_instance ON journey_instance_stage_status (journey_instance_id);
+
+communications
+
+CREATE TABLE communications (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID REFERENCES patients(id),
+  journey_instance_id UUID REFERENCES journey_instances(id),
+  channel TEXT NOT NULL,                 -- 'whatsapp','sms','email','phone','in_app'
+  direction TEXT NOT NULL,               -- 'outbound','inbound'
+  template_code TEXT,                    -- outbound template reference
+  content TEXT,                          -- raw text
+  content_structured JSONB,              -- optional structured content (e.g. options)
+  related_resource_type TEXT,            -- 'Appointment','Encounter','Ticket'
+  related_resource_id TEXT,
+  status TEXT NOT NULL,                  -- 'sent','delivered','failed','read'
+  external_id TEXT,                      -- provider message id
+  created_by_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_communications_patient ON communications (patient_id, created_at DESC);
+
+tickets
+
+CREATE TABLE tickets (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID REFERENCES patients(id),
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'open',     -- 'open','in_progress','resolved','closed'
+  priority TEXT NOT NULL DEFAULT 'medium',
+  created_by_user_id UUID,
+  assigned_to_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_tickets_patient ON tickets (patient_id, status);
+
+2.3.2 Endpoints
+Base: /api/v1/prm
+
+Journeys
+	•	POST /journeys
+	•	Create new journey definition.
+	•	GET /journeys
+	•	GET /journeys/{id}
+	•	PATCH /journeys/{id}
+
+Journey Stages
+	•	POST /journeys/{journey_id}/stages
+	•	GET /journeys/{journey_id}/stages
+
+Journey Instances
+	•	POST /journey-instances
+	•	For a given journey_code + patient_id + optional episode_of_care_fhir_id.
+	•	GET /journey-instances?patient_id=&status=
+	•	GET /journey-instances/{id}
+	•	POST /journey-instances/{id}/advance
+	•	optionally specify next stage or “auto”.
+	•	PATCH /journey-instances/{id} (cancel, complete).
+
+Communications
+	•	POST /communications
+	•	Create and send outbound communication.
+	•	Body:
+	•	patient_id, channel, template_code, content
+	•	journey_instance_id?, related_resource_type?, related_resource_id?
+	•	Implementation delegates to comms-channel-adapter (WhatsApp, SMS, etc.).
+	•	GET /communications?patient_id=&channel=&direction=
+
+Tickets
+	•	POST /tickets
+	•	GET /tickets?patient_id=&status=&assigned_to=
+	•	PATCH /tickets/{id}
+
+2.3.3 Events (Journey Orchestrator Input)
+PRM listens to:
+	•	Appointment.Created
+	•	Appointment.Cancelled
+	•	Appointment.Completed
+	•	Encounter.Created
+	•	Encounter.Completed
+	•	Patient.Created
+
+Based on config in journey_stages.config:
+	•	e.g., for CARDIO_NEW_OPD:
+	•	Stage 1 (PRE_VISIT):
+	•	entry_event: Appointment.Created with specialty=Cardiology.
+	•	config: send reminder N days before appointment.
+	•	Stage 2 (DAY_OF_VISIT):
+	•	entry_event: Appointment.CheckedIn.
+	•	Stage 3 (POST_VISIT):
+	•	entry_event: Encounter.Completed.
+
+⸻
+
+2.4 scribe-service (Text-Based)
+
+Responsibility:
+	•	Accept raw text transcript or free-text note.
+	•	Generate structured SOAP note + FHIR bundle (draft).
+	•	No direct DB writes; returns data to be persisted by another service (later, doc acceptance UI triggers writes).
+
+2.4.1 Endpoints
+Base: /api/v1/scribe
+	•	POST /draft-note
+	•	Input:
+	•	patient_id
+	•	encounter_id
+	•	transcript (text)
+	•	language (default: en)
+	•	specialty (optional)
+	•	Output:
+	•	soap_note: { subjective, objective, assessment, plan }
+	•	problems: array of { code?, display, confidence }
+	•	orders: array of suggested labs/imaging/meds (each with type, desc)
+	•	fhir_bundle: array of draft FHIR resources:
+	•	Composition, Condition[], Observation[], ServiceRequest[], MedicationRequest[]
+
+Implementation:
+	•	Use an LLM with a fixed prompt & output schema.
+	•	Validate output JSON before returning.
+
+No DB schema here; this service stateless (apart from logs).
+
+⸻
+
+2.5 comms-channel-adapter-service (Optional but Useful)
+
+Responsibility:
+	•	Integrate with WhatsApp, SMS, Email providers.
+	•	PRM calls this; it returns provider IDs/status.
+
+Endpoints:
+	•	POST /send
+	•	body: channel, to, message, template_code?, metadata?
+
+Implementation can be swapped depending on region/provider.
+
+⸻
+
+3. Frontend (Phase 2)
+
+A single Next.js app with multiple “personas”:
+	•	Patient portal (basic)
+	•	Doctor portal (OPD-focused)
+	•	Contact-centre console (lightweight)
+
+3.1 App Structure
+
+Routes:
+	•	/login
+	•	/ (role-based redirect)
+	•	/patients (internal search)
+	•	Patient portal
+	•	/patient/me (for logged-in patient)
+	•	/patient/me/appointments
+	•	/patient/me/appointments/new
+	•	/patient/me/journeys
+	•	Doctor portal
+	•	/doctor/dashboard
+	•	/doctor/schedule
+	•	/doctor/appointments
+	•	/doctor/appointments/[appointmentId]/encounter
+	•	Contact Centre
+	•	/cc/search
+	•	/cc/patients/[patientId] (timeline view)
+
+(You can also split into separate apps later; Phase 2 can share.)
+
+⸻
+
+3.2 Patient Portal Screens
+
+3.2.1 /patient/me/appointments
+Core:
+	•	List upcoming & past appointments.
+	•	Actions:
+	•	Reschedule (calls PATCH /appointments/{id} with new slot).
+	•	Cancel.
+
+API calls:
+	•	GET /api/v1/scheduling/appointments?patient_id=me&from=&to=
+
+Components:
+	•	AppointmentList
+	•	AppointmentCard
+
+3.2.2 /patient/me/appointments/new
+Flow:
+	1.	Pick specialty/location, or choose “same as last doctor”.
+	2.	Show available slots.
+	3.	Confirm appointment.
+
+API calls:
+	•	GET /api/v1/scheduling/providers?specialty=
+	•	GET /api/v1/scheduling/slots?practitioner_id=&from=&to=
+	•	POST /api/v1/scheduling/appointments
+
+Components:
+	•	SpecialtySelector
+	•	ProviderList
+	•	SlotPicker
+	•	AppointmentReviewModal
+
+Later, LLM will also suggest “best” slot, but in Phase 2 we keep it manual on UI.
+
+3.2.3 /patient/me/journeys
+	•	List active journeys:
+	•	“New Cardiology Visit”, “Diabetes Control Program”.
+	•	Show:
+	•	current stage,
+	•	upcoming actions/reminders.
+
+API:
+	•	GET /api/v1/prm/journey-instances?patient_id=me
+
+⸻
+
+3.3 Doctor Portal Screens
+
+3.3.1 /doctor/dashboard
+	•	Summary:
+	•	Today’s appointments count.
+	•	Patients waiting.
+	•	Pending notes (where scribe draft ready but not finalised).
+
+API:
+	•	GET /api/v1/scheduling/appointments?practitioner_id=me&from=today&to=today&status=booked,checked_in
+	•	GET /api/v1/encounters?practitioner_id=me&status=in-progress
+
+3.3.2 /doctor/appointments
+	•	Tabular view of day’s schedule.
+
+Components:
+	•	AppointmentTable row:
+	•	time, patient name, reason, status.
+	•	Actions:
+	•	Start encounter → POST /encounters.
+	•	Mark no-show → POST /appointments/{id}/no-show.
+
+3.3.3 /doctor/appointments/[appointmentId]/encounter
+This is the core consult screen.
+
+Layout:
+	•	Left panel:
+	•	Patient summary:
+	•	demographics,
+	•	key conditions,
+	•	meds,
+	•	recent labs.
+	•	Centre:
+	•	Note editor:
+	•	text area (or structured S/O/A/P tabs),
+	•	“Generate draft from transcript” button.
+	•	Right:
+	•	Proposed problems/orders from scribe-service.
+
+Flow:
+	1.	When doctor clicks “Open encounter”:
+	•	POST /api/v1/encounters with appointment_id.
+	2.	When they paste or type transcript:
+	•	POST /api/v1/scribe/draft-note.
+	3.	UI shows SOAP sections.
+	4.	Doctor accepts/edits.
+	5.	“Save & Finalise” triggers:
+	•	call to backend “encounter-note-service” (could be part of encounter-service or new module) to:
+	•	save note (Composition),
+	•	optionally create FHIR resources (Condition, Observations, ServiceRequest, etc.).
+
+⸻
+
+3.4 Contact Centre Screens
+
+3.4.1 /cc/search
+	•	Search by phone, name, ID.
+	•	Show patient summary: upcoming appointments, last encounter summary, open tickets.
+
+APIs:
+	•	GET /api/v1/identity/patients?search=
+	•	GET /api/v1/scheduling/appointments?patient_id=
+	•	GET /api/v1/prm/communications?patient_id=
+	•	GET /api/v1/prm/tickets?patient_id=
+
+3.4.2 /cc/patients/[patientId]
+	•	Timeline view:
+	•	appointments, communications, tickets.
+
+Components:
+	•	PatientTimeline
+	•	CommunicationTimelineItem
+	•	TicketList
+
+This is the base for later agent-in-the-loop call centre flows.
+
+⸻
+
+4. LLM Tools for OPD + PRM (Phase 2)
+
+We expand Phase 1 toolset with OPD + PRM tools.
+
+4.1 Appointment Tools
+	1.	find_appointment_slots
+	2.	book_appointment
+	3.	reschedule_appointment
+	4.	cancel_appointment
+
+Tool: find_appointment_slots
+
+{
+  "name": "find_appointment_slots",
+  "description": "Find available appointment slots for a given specialty or practitioner and date range.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string", "description": "If known, the patient's ID for context." },
+      "specialty_code": { "type": "string", "description": "Specialty, e.g., 'CARDIOLOGY'. Optional if practitioner_id provided." },
+      "practitioner_id": { "type": "string", "description": "Specific doctor id if the patient has a preference." },
+      "location_id": { "type": "string" },
+      "from": { "type": "string", "format": "date-time", "description": "Start of the search window." },
+      "to": { "type": "string", "format": "date-time", "description": "End of the search window." },
+      "max_slots": { "type": "integer", "default": 10 }
+    },
+    "required": ["from", "to"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "slots": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "slot_id": { "type": "string" },
+            "practitioner_id": { "type": "string" },
+            "practitioner_name": { "type": "string" },
+            "location_id": { "type": "string" },
+            "location_name": { "type": "string" },
+            "start_datetime": { "type": "string", "format": "date-time" },
+            "end_datetime": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps to: GET /api/v1/scheduling/slots?...
+
+⸻
+
+Tool: book_appointment
+
+{
+  "name": "book_appointment",
+  "description": "Book an outpatient appointment for a patient using a chosen slot.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "slot_id": { "type": "string" },
+      "appointment_type": { "type": "string", "enum": ["new", "followup", "procedure"] },
+      "reason_text": { "type": "string" },
+      "source_channel": { "type": "string", "description": "e.g., 'whatsapp','web','callcenter'." }
+    },
+    "required": ["patient_id", "slot_id", "appointment_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "appointment_id": { "type": "string" },
+      "status": { "type": "string" },
+      "start_datetime": { "type": "string" },
+      "practitioner_name": { "type": "string" },
+      "location_name": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/scheduling/appointments.
+
+⸻
+
+Tool: reschedule_appointment
+
+{
+  "name": "reschedule_appointment",
+  "description": "Reschedule an existing appointment to a new slot.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "appointment_id": { "type": "string" },
+      "new_slot_id": { "type": "string" },
+      "reason": { "type": "string" }
+    },
+    "required": ["appointment_id", "new_slot_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "appointment_id": { "type": "string" },
+      "old_slot_id": { "type": "string" },
+      "new_slot_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to PATCH /api/v1/scheduling/appointments/{id}.
+
+⸻
+
+Tool: cancel_appointment
+
+{
+  "name": "cancel_appointment",
+  "description": "Cancel an appointment if the patient requests it.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "appointment_id": { "type": "string" },
+      "reason": { "type": "string" }
+    },
+    "required": ["appointment_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "appointment_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to PATCH /appointments/{id} with status='cancelled'.
+
+⸻
+
+4.2 Encounter & Scribe Tools
+	1.	open_encounter_for_appointment
+	2.	draft_clinical_note_from_transcript
+	3.	suggest_followup_journey
+
+Tool: open_encounter_for_appointment
+
+{
+  "name": "open_encounter_for_appointment",
+  "description": "Open a new Encounter for a given appointment when the consultation starts.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "appointment_id": { "type": "string" },
+      "practitioner_id": { "type": "string" }
+    },
+    "required": ["appointment_id", "practitioner_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "encounter_id": { "type": "string" },
+      "fhir_encounter_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/encounters.
+
+⸻
+
+Tool: draft_clinical_note_from_transcript
+
+{
+  "name": "draft_clinical_note_from_transcript",
+  "description": "Generate a draft SOAP note and FHIR bundle from a consultation transcript.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "transcript": { "type": "string", "description": "The plain-text transcript of the consultation, including both doctor and patient." },
+      "specialty": { "type": "string" }
+    },
+    "required": ["patient_id", "encounter_id", "transcript"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "soap_note": {
+        "type": "object",
+        "properties": {
+          "subjective": { "type": "string" },
+          "objective": { "type": "string" },
+          "assessment": { "type": "string" },
+          "plan": { "type": "string" }
+        }
+      },
+      "problems": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "display": { "type": "string" },
+            "confidence": { "type": "number" }
+          }
+        }
+      },
+      "orders": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["lab", "imaging", "medication", "other"] },
+            "description": { "type": "string" }
+          }
+        }
+      },
+      "fhir_bundle": {
+        "type": "array",
+        "items": { "type": "object" }
+      }
+    }
+  }
+}
+
+Maps to POST /api/v1/scribe/draft-note.
+
+⸻
+
+4.3 PRM & Journeys Tools
+	1.	create_journey_instance_for_appointment
+	2.	advance_journey_stage
+	3.	send_patient_communication
+
+Tool: create_journey_instance_for_appointment
+
+{
+  "name": "create_journey_instance_for_appointment",
+  "description": "Create a journey instance for a patient based on a journey code and optionally link it to an appointment.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "journey_code": { "type": "string" },
+      "episode_of_care_fhir_id": { "type": "string" },
+      "appointment_id": { "type": "string" }
+    },
+    "required": ["patient_id", "journey_code"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "journey_instance_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/prm/journey-instances.
+
+⸻
+
+Tool: advance_journey_stage
+
+{
+  "name": "advance_journey_stage",
+  "description": "Advance a journey instance to the next stage when the relevant clinical or operational event has occurred.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "journey_instance_id": { "type": "string" },
+      "target_stage_code": { "type": "string", "description": "Optional explicit stage code. If omitted, the system will auto-advance based on configured sequence." },
+      "event_type": { "type": "string", "description": "Event that triggered this advancement, e.g., 'Appointment.Completed'." }
+    },
+    "required": ["journey_instance_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "journey_instance_id": { "type": "string" },
+      "current_stage_code": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/prm/journey-instances/{id}/advance.
+
+⸻
+
+Tool: send_patient_communication
+
+{
+  "name": "send_patient_communication",
+  "description": "Send an outbound message to a patient over a supported channel and log it as a Communication.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "journey_instance_id": { "type": "string" },
+      "channel": { "type": "string", "enum": ["whatsapp","sms","email","in_app"] },
+      "template_code": { "type": "string", "description": "Template code if using predefined content." },
+      "content": { "type": "string", "description": "Free text content if no template is used." },
+      "related_resource_type": { "type": "string" },
+      "related_resource_id": { "type": "string" }
+    },
+    "required": ["patient_id", "channel"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "communication_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/prm/communications → comms-channel-adapter.
+
+⸻
+
+5. Example System Prompts for Core Phase 2 Agents
+
+5.1 OPD Intake & Appointment Agent
+
+You are the OPD Intake & Appointment Agent for a hospital.
+
+Goals:
+	•	Help patients book, reschedule, or cancel outpatient appointments.
+	•	Minimise errors, double bookings, and unnecessary cancellations.
+
+Rules:
+	1.	Always identify the patient using search_patient first. If you find likely matches, present them as options instead of creating a new patient.
+	2.	Only call create_or_update_patient when the patient is new or when you must update missing key data (e.g. phone, email).
+	3.	When booking:
+	•	Use find_appointment_slots to find multiple options that match patient’s preferences (specialty, location, time window).
+	•	Present at least 3 suitable slot options when possible before calling book_appointment.
+	4.	When rescheduling:
+	•	Confirm that the patient accepts a new time before calling reschedule_appointment.
+	5.	When cancelling:
+	•	Confirm and record a short reason via cancel_appointment.
+	6.	Maintain a polite, concise style and repeat back final appointment details to the patient.
+
+Tools you may use:
+	•	search_patient
+	•	create_or_update_patient
+	•	find_appointment_slots
+	•	book_appointment
+	•	reschedule_appointment
+	•	cancel_appointment
+	•	send_patient_communication (for confirmation messages)
+
+Never invent appointment details. Always use the tools’ returned values.
+
+⸻
+
+5.2 Doctor Assist & Scribe Agent (Text-Based)
+
+You are the Doctor Assist & Scribe Agent for outpatient consultations.
+
+Goals:
+	•	Turn doctor-patient consultation transcripts into accurate, concise, and clinically useful SOAP notes.
+	•	Suggest structured diagnoses and orders that the doctor can review.
+
+Rules:
+	1.	You will be provided with:
+	•	the patient’s ID,
+	•	encounter ID,
+	•	the plain-text transcript or summary of the consultation,
+	•	optional specialty.
+	2.	You must use draft_clinical_note_from_transcript to transform the transcript into:
+	•	a SOAP note (S/O/A/P),
+	•	a list of problem statements,
+	•	suggested orders (lab, imaging, meds),
+	•	and a draft FHIR bundle.
+	3.	You must never directly update the database. You only provide drafts. The doctor will accept/edit them in the UI.
+	4.	Avoid absolute statements that go beyond what is supported by the transcript. If in doubt, label something as “possible” or “to be confirmed by clinician.”
+	5.	Always prioritize clarity and safety:
+	•	avoid ambiguous abbreviations,
+	•	ensure the Assessment and Plan clearly reflect what the doctor actually decided.
+
+Tools:
+	•	draft_clinical_note_from_transcript
+
+⸻
+
+5.3 Journey Orchestrator Agent (PRM)
+
+You are the Journey Orchestrator Agent for patient relationship management.
+
+Goals:
+	•	Keep patients on track through defined journeys (e.g. “New Cardiology OPD”, “Diabetes Control Program”).
+	•	Trigger stage changes and communications based on events.
+
+Rules:
+	1.	You will observe events such as:
+	•	Appointment.Created, Appointment.CheckedIn, Appointment.Completed,
+	•	Encounter.Completed.
+	2.	For each event, check if there is an existing journey instance for the patient:
+	•	If not and the event matches a journey entry rule (e.g., first cardiology appointment), create one using create_journey_instance_for_appointment.
+	3.	When an event corresponds to a configured stage transition:
+	•	Use advance_journey_stage to move the journey instance forward.
+	4.	When entering a stage with configured reminders or follow-ups:
+	•	Use send_patient_communication to send appropriate messages (pre-visit instructions, reminders, thank-you notes, follow-up prompts).
+	5.	Communications must be short, respectful, and explicit about the next step for the patient.
+
+Tools:
+	•	create_journey_instance_for_appointment
+	•	advance_journey_stage
+	•	send_patient_communication
+
+⸻
+
+5.4 Contact Centre Support Agent (Read-Only for Now)
+
+You are the Contact Centre Support Agent.
+
+Goals:
+	•	Help human contact-centre staff quickly get a contextual view of a patient’s OPD interactions.
+
+Rules:
+	1.	Given a patient identifier (name, phone, ID), use search_patient to identify them.
+	2.	Summarise:
+	•	upcoming appointments,
+	•	recent encounters (only high-level, non-sensitive summary),
+	•	recent communications and tickets from PRM.
+	3.	For Phase 2, you are read-only: do not book or cancel appointments yourself; instead, suggest actions that the human agent can execute in their UI.
+
+Tools:
+	•	search_patient
+	•	read-only wrappers on scheduling & PRM (get_appointments_for_patient, get_communications_for_patient, get_tickets_for_patient).
+
+⸻

@@ -1,0 +1,1111 @@
+Alright, Phase 3 is where this thing stops being “cute OPD + PRM” and starts running the actual hospital.
+
+I’ll treat Phase 3 as:
+
+IPD + Nursing + Orders + ICU / OT base
+
+Same treatment as Phase 1 & 2:
+	1.	Scope & boundaries
+	2.	Backend modules
+	•	bed-management-service
+	•	admission-service (IPD)
+	•	nursing-service
+	•	orders-service (lab/imaging/med orders)
+	•	icu-service (scores, alarms)
+	3.	Frontend routes / screens
+	4.	LLM tools for IPD / Nursing / ICU
+	5.	System prompts for core agents
+
+⸻
+
+1. Phase 3 Scope & Boundaries
+
+1.1 What Phase 3 Adds
+
+On top of Phase 1 (core) + Phase 2 (OPD + PRM):
+	•	Full Inpatient Admission → Bed Management → IPD Encounters.
+	•	Nursing workflows:
+	•	nurse tasking,
+	•	vitals documentation,
+	•	nursing notes.
+	•	Orders & Results for IPD:
+	•	labs, imaging, procedures, meds (at order level; not full MAR yet).
+	•	ICU basics:
+	•	track ICU encounters,
+	•	calculate EWS/NEWS/SOFA from vitals,
+	•	generate alerts.
+
+We’re not yet building full MAR (Medication Administration), inventory, or surgical theatre with all bells & whistles – that’s Phase 4+. But we will set shapes correctly so we can extend.
+
+1.2 Success Criteria
+
+By end of Phase 3, for pilot wards (including at least one ICU):
+	•	A patient can be admitted, assigned a bed, transferred between beds/wards, and discharged using our system.
+	•	Nurses can:
+	•	see ward/bed dashboards,
+	•	record vitals and nursing observations,
+	•	get tasks from doctors & system, and close them.
+	•	Doctors can:
+	•	see their IPD inpatients list,
+	•	view a timeline of vitals/notes,
+	•	sign daily progress notes (with AI draft).
+	•	Orders (labs, imaging, meds) are created in our system and integrated outwards to LIS/RIS/Pharmacy via events or APIs.
+	•	ICU early warning logic is up and sending alerts (even if simple rules).
+
+⸻
+
+2. Backend Modules (Phase 3)
+
+We’ll add:
+	1.	bed-management-service
+	2.	admission-service
+	3.	nursing-service
+	4.	orders-service
+	5.	icu-service
+
+All FastAPI-based, sharing Phase 1 DB, FHIR, event bus.
+
+⸻
+
+2.1 bed-management-service
+
+Responsibility:
+	•	Manage physical beds, wards, and their occupancy.
+	•	Support bed assignments, transfers, holds, and status (cleaning, blocked, etc.)
+	•	Link beds ↔ locations (FHIR Location).
+
+2.1.1 DB Schema
+Tables:
+	•	wards
+	•	beds
+	•	bed_assignments
+
+wards
+
+CREATE TABLE wards (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,          -- e.g., "WARD-3A"
+  name TEXT NOT NULL,          -- "Ward 3A - General Medicine"
+  location_id UUID NOT NULL,   -- link to FHIR Location
+  type TEXT,                   -- 'general','icu','hdu','pediatrics', etc.
+  floor TEXT,
+  capacity INT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_ward_code_tenant ON wards (tenant_id, code);
+
+beds
+
+CREATE TABLE beds (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  ward_id UUID NOT NULL REFERENCES wards(id),
+  code TEXT NOT NULL,              -- e.g., "3A-12"
+  type TEXT,                       -- 'standard','icu','isolation', etc.
+  status TEXT NOT NULL DEFAULT 'available', 
+  -- 'available','occupied','cleaning','maintenance','blocked'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_bed_code_ward ON beds (ward_id, code);
+CREATE INDEX idx_beds_status_ward ON beds (ward_id, status);
+
+bed_assignments
+
+Tracks which patient is in which bed over time.
+
+CREATE TABLE bed_assignments (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  bed_id UUID NOT NULL REFERENCES beds(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  admission_id UUID NOT NULL,   -- will reference admissions table
+  start_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ,         -- null = current
+  status TEXT NOT NULL DEFAULT 'active', 
+  -- 'active','transferred','discharged','cancelled'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_bed_assignments_bed ON bed_assignments (bed_id, status);
+CREATE INDEX idx_bed_assignments_patient ON bed_assignments (patient_id, start_time DESC);
+
+2.1.2 FHIR Mapping
+	•	wards → FHIR Location of type=ward.
+	•	beds → FHIR Location of type=bed, partOf = ward.
+
+You can either store FHIR Location in fhir_resources and link by location_id, or directly map.
+
+2.1.3 Endpoints
+Base: /api/v1/bed-management
+
+Wards
+	•	POST /wards
+	•	GET /wards?type=&active=
+	•	GET /wards/{id}
+	•	PATCH /wards/{id}
+
+Beds
+	•	POST /wards/{ward_id}/beds
+	•	GET /beds?ward_id=&status=
+	•	GET /beds/{id}
+	•	PATCH /beds/{id}
+	•	Change status (e.g. to cleaning, maintenance, blocked).
+
+Assignments
+	•	POST /bed-assignments
+	•	Input:
+	•	bed_id, patient_id, encounter_id, admission_id.
+	•	Logic:
+	•	Ensure bed is available.
+	•	Set bed status → occupied.
+	•	Create active bed_assignment.
+	•	POST /bed-assignments/{id}/end
+	•	For transfer/discharge:
+	•	set end_time, status.
+	•	free bed or mark as cleaning.
+	•	POST /admissions/{admission_id}/transfer-bed
+	•	Input:
+	•	from_bed_id, to_bed_id.
+	•	Logic:
+	•	End current assignment; start new one.
+	•	Publish BedAssignment.Updated events.
+
+2.1.4 Events
+	•	Bed.Created
+	•	Bed.StatusChanged
+	•	BedAssignment.Created
+	•	BedAssignment.Ended
+	•	Admission.BedTransferred (with old & new bed)
+
+These feed dashboards & ICU logic.
+
+⸻
+
+2.2 admission-service (IPD)
+
+Responsibility:
+	•	Manage admission episodes for IPD.
+	•	Link to OPD appointments (if converted admission).
+	•	FHIR mapping: Encounter (inpatient), EpisodeOfCare.
+
+2.2.1 DB Schema
+Tables:
+	•	admissions
+	•	Possibly link to encounters table (we already have from Phase 2).
+
+admissions
+
+CREATE TABLE admissions (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  primary_practitioner_id UUID NOT NULL,    -- admitting doctor
+  admitting_department TEXT,                -- e.g., 'General Medicine'
+  admission_type TEXT,                      -- 'elective','emergency','transfer'
+  admission_reason TEXT,
+  source_type TEXT,                         -- 'OPD','ER','REFERRAL'
+  source_appointment_id UUID,               -- if from OPD
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  episode_of_care_fhir_id TEXT,             -- FHIR EpisodeOfCare.id
+  status TEXT NOT NULL DEFAULT 'admitted',  -- 'admitted','transferred','discharged','cancelled'
+  admitted_at TIMESTAMPTZ NOT NULL,
+  discharged_at TIMESTAMPTZ,
+  discharge_summary_fhir_id TEXT,           -- later
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_admissions_patient ON admissions (patient_id, admitted_at DESC);
+CREATE INDEX idx_admissions_status ON admissions (status);
+CREATE INDEX idx_admissions_doctor ON admissions (primary_practitioner_id, status);
+
+We also ensure that the Encounter linked is an IPD-type:
+	•	Encounter.class.code = 'IMP' (inpatient).
+
+2.2.2 FHIR Mapping
+	•	For each admission:
+	•	Encounter with class = 'IMP', status, period.start/end, serviceType, location.
+	•	EpisodeOfCare linking encounters over the admission.
+
+We store FHIR Encounter & EpisodeOfCare in fhir_resources.
+
+2.2.3 Endpoints
+Base: /api/v1/admissions
+	•	POST /
+	•	Create new admission:
+	•	patient_id, primary_practitioner_id, admitting_department, admission_type, admission_reason, source_type, source_appointment_id?.
+	•	Workflow:
+	•	Creates IPD Encounter via fhir-service (status in-progress, class IMP).
+	•	Creates EpisodeOfCare.
+	•	Writes admissions row.
+	•	Emits Admission.Created.
+	•	GET /{id}
+	•	GET /?patient_id=&status=&from=&to=
+	•	GET /?primary_practitioner_id=&status=
+	•	POST /{id}/discharge
+	•	Sets:
+	•	status='discharged',
+	•	discharged_at=now().
+	•	Later, attach discharge_summary_fhir_id.
+	•	Marks encounter as finished.
+	•	POST /{id}/cancel
+	•	For planned admissions not completed.
+	•	POST /{id}/link-bed-assignment
+	•	Optionally to attach the initial bed assignment.
+
+2.2.4 Events
+	•	Admission.Created
+	•	Admission.Updated
+	•	Admission.Discharged
+	•	Admission.Cancelled
+
+These drive I/O, nursing & PRM.
+
+⸻
+
+2.3 nursing-service
+
+Responsibility:
+	•	Manage nurse tasks & workloads.
+	•	Collect vitals and nursing observations.
+	•	Nursing notes.
+
+2.3.1 DB Schema
+Tables:
+	•	nursing_tasks
+	•	nursing_observations
+	•	(Reuse Phase 1 tasks table if you had a generic; I’ll treat this as a specific.)
+
+nursing_tasks
+
+CREATE TABLE nursing_tasks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  admission_id UUID NOT NULL REFERENCES admissions(id),
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  bed_assignment_id UUID REFERENCES bed_assignments(id),
+  ward_id UUID REFERENCES wards(id),
+  created_by_user_id UUID,
+  assigned_to_user_id UUID,
+  task_type TEXT NOT NULL,         -- e.g., 'medication', 'vitals', 'procedure', 'education'
+  description TEXT NOT NULL,
+  priority TEXT DEFAULT 'normal',  -- 'low','normal','high','critical'
+  due_at TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'open',  -- 'open','in_progress','completed','cancelled'
+  completed_at TIMESTAMPTZ,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_nursing_tasks_ward_status ON nursing_tasks (ward_id, status, due_at);
+CREATE INDEX idx_nursing_tasks_patient ON nursing_tasks (patient_id, status);
+
+nursing_observations
+
+We want to support multiple observation types (vitals, I/O, pain, wounds, etc.)
+
+CREATE TABLE nursing_observations (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  admission_id UUID NOT NULL REFERENCES admissions(id),
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  bed_assignment_id UUID REFERENCES bed_assignments(id),
+  observed_by_user_id UUID,
+  observation_type TEXT NOT NULL,      -- 'vitals','pain','wound','io','other'
+  observation_time TIMESTAMPTZ NOT NULL,
+  data JSONB NOT NULL,                 -- e.g., { "temp": 37.8, "bp_systolic": 130, ... }
+  fhir_observation_ids JSONB,          -- list of Observation.id's
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_nursing_obs_patient_time ON nursing_observations (patient_id, observation_time DESC);
+
+Vital data will also be mirrored into FHIR Observation resources.
+
+2.3.2 FHIR Mapping
+For each vital set:
+	•	Create FHIR Observation resources:
+	•	e.g., BP, HR, RR, SpO2, Temp as separate or combined Observations.
+	•	Link to Encounter & Patient.
+
+2.3.3 Endpoints
+
+Base: /api/v1/nursing
+
+Tasks
+	•	POST /tasks
+	•	Create nurse task:
+	•	from doctor orders or system logic.
+	•	GET /tasks?ward_id=&status=&assigned_to=&due_before=
+	•	GET /tasks/{id}
+	•	PATCH /tasks/{id}
+	•	update status, assignee, due time.
+
+Observations
+	•	POST /observations
+	•	Input:
+	•	admission_id, encounter_id, patient_id, observation_type, observation_time, data.
+	•	Implementation:
+	•	Validate patient/admission.
+	•	Create nursing_observations row.
+	•	Create corresponding FHIR Observation resources and store their IDs.
+	•	Publish event NursingObservation.Recorded.
+	•	GET /observations?patient_id=&admission_id=&type=&from=&to=
+
+Additionally, later we’ll add voice-based input; Phase 3 can already accept structured JSON from an LLM.
+
+2.3.4 Events
+	•	NursingTask.Created
+	•	NursingTask.Updated
+	•	NursingObservation.Recorded
+
+These feed ICU/EWS, doctor dashboards, etc.
+
+⸻
+
+2.4 orders-service
+
+Responsibility:
+	•	Manage orders for labs, imaging, procedures, and medications at the request level.
+	•	FHIR mapping: ServiceRequest, MedicationRequest, DiagnosticReport (results, though LIS/RIS will feed them).
+
+2.4.1 DB Schema
+Tables:
+	•	orders
+	•	order_items (if you need grouped orders; we can start simpler)
+
+Simplify: each row = one order (lab, imaging, procedure, medication).
+
+orders
+
+CREATE TABLE orders (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  admission_id UUID REFERENCES admissions(id),
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  ordering_practitioner_id UUID NOT NULL,
+  order_type TEXT NOT NULL,        -- 'lab','imaging','procedure','medication'
+  code TEXT,                       -- e.g., LOINC code / internal code
+  description TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'requested', 
+  -- 'requested','in_progress','completed','cancelled','rejected'
+  priority TEXT DEFAULT 'routine', -- 'routine','urgent','stat'
+  reason TEXT,
+  external_order_id TEXT,          -- ID in LIS/RIS/Pharmacy
+  fhir_service_request_id TEXT,
+  fhir_medication_request_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_orders_patient ON orders (patient_id, created_at DESC);
+CREATE INDEX idx_orders_encounter ON orders (encounter_id);
+CREATE INDEX idx_orders_status ON orders (status);
+
+For medication orders, we may add more tables later (dose, route, etc.), but for Phase 3 it’s okay to store in FHIR MedicationRequest and in orders.description.
+
+2.4.2 FHIR Mapping
+	•	order_type='lab'|'imaging'|'procedure' → FHIR ServiceRequest.
+	•	order_type='medication' → FHIR MedicationRequest.
+
+We store resulting FHIR IDs in the row.
+
+Later we attach DiagnosticReport or Observation as results.
+
+2.4.3 Endpoints
+Base: /api/v1/orders
+	•	POST /
+	•	Input:
+	•	admission_id?, encounter_id, patient_id, order_type, code, description, priority, reason.
+	•	Implementation:
+	•	Create orders row.
+	•	Create appropriate FHIR resource (ServiceRequest / MedicationRequest).
+	•	Emit Order.Created event.
+	•	GET /{id}
+	•	GET /?patient_id=&encounter_id=&order_type=&status=&from=&to=
+	•	PATCH /{id}
+	•	Update status (in_progress, completed, cancelled, rejected) and external_order_id.
+
+2.4.4 Events
+	•	Order.Created
+	•	Order.Updated
+	•	Eventually, Order.ResultAvailable (when LIS/RIS data arrives).
+
+⸻
+
+2.5 icu-service
+
+Responsibility:
+	•	Process nursing observations & vitals to calculate Early Warning Scores (EWS/NEWS/SOFA).
+	•	Generate alerts for ICU / HDU patients.
+	•	Tag events for PRM & doctor dashboards.
+
+2.5.1 DB Schema
+Tables:
+	•	ews_scores
+	•	icu_alerts
+
+ews_scores
+
+CREATE TABLE ews_scores (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  admission_id UUID NOT NULL REFERENCES admissions(id),
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  score_type TEXT NOT NULL,             -- 'NEWS2','MEWS','SOFA'
+  score_value INT NOT NULL,
+  risk_level TEXT NOT NULL,             -- 'low','medium','high','critical'
+  calculated_at TIMESTAMPTZ NOT NULL,
+  source_observation_ids JSONB,         -- list of nursing_observations.id or FHIR Observation ids
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ews_patient ON ews_scores (patient_id, calculated_at DESC);
+
+icu_alerts
+
+CREATE TABLE icu_alerts (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  admission_id UUID NOT NULL REFERENCES admissions(id),
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  alert_type TEXT NOT NULL,        -- 'ews_high','vitals_trend','device_alarm'
+  message TEXT NOT NULL,
+  severity TEXT NOT NULL,          -- 'info','warning','critical'
+  status TEXT NOT NULL DEFAULT 'open', -- 'open','acknowledged','resolved'
+  triggered_at TIMESTAMPTZ NOT NULL,
+  acknowledged_by_user_id UUID,
+  acknowledged_at TIMESTAMPTZ,
+  resolved_at TIMESTAMPTZ,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_icu_alerts_patient ON icu_alerts (patient_id, status, triggered_at DESC);
+
+2.5.2 Inputs
+	•	Subscribes to:
+	•	NursingObservation.Recorded events.
+	•	Possibly device-steam events later.
+
+2.5.3 Logic
+For each NursingObservation.Recorded of type vitals:
+	•	Parse vitals:
+	•	HR, RR, BP, SpO2, Temp, AVPU, etc.
+	•	Calculate NEWS2:
+	•	assign sub-scores, sum to total.
+	•	Determine risk_level.
+	•	Insert ews_scores row.
+	•	If risk_level ≥ threshold:
+	•	create icu_alerts row with severity='critical'.
+	•	emit ICU.AlertCreated event.
+
+2.5.4 Endpoints
+Base: /api/v1/icu
+	•	GET /ews?patient_id=&admission_id=&from=&to=
+	•	GET /alerts?ward_id=&status=&severity=
+	•	PATCH /alerts/{id}
+	•	update status (acknowledged/resolved), add notes.
+
+⸻
+
+3. Frontend – Phase 3
+
+We extend existing Next.js app.
+
+3.1 New Top-Level Sections
+	•	/wards (bed management + ward board)
+	•	/wards/[wardId] (ward dashboard)
+	•	/wards/[wardId]/beds/[bedId] (bed detail)
+	•	/doctor/inpatients (doctor IPD list)
+	•	/doctor/inpatients/[admissionId] (inpatient chart)
+	•	/nursing/wards (nursing dashboards; can overlap with /wards)
+	•	/icu/dashboard (ICU consolidated view)
+
+⸻
+
+3.2 Bed Management & Ward Dashboard
+
+3.2.1 /wards
+	•	List of wards:
+	•	name, type, capacity, occupancy, number of alerts.
+
+API:
+	•	GET /api/v1/bed-management/wards
+	•	For each ward: aggregated stats (server provides or computed client-side from GET /beds + GET /icu/alerts).
+
+Components:
+	•	WardListCard
+	•	WardOccupancySummary
+
+3.2.2 /wards/[wardId]
+Core “ward board”:
+	•	Grid/list of beds with:
+	•	bed code,
+	•	patient name (if occupied),
+	•	primary doctor,
+	•	key flags (high EWS, NPO, isolation).
+	•	Filters:
+	•	show only my patients,
+	•	show unstable patients (high EWS).
+	•	Actions:
+	•	open patient chart,
+	•	view nurse tasks for bed.
+
+APIs:
+	•	GET /api/v1/bed-management/beds?ward_id=...
+	•	For each occupied bed:
+	•	GET /api/v1/admissions?patient_id=&status=admitted or direct join,
+	•	GET /api/v1/icu/ews?patient_id=&from=&to= (most recent),
+	•	GET /api/v1/nursing/tasks?bed_id=&status=open.
+
+Components:
+	•	WardBedTile
+	•	BedPatientSummaryCard
+	•	WardFiltersBar
+
+3.2.3 /wards/[wardId]/beds/[bedId]
+Bed detail view:
+	•	Patient details & admission summary.
+	•	Latest vitals & EWS trends.
+	•	Open nursing tasks.
+	•	Orders.
+
+APIs:
+	•	GET /api/v1/bed-management/beds/{bedId}
+	•	GET /api/v1/bed-management/bed-assignments?bed_id=&status=active
+	•	GET /api/v1/nursing/observations?patient_id=&from=&type=vitals
+	•	GET /api/v1/icu/ews?patient_id=&from=&to=
+	•	GET /api/v1/nursing/tasks?bed_id=&status=open
+	•	GET /api/v1/orders?patient_id=&order_type=&status=
+
+⸻
+
+3.3 Doctor IPD Screens
+
+3.3.1 /doctor/inpatients
+	•	Table of doctor’s admitted patients:
+	•	name, ward/bed, diagnosis, days since admission, last EWS, pending tasks/orders.
+
+API:
+	•	GET /api/v1/admissions?primary_practitioner_id=me&status=admitted
+	•	For each: aggregated data from other services.
+
+Components:
+	•	InpatientListTable
+	•	InpatientRow with quick actions:
+	•	Open chart, Add order, Write progress note.
+
+3.3.2 /doctor/inpatients/[admissionId]
+Inpatient chart – key screen.
+
+Layout:
+	•	Left: Patient & admission summary
+	•	demographics,
+	•	primary diagnosis,
+	•	allergies,
+	•	meds (read-only for now).
+	•	Centre:
+	•	Tabs:
+	•	Timeline,
+	•	Progress notes,
+	•	Orders,
+	•	Labs & Imaging.
+	•	Right:
+	•	Latest vitals,
+	•	EWS trend sparkline,
+	•	Open tasks.
+
+Functionalities:
+	•	“Write progress note”:
+	•	Doctor types or pastes text.
+	•	On “AI Suggest”:
+	•	calls draft_clinical_note_from_transcript (Phase 2 tool) but in IPD context.
+	•	“Add order”:
+	•	Quick order UI (lab/imaging/med):
+	•	calls POST /api/v1/orders.
+
+APIs:
+	•	GET /api/v1/admissions/{id}
+	•	GET /api/v1/nursing/observations?admission_id=
+	•	GET /api/v1/icu/ews?admission_id=
+	•	GET /api/v1/orders?admission_id=
+	•	GET /fhir/R4/DiagnosticReport?encounter= (for completed results).
+
+⸻
+
+3.4 Nursing Screens
+
+3.4.1 /nursing/wards
+	•	For a nurse’s assigned wards:
+	•	list of wards & bed counts.
+	•	Similar to /wards but perspective: tasks.
+
+APIs:
+	•	GET /api/v1/bed-management/wards
+	•	GET /api/v1/nursing/tasks?assigned_to=me&status=open
+
+3.4.2 /nursing/wards/[wardId]
+	•	Ward task board:
+	•	group tasks by bed or by priority.
+	•	Components:
+	•	NursingTaskBoard,
+	•	NursingTaskCard.
+
+APIs:
+	•	GET /api/v1/nursing/tasks?ward_id=&status=open
+
+3.4.3 Vital Entry Form (Modal on bed / patient)
+	•	Simplified form for vitals:
+	•	BP, HR, RR, Temp, SpO2, Pain scale, etc.
+	•	On submit:
+	•	POST /api/v1/nursing/observations.
+
+Later we can add “voice entry” where nurse speaks and an agent translates to structured JSON.
+
+⸻
+
+3.5 ICU Dashboard
+
+3.5.1 /icu/dashboard
+	•	Focus on ICU wards (type=‘icu’).
+	•	List of high-risk patients:
+	•	bed, patient, current EWS/SOFA, trend arrow.
+	•	Alerts list:
+	•	open ICU alerts for quick triage.
+
+APIs:
+	•	GET /api/v1/bed-management/wards?type=icu
+	•	GET /api/v1/icu/alerts?status=open
+	•	GET /api/v1/icu/ews?from=&to= for trends.
+
+Components:
+	•	ICUAlertList
+	•	ICUPatientRiskTable
+	•	EWSTrendSparkline
+
+⸻
+
+4. LLM Tools for Phase 3 (IPD, Nursing, ICU)
+
+We’ll add tools:
+	1.	Admission & bed
+	•	admit_patient_to_ipd
+	•	transfer_patient_bed
+	•	discharge_admission
+	2.	Nursing
+	•	create_nursing_task
+	•	record_nursing_observation
+	3.	Orders
+	•	create_order_for_problem (lab/imaging/procedure/med)
+	4.	ICU/EWS
+	•	calculate_ews_from_vitals (internal agent-facing)
+	•	acknowledge_icu_alert
+
+These complement Phase 1 & 2 tools.
+
+⸻
+
+4.1 Admission & Bed Tools
+
+Tool: admit_patient_to_ipd
+
+{
+  "name": "admit_patient_to_ipd",
+  "description": "Create an inpatient admission for a patient, link to an IPD Encounter and optionally assign a ward/bed.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "primary_practitioner_id": { "type": "string" },
+      "admitting_department": { "type": "string" },
+      "admission_type": { "type": "string", "enum": ["elective","emergency","transfer"] },
+      "admission_reason": { "type": "string" },
+      "source_type": { "type": "string", "enum": ["OPD","ER","REFERRAL","OTHER"] },
+      "source_appointment_id": { "type": "string" },
+      "preferred_ward_type": { "type": "string", "description": "e.g., 'general','icu','hdu','private'." }
+    },
+    "required": ["patient_id", "primary_practitioner_id", "admitting_department", "admission_type", "admission_reason"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "episode_of_care_fhir_id": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/admissions (and optionally a call to bed assignment if we want auto allocation).
+
+⸻
+
+Tool: transfer_patient_bed
+
+{
+  "name": "transfer_patient_bed",
+  "description": "Transfer an admitted patient from one bed to another, updating bed assignments and statuses.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "from_bed_id": { "type": "string" },
+      "to_bed_id": { "type": "string" },
+      "reason": { "type": "string" }
+    },
+    "required": ["admission_id", "from_bed_id", "to_bed_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "old_bed_assignment_id": { "type": "string" },
+      "new_bed_assignment_id": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/bed-management/admissions/{admission_id}/transfer-bed.
+
+⸻
+
+Tool: discharge_admission
+
+{
+  "name": "discharge_admission",
+  "description": "Mark an inpatient admission as discharged and release the associated bed assignment.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "discharge_reason": { "type": "string" },
+      "disposition": { "type": "string", "description": "e.g., 'home','transfer','expired'." }
+    },
+    "required": ["admission_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/admissions/{id}/discharge + bed end.
+
+⸻
+
+4.2 Nursing Tools
+
+Tool: create_nursing_task
+
+{
+  "name": "create_nursing_task",
+  "description": "Create a new nursing task for an inpatient, usually originating from a doctor order or system rule.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "bed_assignment_id": { "type": "string" },
+      "task_type": { "type": "string" },
+      "description": { "type": "string" },
+      "priority": { "type": "string", "enum": ["low","normal","high","critical"], "default": "normal" },
+      "due_at": { "type": "string", "format": "date-time" }
+    },
+    "required": ["admission_id", "encounter_id", "patient_id", "task_type", "description"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "task_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/nursing/tasks.
+
+⸻
+
+Tool: record_nursing_observation
+
+{
+  "name": "record_nursing_observation",
+  "description": "Record a nursing observation such as vitals or I/O for an inpatient, which will be converted into FHIR Observations.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "observation_type": { "type": "string", "enum": ["vitals","pain","wound","io","other"] },
+      "observation_time": { "type": "string", "format": "date-time" },
+      "data": {
+        "type": "object",
+        "description": "Key-value pairs representing the observation, e.g., {\"hr\":80,\"bp_systolic\":120,\"bp_diastolic\":80}"
+      }
+    },
+    "required": ["admission_id", "encounter_id", "patient_id", "observation_type", "observation_time", "data"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "nursing_observation_id": { "type": "string" },
+      "fhir_observation_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}
+
+Maps to POST /api/v1/nursing/observations.
+
+⸻
+
+4.3 Order Tool
+
+Tool: create_order_for_problem
+
+{
+  "name": "create_order_for_problem",
+  "description": "Create an order (lab, imaging, procedure, or medication) for a patient, typically in response to a documented problem.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "ordering_practitioner_id": { "type": "string" },
+      "order_type": { "type": "string", "enum": ["lab","imaging","procedure","medication"] },
+      "code": { "type": "string", "description": "Standardised code if available (LOINC, SNOMED, internal)." },
+      "description": { "type": "string" },
+      "priority": { "type": "string", "enum": ["routine","urgent","stat"], "default": "routine" },
+      "reason": { "type": "string" }
+    },
+    "required": ["encounter_id", "patient_id", "ordering_practitioner_id", "order_type", "description"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "order_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/orders.
+
+⸻
+
+4.4 ICU / EWS Tools
+
+Tool: calculate_ews_from_vitals (internal)
+This is more for internal ICU agent than external LLM, but we define it:
+
+{
+  "name": "calculate_ews_from_vitals",
+  "description": "Calculate an Early Warning Score for an inpatient using a set of vital signs.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "admission_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "observation_time": { "type": "string", "format": "date-time" },
+      "vitals": {
+        "type": "object",
+        "description": "Vital signs, e.g., {\"hr\":110,\"rr\":24,\"bp_systolic\":90,\"temp\":38.5,\"spo2\":92}"
+      }
+    },
+    "required": ["admission_id", "encounter_id", "patient_id", "observation_time", "vitals"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "score_type": { "type": "string" },
+      "score_value": { "type": "integer" },
+      "risk_level": { "type": "string" }
+    }
+  }
+}
+
+Maps to icu-service logic (but honestly, this can be done rule-based without LLM).
+
+⸻
+
+Tool: acknowledge_icu_alert
+
+{
+  "name": "acknowledge_icu_alert",
+  "description": "Mark an ICU alert as acknowledged or resolved when the clinical team reviews it.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "alert_id": { "type": "string" },
+      "action": { "type": "string", "enum": ["acknowledge","resolve"] },
+      "note": { "type": "string" }
+    },
+    "required": ["alert_id", "action"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "alert_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to PATCH /api/v1/icu/alerts/{id}.
+
+⸻
+
+5. Example System Prompts for Phase 3 Agents
+
+5.1 Admission Planner Agent
+
+You are the Admission Planner Agent.
+
+Your job:
+	•	Help clinicians and front-desk staff create inpatient admissions correctly, with appropriate IPD encounters and bed assignments.
+
+Rules:
+	1.	Always confirm patient identity using search_patient before admission.
+	2.	Clarify:
+	•	admitting department,
+	•	admitting consultant,
+	•	admission type (emergency vs elective),
+	•	reason for admission.
+	3.	Use admit_patient_to_ipd to create the admission and IPD encounter.
+	4.	If the clinician expresses a ward preference:
+	•	pass it as preferred_ward_type.
+	•	do not auto-allocate ICU beds unless explicitly requested or required by clinical status.
+	5.	Provide a clear summary back:
+	•	admission id,
+	•	ward/bed (if assigned),
+	•	admitting doctor,
+	•	any special instructions captured.
+
+Tools:
+	•	search_patient
+	•	admit_patient_to_ipd
+	•	transfer_patient_bed (for corrections shortly after admission)
+
+⸻
+
+5.2 Round Scribe Agent (Inpatient)
+
+You are the Inpatient Round Scribe Agent.
+
+Your job:
+	•	Convert the discussion during inpatient ward rounds into structured progress notes and highlight any necessary orders or nursing tasks.
+
+Rules:
+	1.	Input:
+	•	patient_id,
+	•	encounter_id (current inpatient encounter),
+	•	admission_id,
+	•	transcript of the round (doctor + team conversation).
+	2.	Use draft_clinical_note_from_transcript to generate:
+	•	SOAP note,
+	•	problem list,
+	•	suggested orders.
+	3.	When orders are appropriate and clearly requested:
+	•	propose calling create_order_for_problem for each discrete order,
+	•	but only after the human clinician explicitly confirms.
+	4.	You may also propose nursing tasks using create_nursing_task:
+	•	e.g., “Check blood sugar before each meal”, “Elevate head of bed”.
+	5.	Never finalize clinical decisions yourself; everything you generate is a draft for clinician review.
+	6.	Keep notes concise, avoid duplicating old information unless it has changed.
+
+Tools:
+	•	draft_clinical_note_from_transcript
+	•	create_order_for_problem
+	•	create_nursing_task
+
+⸻
+
+5.3 Nurse Companion Agent
+
+You are the Nurse Companion Agent.
+
+Your job:
+	•	Help nurses quickly record observations and manage their tasks using natural language.
+
+Rules:
+	1.	When a nurse provides vitals or I/O in free text (e.g., “Bed 12: BP 90 over 60, HR 110, temp 38.2, SpO2 92 on room air, RR 24”):
+	•	parse the data into structured vitals,
+	•	call record_nursing_observation with observation_type = vitals.
+	2.	If the vitals suggest a high risk (e.g., hypotension, tachycardia, hypoxia), you should:
+	•	highlight concern in your response,
+	•	ensure the ICU/EWS system will handle scoring,
+	•	optionally propose a nursing task (e.g. repeat vitals in 15 min) via create_nursing_task if allowed by local policy.
+	3.	When nurses describe nursing tasks in free text:
+	•	identify whether it should be a task,
+	•	call create_nursing_task with a clear description and reasonable due time.
+	4.	Always keep nurse workflows simple and short:
+	•	reflect back what you recorded,
+	•	avoid clinical interpretation beyond simple risk flags.
+
+Tools:
+	•	record_nursing_observation
+	•	create_nursing_task
+
+⸻
+
+5.4 Early Warning / ICU Agent
+
+You are the Early Warning / ICU Agent.
+
+Your job:
+	•	Assist in monitoring inpatients (especially ICU/HDU) for early signs of deterioration.
+
+Rules:
+	1.	Your primary data sources are:
+	•	nursing observations (vitals),
+	•	device data (later),
+	•	EWS/EWS2 scores calculated by rules.
+	2.	When a new set of vitals is recorded:
+	•	calculate an Early Warning Score if the rules engine hasn’t already,
+	•	interpret the risk level:
+	•	low (routine),
+	•	medium (increased vigilance),
+	•	high/critical (urgent review).
+	3.	If risk is high or critical:
+	•	create ICU alert entries via internal APIs (handled by backend),
+	•	provide a short explanation:
+	•	which vital sign(s) are abnormal,
+	•	suggested urgency for review.
+	4.	You never change patient treatment yourself; you only suggest actions (e.g., “inform on-call physician”, “repeat vitals in 15 minutes”).
+
+Tools:
+	•	calculate_ews_from_vitals
+	•	acknowledge_icu_alert (used by clinicians/nurses after reviewing)
+
+⸻
+
+This gives you:
+	•	Backend modules + DB + FHIR mapping for IPD, nursing, orders, ICU.
+	•	Frontend routes & components for ward, nursing, ICU, and doctor IPD views.
+	•	LLM tools & system prompts for Phase 3 agents.

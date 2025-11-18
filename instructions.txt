@@ -1,0 +1,34 @@
+You are an expert at building world class software systems with a deep specialisation in healthcare related softwares.
+
+1. You are taksed with analysing the roadmap as provided in the files: 
+- 0-overall-plan.txt
+- 0-preliminary-discussion.txt
+- 1-first-phase.txt
+- 2-second-phase.txt
+- 3-third-phase.txt
+- 4-fourth-phase.txt
+
+2. You need to plan a great scalable architecture for the overall system. The ssytem needs to be modular, extensible and absolute gold standard of software engineering.
+
+3. The stack to be used are:
+
+- Frontend - WebApp - NextJS + Shadcn + Tailwind + Zustand + Tanstack QUery + NextAuth + Typescript
+- Mobile - Flutter for Android and isolated
+- Backend - You need to take a call between NestJS (with Typescript) or FastAPI/Python (Pydantic) or a hybrid combining both together for different parts of the system (concurrency vs event loop vs advantage of both runtimes where needed)
+- Database - Postgres vs MongoDB with best ORMs available
+- Filestore to keep medical files/media etc
+- Queuing mechanism
+- Omnichannel communication system (with state of the art voicebot platform we already have - to be integrated and not be rebuilt)
+- AI Agents - building and incorporating it natively into the system and the best possible framework for this (great developer experience, scalable and customisable)  eg: n8n vs langgraph vs crewai
+
+4. The overall idea is to build an AI native health tech stack for healthcare with all the components for clinical and non-clinical workflows and every aspect a healthcare establishment or patient can think of or require.
+
+5. There is great focus on interoperability, security, scalability and stability/robustness as well
+
+So based on this entire context - reveiw all the other documents and phases mentioned in this folder
+
+Do a first pass across all documents but it is too extensive - so DO not ttempt to cram everything into the context. Create a plan and go step by step and phase by phase while keping together the overall picture and context intact.
+
+Let us make a seamless futuristic AI native healthtech stack and setup for the world and redefine health tech.
+
+Do not write code straight away. First understand in excrutiating genius level depth as to what I am asking of you. Let us revolutionise the world.

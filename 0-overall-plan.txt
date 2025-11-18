@@ -1,0 +1,801 @@
+
+Okay, let’s build the thing that makes every existing HIS/EHR look like a DOS terminal.
+
+I’ll give you:
+	1.	North Star & Design Principles
+	2.	End-state Architecture Overview
+	3.	Deep Domain & Workflow Design (clinical, CRM/PRM, billing, nursing, devices, research, etc.)
+	4.	Agent & AI Layer – in detail
+	5.	Data, Security, Compliance, Governance
+	6.	Migration & Coexistence with Legacy EHRs (Athma/EPIC/Cerner/etc.)
+	7.	Phased Roadmap – painfully detailed (Phase 0 → Phase 5)
+
+Use this as the “Mother RFC” you can keep slicing into more specific specs, prompt packs, and file-by-file build plans.
+
+⸻
+
+1. North Star & Design Principles
+
+1.1 North Star
+
+A single, longitudinal, FHIR-native patient & provider graph with agentic workflows layered on top, where every interaction (call, chat, visit, bill, lab, nurse task) is:
+	•	captured once,
+	•	understood by AI agents,
+	•	mapped to structured clinical + operational data,
+	•	re-used everywhere (care, operations, billing, research).
+
+Concretely:
+	•	No duplicate data entry.
+	•	No “forms first” design.
+	•	LLM agents are first-class operators in the system, not bolted-on chatbots.
+
+⸻
+
+1.2 Non-Negotiable Design Principles
+	1.	Patient Graph, not Screens
+Everything is a node/edge on a shared graph: Patient, Conditions, Encounters, Tasks, Communications, Bills, Insurance, Devices, etc.
+	2.	Conversation-First, Form-Second
+Default interaction is natural language (voice/text) → agents infer structured data → minimal confirmation UIs for humans.
+	3.	Agents Only Act via Tools
+LLMs never directly touch DBs. They call strongly typed tools / APIs (book_appointment, propose_orders, generate_discharge_summary) with narrow scope.
+	4.	FHIR + Internal Protocol
+Use FHIR for clinical semantics + an internal “Operational Protocol” for CRM, billing, scheduling, etc. Everything map-able to FHIR if needed.
+	5.	Event-Driven Spine
+Every important change emits events (Appointment.Created, Encounter.Updated, LabResult.Finalized, Invoice.Settled, CarePlan.Changed), which agents subscribe to.
+	6.	Safety & Auditability Built-in
+Every AI output is traceable: model version, prompt, tools, context, human approval. Clear separation between “suggested” vs “clinician-attested”.
+	7.	Composable & Vendor-Agnostic
+Must coexist with EPIC/Cerner/Athma/etc. via HL7/FHIR interfaces. Our system can be overlay, sidecar, or full core.
+	8.	Role-Centric UX
+	•	Patient
+	•	Clinician (doctor, nurse, therapist, pharmacist)
+	•	Admin / front desk
+	•	Finance / billing / RCM
+	•	Call centre / contact-centre
+	•	Management & quality
+Each gets tailored UI + agent support.
+
+⸻
+
+2. End-State Architecture Overview
+
+Think of it as 6 big layers:
+	1.	Channels & Experience Layer (apps, portals, telephony, WhatsApp)
+	2.	Agent & Orchestration Layer (LLM agents, tool registry, safety engine)
+	3.	Core Health Platform (EHR, PRM/CRM, scheduling, billing, tasks, orders, inventory)
+	4.	Data & Intelligence Layer (analytics, ML models, vector stores, feature store)
+	5.	Integration Layer (FHIR/HL7/REST bridges to legacy systems, policy engines)
+	6.	Platform Ops & Governance (RBAC/ABAC, auditing, config, tenant mgmt, observability)
+
+I’ll now go subsystem by subsystem.
+
+⸻
+
+3. Deep Domain & Workflow Design
+
+3.1 Identity, Master Data & Consent
+
+Entities:
+	•	Patient (FHIR Patient)
+	•	RelatedPerson (family, caregivers)
+	•	Practitioner (doctors, nurses, etc.)
+	•	Organization (hospitals, insurers, labs)
+	•	Location (wards, clinics, centres)
+	•	Consent (FHIR Consent)
+
+Capabilities:
+	•	Patient creation with multi-ID linking:
+	•	national IDs, ABHA, MRN, phone numbers, email, insurance IDs.
+	•	Deduplication & merge/unmerge workflows:
+	•	with human review + AI suggestions.
+	•	Consent management:
+	•	per purpose (care, research, marketing),
+	•	per channel (WhatsApp/phone/email),
+	•	per data domain (mental health, HIV, reproductive, etc.).
+
+Agents involved:
+	•	Identity Resolution Agent:
+	•	Given a new person, propose matches from existing records.
+	•	Consent Advisor Agent:
+	•	Explain consent options in normal language to the patient.
+	•	Log acceptance/withdrawal; keep FHIR Consent up to date.
+
+⸻
+
+3.2 Registration & Intake (OPD / IPD / Virtual)
+
+Common flows:
+	•	First contact via:
+	•	WhatsApp,
+	•	phone call,
+	•	self-serve web portal,
+	•	walk-in kiosk.
+
+Data captured:
+	•	Demographics (name, DOB, gender, address, etc.)
+	•	Contact details
+	•	Insurance / payer info
+	•	Presenting complaint (free text + structured triage)
+	•	Referring doctor / institution
+	•	High-level risk flags & consents
+
+Redesign:
+	•	Conversational intake:
+	•	“Hi, I’d like to see someone about my knee pain.”
+Intake Agent:
+	•	collects details conversationally;
+	•	builds FHIR Patient, Coverage, QuestionnaireResponse, and maybe initial Condition & EpisodeOfCare.
+	•	For IPD:
+	•	pre-admission flows, bed request, estimate, pre-auth.
+
+⸻
+
+3.3 Outpatient (OPD) Care – Deep
+
+Phases:
+	1.	Pre-Visit
+	2.	Check-in & Waiting Room
+3.Consultation (incl. scribing)
+	3.	Orders & Plans
+	4.	Post-Visit Follow-up
+
+3.3.1 Pre-Visit
+	•	Reminder & preparation:
+	•	Pre-visit question sets (Questionnaire),
+	•	collecting outside reports (upload/parse PDFs, images),
+	•	medication list reconciliation.
+
+Agents:
+	•	Pre-Visit Prep Agent:
+	•	summarises long histories & external docs into:
+	•	existing Conditions,
+	•	Medications,
+	•	key Observations (labs),
+	•	timeline of major events.
+	•	surfaces this as a one-pager to the doctor before consult.
+
+3.3.2 Check-in & Waiting Room
+	•	Self check-in:
+	•	verify details, insurance, contact.
+	•	Screening (vitals, pain score, red flags).
+
+Events:
+	•	Encounter.Opened (outpatient)
+	•	Observation.Created (vitals)
+
+Agents:
+	•	Queue Management Agent:
+	•	predicts wait time,
+	•	auto-stagger notifications,
+	•	reassigns patients if clinicians fall behind.
+
+3.3.3 Consultation & Scribing
+	•	Scribe agent runs live:
+	•	speech-to-text,
+	•	diarization (doctor vs patient),
+	•	segmentation into HPI, PMH, FH, SH, ROS, Exam, Plan.
+	•	Outputs:
+	•	Draft Composition (clinical note),
+	•	Structured Conditions, Observations, MedicationRequests, ServiceRequests.
+	•	UI:
+	•	Doctor sees structured suggestion:
+	•	clickable: accept / edit / reject per section.
+	•	Hard guardrails:
+	•	AI can’t finalize; doctor must attest.
+
+3.3.4 Orders & Plans
+	•	Based on diagnosis and guidelines:
+	•	Suggest labs, meds, imaging, referrals, lifestyle interventions.
+
+Agents:
+	•	Order Set Suggestion Agent:
+	•	consults knowledge base (guidelines, local protocols),
+	•	proposes standardized order sets with rationales.
+	•	Drug Interaction Agent:
+	•	checks interactions, allergies, dose limits.
+
+3.3.5 Post-Visit Follow-up
+	•	Follow-up appointments, remote check-ins, reminders.
+	•	Adherence tracking:
+	•	Pill reminders,
+	•	capturing self-reported outcomes (pain, mood, etc.).
+	•	Escalations:
+	•	If worsening symptoms → triage agent re-engages.
+
+⸻
+
+3.4 Inpatient (IPD), Nursing, ICU & OT – Deep
+
+3.4.1 Admission
+	•	Admission note (AI drafted):
+	•	reason for admission,
+	•	key history, exam,
+	•	initial plan,
+	•	risk scores (NEWS2, SOFA, etc.).
+	•	Bed management:
+	•	assign/upgrade/downgrade:
+	•	Ward, HDU, ICU.
+
+Agents:
+	•	Admission Planner Agent:
+	•	suggests optimal bed allocation based on acuity, specialty, payer, isolation needs.
+
+3.4.2 Daily Rounds & Nursing
+Core concepts:
+	•	CarePlan + Tasks:
+	•	each care goal (e.g. “control glucose”, “prevent DVT”) becomes:
+	•	set of tasks for nurse, doctor, physio, nutritionist.
+	•	Nursing documentation:
+	•	vital signs, intake/output, wound care, devices, lines, drains.
+
+Agents:
+	•	Round Scribe Agent:
+	•	listens to multidisciplinary rounds,
+	•	updates problem list & daily notes,
+	•	suggests updates to CarePlan & Tasks.
+	•	Nurse Companion Agent:
+	•	nurse talks to it in natural language:
+	•	“I just changed the dressing; wound looks better, less exudate.”
+	•	agent updates the wound assessment & documentation,
+	•	surfaces overdue tasks,
+	•	warns about early warning score changes.
+	•	Early Warning Agent:
+	•	consumes streaming vitals,
+	•	calculates NEWS/SOFA,
+	•	triggers alerts with explanation and suggested actions.
+
+3.4.3 ICU Specifics
+	•	Device integrations:
+	•	ventilators, infusion pumps, monitors.
+	•	Sedation, delirium scoring.
+	•	Frequent labs & imaging.
+
+Agents:
+	•	ICU Triage Agent:
+	•	helps decide admission/transfer/discharge from ICU.
+	•	Alarm Triage Agent:
+	•	classifies alarms (true vs noise),
+	•	escalates important ones to right clinician.
+
+3.4.4 OT / Procedure
+	•	Pre-op:
+	•	patient risk evaluation (ASA score),
+	•	fitness clearance,
+	•	checklists (WHO surgical safety checklist).
+	•	Intra-op:
+	•	times, events, implants used, complications.
+	•	Post-op:
+	•	PACU handover,
+	•	pain control, mobilization plans.
+
+Agents:
+	•	Surgical Checklist Agent:
+	•	ensures timeouts & checklists are completed properly,
+	•	logs compliance.
+
+⸻
+
+3.5 Orders, Labs, Imaging, & Result Management
+
+Flows:
+	•	Order creation (lab/imaging/procedure).
+	•	Routing to correct external system (LIS/RIS/PACS).
+	•	Status tracking (ordered, collected, in-progress, finalized).
+	•	Result integration, interpretation, critical results escalation.
+
+Agents:
+	•	Order Routing Agent:
+	•	maps internal order codes to external system codes.
+	•	Result Summarization Agent:
+	•	converts long reports into:
+	•	structured Observation(s),
+	•	patient-friendly summaries.
+	•	Critical Result Agent:
+	•	detects critical findings (e.g. K+ 6.5, massive PE),
+	•	makes sure escalations are acknowledged.
+
+⸻
+
+3.6 Medications, Pharmacy & Inventory
+
+Entities:
+	•	Formulary, generic vs brand, restrictions (ICU-only, restricted ABs).
+	•	MedicationRequest (orders), MedicationAdministration, MedicationDispense.
+	•	Inventory: stock, expiry, location.
+
+Agents:
+	•	Formulary Advisor Agent:
+	•	suggests cost-effective equivalents within formulary.
+	•	Inventory Prediction Agent:
+	•	forecasts stock requirements, flags shortages before they happen.
+	•	Narcotics Compliance Agent:
+	•	tracks controlled substances, reconciles inventory with administrations.
+
+⸻
+
+3.7 Scheduling & Resource Management
+	•	Doctor rosters, room schedules, equipment bookings, teleconsult slots.
+	•	Overbooking policies, urgent slot carving.
+
+Agents:
+	•	Scheduling Optimizer Agent:
+	•	balances no-show rates, patient preferences, doctor schedules.
+	•	Surge Management Agent:
+	•	detects demand spikes (flu season, outbreak),
+	•	reconfigures slot templates, staffing.
+
+⸻
+
+3.8 Billing, Insurance, Claims & RCM
+
+Key workflows:
+	•	Price estimation before visit/admission.
+	•	Charge capture (linked to orders, procedures, consumables).
+	•	Invoice generation.
+	•	Pre-authorization with payers.
+	•	Claim generation, submission, denial management.
+
+Agents:
+	•	Estimate Agent:
+	•	given diagnosis, planned procedures & insurance, estimates out-of-pocket & total costs.
+	•	Coding Agent:
+	•	suggests ICD, CPT/OPS codes from notes and orders;
+	•	flags missing documentation.
+	•	Pre-Auth Agent:
+	•	generates payer-specific pre-auth forms from clinical notes.
+	•	Denial Analysis Agent:
+	•	learns from claim denials to improve future documentation & coding.
+
+⸻
+
+3.9 CRM / PRM & Omni-Channel Communications
+
+Channels:
+	•	WhatsApp, SMS, email, mobile app push, in-app chat.
+	•	Telephony (voice, IVR, call recordings).
+
+Data:
+	•	Campaigns (screening drives, follow-up programs).
+	•	Journeys (e.g., pre-surgery, pregnancy, chemo cycle).
+	•	Tickets (issues, complaints, compliments).
+	•	Contact history & preferences.
+
+Agents:
+	•	Journey Orchestrator Agent:
+	•	subscribes to events and moves patient through journeys.
+	•	Conversation Unifier Agent:
+	•	merges conversations across channels into a single timeline.
+	•	Loyalty & Retention Agent:
+	•	identifies at-risk patients (non-adherence, missed follow-ups),
+	•	suggests outreach actions.
+
+⸻
+
+3.10 Patient Companion & Behavioural Support
+
+Beyond transactional chat:
+	•	Anxiety management, chronic disease coaching, rehab follow-up.
+	•	Multi-modal content (videos, instructions, diet plans).
+	•	Connects patient messages back to care team appropriately.
+
+Agents:
+	•	Companion Agent:
+	•	24x7 conversational layer, safe-guarded (no diagnosis, no medication changes without rules).
+	•	Behavioural Coaching Agent:
+	•	uses nudging, habit-forming techniques,
+	•	integrates with wearables, step counters, CGMs.
+
+⸻
+
+3.11 Population Health, Programs & Public Health
+	•	Cohorts and registries (diabetes, HF, COPD, TB, maternal health).
+	•	Gap in care detection.
+	•	Outreach and reminders at scale.
+
+Agents:
+	•	Cohort Manager Agent:
+	•	identifies patients meeting criteria from FHIR data.
+	•	Program Outcome Agent:
+	•	tracks program KPIs (HbA1c control rates, readmission rates, etc.).
+
+⸻
+
+3.12 Research & Data Products
+	•	De-identification pipelines.
+	•	Study cohort definitions.
+	•	Synthetic data generation for model training & testing.
+
+Agents:
+	•	Protocol Helper Agent:
+	•	assists researchers in defining inclusion/exclusion criteria using natural language.
+	•	De-Identification Agent:
+	•	automatically de-IDs free text & structured data according to policy.
+
+⸻
+
+3.13 Admin, HR, Rostering, Facility Ops
+	•	Staff scheduling, credentialing, privileges.
+	•	Facility usage, bed occupancy, OR utilisation.
+
+Agents:
+	•	Ops Intelligence Agent:
+	•	surfaces inefficiencies, resource bottlenecks.
+	•	Credentialing Agent:
+	•	tracks practitioner licenses, renewals, permissions in system.
+
+⸻
+
+4. Agent & AI Layer – Excruciating Detail
+
+4.1 Agent Taxonomy
+	1.	Channel Agents – bound to a channel (WhatsApp, IVR, web).
+	2.	Domain Agents – specialized by domain (triage, scribe, orders, billing).
+	3.	Supervisor Agents – orchestrate domain agents, handle escalation.
+	4.	Guardian Agents – policy & safety enforcement, adversarial checks.
+	5.	Analytics Agents – summarization, pattern detection, research support.
+
+⸻
+
+4.2 Tooling Protocol Design
+
+Each tool exposed to agents has:
+	•	name: e.g., book_appointment
+	•	description: plain language, strict purpose
+	•	input_schema: JSON Schema
+	•	output_schema: JSON
+	•	permissions: which roles/agents can use it
+	•	safety_class: A/B/C (informational vs suggestive vs direct action)
+
+Example (conceptual):
+
+{
+  "name": "create_medication_request",
+  "description": "Create a proposed medication request for a patient. Must be reviewed by a clinician.",
+  "safety_class": "B",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "drug_code": { "type": "string" },
+      "dose": { "type": "string" },
+      "route": { "type": "string" },
+      "frequency": { "type": "string" },
+      "duration": { "type": "string" },
+      "indication": { "type": "string" }
+    },
+    "required": ["patient_id", "encounter_id", "drug_code", "dose", "route", "frequency"]
+  }
+}
+
+Agents never call generic “run SQL”; only these tools.
+
+⸻
+
+4.3 Safety Classes
+	•	Class A (Informational)
+	•	summarise_notes, explain_lab_result_to_patient.
+	•	Can act autonomously; only display.
+	•	Class B (Suggestive)
+	•	propose_diagnosis_codes, draft_discharge_summary, suggest_orders.
+	•	Must be explicitly accepted/edited by human.
+	•	Class C (Operational Action)
+	•	book_appointment, send_patient_message, create_invoice.
+	•	Some allowed with policy constraints; others require human confirmation.
+
+Policy Engine enforces:
+	•	which agent may use which tool, in which context,
+	•	preconditions (e.g. no discharge without nurse sign-off).
+
+⸻
+
+4.4 Orchestration Flow
+	1.	Channel event: patient message / call / UI action.
+	2.	Orchestrator:
+	•	identifies intent & context (which patient, which episode).
+	•	picks primary domain agent(s).
+	3.	Domain agent:
+	•	retrieves context via tools (get_patient, get_active_episodes, etc.),
+	•	reasons via LLM,
+	•	calls tools to propose actions.
+	4.	Guardian agent:
+	•	checks actions against policies & risk patterns.
+	5.	Output:
+	•	actions executed or presented for human approval.
+
+All steps logged in an “AI Interaction Log” for audit.
+
+⸻
+
+4.5 Model Strategy
+	•	Mix of:
+	•	general LLMs (core reasoning),
+	•	domain-fine tuned models (clinical, billing),
+	•	small models for edge/on-prem deployment (privacy).
+	•	Use retrieval (RAG) for:
+	•	hospital policies,
+	•	local clinical guidelines & order sets,
+	•	payer rules.
+
+Long-term:
+	•	track performance metrics per agent per model,
+	•	support hot-swapping models with rollback.
+
+⸻
+
+5. Data, Security, Compliance, Governance
+
+5.1 Data Architecture
+	•	Operational DBs:
+	•	FHIR store (Postgres + JSONB / Mongo, etc.),
+	•	scheduling/billing/queues (relational).
+	•	Events Bus:
+	•	Kafka/Pulsar/NATS; events schema versioned.
+	•	Data Lake & Warehouse:
+	•	for analytics, cohort building.
+	•	Vector Stores:
+	•	separate indexes for:
+	•	clinical guidelines,
+	•	local SOPs,
+	•	patient longitudinal summaries,
+	•	documentation templates.
+
+⸻
+
+5.2 Security & Access Control
+	•	ABAC:
+	•	decisions based on role, department, location, patient relationship, consent.
+	•	“Break Glass” mode:
+	•	in emergencies, allow broader access with heavy logging.
+	•	Encryption:
+	•	at rest & in transit,
+	•	field-level encryption for sensitive data (HIV, reproductive health).
+
+⸻
+
+5.3 AI Governance
+	•	AI use registry:
+	•	list of all agents, tools, prompts, models.
+	•	Monitoring:
+	•	bias detection,
+	•	hallucination cases,
+	•	harmful suggestion tracking.
+	•	Periodic reviews:
+	•	transcript sampling,
+	•	outcome correlations.
+
+⸻
+
+6. Integration & Migration Strategy
+	•	Start as overlay:
+	•	Use FHIR/HL7 to sync with Athma/EPIC/Cerner.
+	•	Keep our system as the agentic, UX & CRM layer.
+	•	Gradually move:
+	•	new workflows into our system (start with OPD + PRM).
+	•	old EHR becomes backend data source.
+	•	Design:
+	•	a “Connector Gateway” that:
+	•	normalizes different EHR APIs → our internal protocol,
+	•	handles mapping & transformations.
+
+⸻
+
+7. Phased Roadmap – Excruciatingly Detailed
+
+Think in phases, each with clear objectives, deliverables, and “go/no-go” gates.
+
+⸻
+
+Phase 0 – Foundations, Discovery & Clinical Governance (6–10 weeks)
+
+Objectives:
+	•	Understand target hospital(s) deeply.
+	•	Define governance, safety, and success metrics.
+	•	Formalise domain model and internal protocol.
+
+Key Workstreams:
+	1.	Clinical & Operational Discovery
+	•	Shadow OPD, IPD, ICU, OT, billing, call centre.
+	•	Map current workflows in swimlanes, identify pain points.
+	•	Prioritise 3 specialties for MVP (e.g. cardiology, ortho, internal medicine).
+	2.	Data & System Mapping
+	•	Inventory existing systems (Athma/EPIC, LIS, RIS, billing, call centre).
+	•	Identify available APIs, FHIR support, HL7 feeds.
+	3.	Domain Modeling
+	•	Create canonical resource model:
+	•	FHIR entity set + local extensions.
+	•	Define internal operational entities:
+	•	Contacts, Tickets, Journeys, Campaigns, Inventory, Roster, etc.
+	4.	Agent Governance Charter
+	•	Define:
+	•	safety classes,
+	•	allowed agent capabilities,
+	•	approval flows per specialty.
+	•	Identify “no-go” zones initially:
+	•	e.g. no AI medication initiation for pediatrics.
+	5.	Non-Functional Requirements
+	•	Performance (OPD peak), uptime, DR/BCP.
+	•	Security posture (regulations by country).
+
+Deliverables:
+	•	Master Architecture RFC (this doc, refined).
+	•	Data & Integration map.
+	•	Safety & Governance spec v1.
+	•	Prioritised MVP scope & KPIs.
+
+⸻
+
+Phase 1 – Core Platform & FHIR Backbone (8–12 weeks)
+
+Objectives:
+	•	Stand up the core health platform with FHIR backbone.
+	•	Implement basic patient graph, identity, consent, and events bus.
+
+Workstreams:
+	1.	Platform Infrastructure
+	•	Environment setup (dev/stage/prod).
+	•	CI/CD pipelines, IaC.
+	•	Observability (logging, metrics, tracing).
+	2.	FHIR Store & Clinical Core
+	•	Implement FHIR R4 server (custom or existing).
+	•	Support for:
+	•	Patient, Practitioner, Encounter, EpisodeOfCare, Condition, Observation, Medication*, Procedure, ServiceRequest, DiagnosticReport, CarePlan, Task, Consent, Communication.
+	3.	Identity & Consent
+	•	Identity resolution service.
+	•	Consent capture flows (simple web UIs + APIs).
+	•	ABAC engine skeleton.
+	4.	Events Bus & Internal Schema
+	•	Define event schemas for:
+	•	Patient.Created, Encounter.Opened, Appointment.Booked, etc.
+	•	Implement producer/consumer patterns.
+	5.	Admin Console v1
+	•	Tenant & org configuration.
+	•	Basic user/role management.
+
+Deliverables:
+	•	Running core platform.
+	•	First sync job with legacy EHR (for patients & encounters).
+	•	Documentation & initial test coverage.
+
+⸻
+
+Phase 2 – Agentic PRM + Outpatient MVP (12–16 weeks)
+
+Objectives:
+	•	Deliver fully agentic OPD + PRM for selected specialties.
+	•	Channels: Web, WhatsApp, Call centre (partial).
+
+Workstreams:
+	1.	Patient & Doctor Portals (MVP)
+	•	Patient portal:
+	•	registration, viewing appointments, reports, bills.
+	•	Doctor portal:
+	•	worklist, patient timeline, note editor with AI suggestions.
+	2.	Appointment & Scheduling
+	•	Implement Appointment service:
+	•	slot definitions,
+	•	booking, rescheduling, cancellation.
+	•	Integrate with existing scheduling if needed.
+	3.	Intake & Pre-Visit Agents
+	•	Multi-channel flows:
+	•	WhatsApp + web chat.
+	•	Conversation to FHIR mapping:
+	•	create/merge Patient,
+	•	EpisodeOfCare for selected program,
+	•	pre-visit questionnaires.
+	4.	OPD Scribe Agent (Basic)
+	•	Text-only initially (doctor types notes or uploads transcripts).
+	•	Agent:
+	•	structures notes,
+	•	suggests problems, orders, follow-up.
+	•	Doctor UI for acceptance & editing.
+	5.	PRM & Journeys
+	•	Set up journey definitions:
+	•	e.g., “New Cardiology OPD”, “Diabetes Review”.
+	•	Journey Orchestrator agent:
+	•	listens to events (Encounter.Closed),
+	•	schedules follow-up reminders, labs, etc.
+	6.	Call Centre UI v1
+	•	Unified patient lookup.
+	•	See upcoming appointments, basic clinical summary.
+	•	Basic scripts and macros for agents.
+
+Deliverables:
+	•	Live OPD + PRM for 1–3 specialties, limited clinics.
+	•	Data on agent performance:
+	•	reduction in manual data entry,
+	•	time saved per consult,
+	•	NPS change.
+
+⸻
+
+Phase 3 – Deep Clinical & Inpatient Expansion (16–24+ weeks)
+
+Objectives:
+	•	Bring in IPD, nursing, ICU, OT workflows.
+	•	Introduce more powerful scribing & clinical agents.
+
+Workstreams:
+	1.	IPD Admission & Bed Management
+	•	Bed & ward modeling.
+	•	Admission agent flows:
+	•	reason for admission,
+	•	risk profiles,
+	•	pre-auth hooks.
+	2.	Nursing Module
+	•	Task board & care plans.
+	•	Vital sign charting with device integrations (if available).
+	•	Nursing documentation templates with AI assistance.
+	3.	Advanced Scribe (Voice)
+	•	Voice-enabled scribing for OPD & IPD.
+	•	Real-time summarization with:
+	•	privacy controls (e.g. “off-the-record” segments).
+	4.	Orders & Results
+	•	Deep LIS/RIS/PACS integration.
+	•	Result summarization agents.
+	•	Critical result workflows.
+	5.	ICU & OT Extensions
+	•	ICU dashboards.
+	•	OT scheduling & documentation support.
+	•	Checklist & perioperative agent flows.
+
+Deliverables:
+	•	IPD live for pilot wards.
+	•	Nursing staff using the system daily.
+	•	Documentation completeness & quality improvements measured.
+
+⸻
+
+Phase 4 – Full RCM, Insurance, and Financial Intelligence (16–24 weeks, overlap)
+
+Objectives:
+	•	Make the platform financially intelligent.
+	•	Full RCM automation.
+
+Workstreams:
+	1.	Charge Capture
+	•	Link charges to orders, procedures, consumables.
+	•	Auto suggestions from scribed notes.
+	2.	Estimations & Pre-Auth
+	•	OPD & IPD estimates integrated into patient and provider UIs.
+	•	Pre-auth agent generating payer-specific forms.
+	3.	Claims & Denials
+	•	Claims generation, submission.
+	•	Denial processing & learning loops.
+	4.	Financial Dashboards & Alerts
+	•	Revenue, margins, leakage detection.
+	•	Payer behaviour analytics.
+
+Deliverables:
+	•	End-to-end RCM for at least a subset of services.
+	•	Documented financial impact & improved collections.
+
+⸻
+
+Phase 5 – Population Health, Remote Care, Research & Multi-Site Scale (Ongoing)
+
+Objectives:
+	•	Turn system into a learning healthcare platform.
+	•	Multi-hospital, multi-country capability.
+	•	Research & partner APIs.
+
+Workstreams:
+	1.	Cohorts & Programs
+	•	Disease registries.
+	•	Gap-in-care detection agents.
+	2.	Remote Monitoring & At-Home Care
+	•	Integrations with wearables, home devices.
+	•	Virtual wards.
+	3.	Research & Data Access
+	•	De-ID pipelines.
+	•	Cohort builder UI.
+	•	Governance for data collaborations.
+	4.	Marketplace & Extensibility
+	•	Let other vendors build plug-in agents & modules on top:
+	•	triage tools,
+	•	advanced imaging AI,
+	•	domain-specific apps.
+
+Deliverables:
+	•	Established programs with measurable health outcome improvements.
+	•	Partnerships & research output.

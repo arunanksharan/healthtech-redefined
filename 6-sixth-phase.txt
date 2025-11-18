@@ -1,0 +1,1514 @@
+Phase 6 time, captain. This is where the hospital OS stops being just “operationally excellent” and becomes a learning health system + research platform that can run real science, trials, and guideline-based care on top of everything we’ve already built.
+
+I’ll define:
+
+Phase 6 – Research, Trials & Learning Health System
+
+We’ll go through:
+	1.	Scope & philosophy
+	2.	Backend modules (DB schema, endpoints, FHIR mapping)
+	•	deidentification-service
+	•	research-registry-service
+	•	trial-management-service
+	•	guideline-engine-service (CDS)
+	•	synthetic-data-service
+	•	knowledge-graph-service
+	3.	Frontend routes / UIs
+	4.	LLM tools (research, trials, guideline support, synthetic data)
+	5.	System prompts for Phase 6 agents
+
+⸻
+
+1. Phase 6 – Scope & Philosophy
+
+1.1 What Phase 6 Adds
+
+On top of Phases 1–5, Phase 6 makes the platform:
+	•	A research engine:
+	•	Build disease registries.
+	•	Run observational cohorts.
+	•	Track outcomes/covariates longitudinally.
+	•	A clinical trial platform:
+	•	Protocol definitions.
+	•	Eligibility screening.
+	•	eConsent.
+	•	Trial visits tracking and protocol deviations.
+	•	A guideline & CDS engine:
+	•	Codify care pathways (e.g., HF, sepsis, stroke).
+	•	Trigger point-of-care recommendations in OPD/IPD/ICU flows.
+	•	A privacy-safe research sandbox:
+	•	De-identification + pseudonymization.
+	•	Synthetic data generation.
+	•	Transparent governance & audit.
+	•	A knowledge graph:
+	•	Relationships between conditions, meds, labs, events.
+	•	Fuel for LLM reasoning & trial matching.
+
+1.2 Success Criteria
+
+By the end of Phase 6:
+	•	Research team can:
+	•	Define registries & trials with inclusion/exclusion criteria.
+	•	Run eligibility screens across the live population.
+	•	Follow cohorts with outcomes from Phase 4.
+	•	Clinicians get:
+	•	Inline guideline suggestions (CDS) for target conditions.
+	•	Transparent explanation of why a suggestion fired.
+	•	Privacy & governance:
+	•	There is a clean de-identified mirror of data for research.
+	•	Synthetic datasets can be generated per protocol/app.
+	•	Access to research datasets is controlled + audited.
+	•	Knowledge:
+	•	There’s a structured knowledge graph linking:
+	•	conditions ↔ labs ↔ meds ↔ events ↔ outcomes.
+	•	Agents can traverse this instead of hallucinating relationships.
+
+⸻
+
+2. Backend Modules (Phase 6)
+
+New services:
+	1.	deidentification-service
+	2.	research-registry-service
+	3.	trial-management-service
+	4.	guideline-engine-service (CDS)
+	5.	synthetic-data-service
+	6.	knowledge-graph-service
+
+All sit atop:
+	•	FHIR store (Phase 1)
+	•	Outcomes/risk (Phase 4)
+	•	Analytics-hub (Phase 4)
+	•	Consent/governance (Phase 4–5)
+
+⸻
+
+2.1 deidentification-service
+
+Responsibility:
+	•	Take identifiable FHIR data / events and produce:
+	•	De-identified datasets (HIPAA-like “safe harbor” style).
+	•	Pseudonymized datasets (stable IDs, no direct identifiers).
+	•	Manage mapping between real IDs and pseudo IDs (extremely locked down).
+
+2.1.1 DB Schema
+Tables:
+	•	deid_configs
+	•	pseudo_id_spaces
+	•	pseudo_id_mappings
+	•	deid_jobs
+	•	deid_job_outputs
+
+deid_configs – what fields to remove/generalise for a given use case.
+
+CREATE TABLE deid_configs (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                      -- 'SAFE_HARBOR','LIMITED_DATASET','TRIAL_FEASIBILITY'
+  name TEXT NOT NULL,
+  description TEXT,
+  mode TEXT NOT NULL,                      -- 'deidentification','pseudonymization','both'
+  rules JSONB NOT NULL,                    -- e.g., { "remove": [...], "generalize": [...], "mask": [...] }
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_deid_config_code_tenant ON deid_configs (tenant_id, code);
+
+pseudo_id_spaces – different pseudonymization universes.
+
+CREATE TABLE pseudo_id_spaces (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                      -- 'RESEARCH_SPACE_1','TRIAL_XYZ'
+  name TEXT NOT NULL,
+  description TEXT,
+  scope TEXT NOT NULL,                     -- 'patient','practitioner','org'
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_pseudo_space_code_tenant ON pseudo_id_spaces (tenant_id, code);
+
+pseudo_id_mappings – real ↔ pseudo mapping.
+
+This table should live in a logically separate, super-locked schema, but structurally:
+
+CREATE TABLE pseudo_id_mappings (
+  id UUID PRIMARY KEY,
+  pseudo_id_space_id UUID NOT NULL REFERENCES pseudo_id_spaces(id),
+  real_id TEXT NOT NULL,                    -- `patients.id`, `practitioners.id`, etc.
+  pseudo_id TEXT NOT NULL,                  -- random or hashed ID, non-reversible without mapping
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_used_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX uniq_pseudo_mapping_real ON pseudo_id_mappings (pseudo_id_space_id, real_id);
+CREATE UNIQUE INDEX uniq_pseudo_mapping_pseudo ON pseudo_id_mappings (pseudo_id_space_id, pseudo_id);
+
+deid_jobs
+
+CREATE TABLE deid_jobs (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  deid_config_id UUID NOT NULL REFERENCES deid_configs(id),
+  pseudo_id_space_id UUID REFERENCES pseudo_id_spaces(id),
+  job_type TEXT NOT NULL,                   -- 'snapshot','incremental','export'
+  status TEXT NOT NULL DEFAULT 'queued',    -- 'queued','running','completed','failed'
+  requested_by_user_id UUID NOT NULL,
+  description TEXT,
+  filters JSONB,                            -- cohort/time filters
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+deid_job_outputs
+
+CREATE TABLE deid_job_outputs (
+  id UUID PRIMARY KEY,
+  deid_job_id UUID NOT NULL REFERENCES deid_jobs(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,                -- 'fhir_bundle','parquet','csv','db_table'
+  location TEXT NOT NULL,                   -- URI or table name
+  row_count BIGINT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.1.2 Endpoints
+Base: /api/v1/deid
+
+Configs
+	•	POST /configs
+	•	GET /configs
+	•	GET /configs/{id}
+
+Pseudo ID spaces
+	•	POST /pseudo-spaces
+	•	GET /pseudo-spaces
+	•	GET /pseudo-spaces/{id}
+
+Jobs
+	•	POST /jobs
+	•	Input:
+	•	deid_config_code,
+	•	pseudo_id_space_code?,
+	•	job_type,
+	•	filters (cohort/time definition).
+	•	GET /jobs?status=&requested_by=
+	•	GET /jobs/{id}
+	•	GET /jobs/{id}/outputs
+
+2.1.3 FHIR Mapping
+	•	Reads FHIR resources via fhir-service and/or analytics-hub.
+	•	Applies rules:
+	•	Remove names, exact dates, addresses, etc.
+	•	Generalise location (state/city-level).
+	•	Replace IDs with pseudo IDs.
+
+⸻
+
+2.2 research-registry-service
+
+Responsibility:
+	•	Define registries (e.g., HF registry, COVID registry).
+	•	Enroll patients into registries (auto + manual).
+	•	Track registry-specific data elements and snapshots.
+
+2.2.1 DB Schema
+Tables:
+	•	registries
+	•	registry_criteria
+	•	registry_enrollments
+	•	registry_data_elements
+	•	registry_data_values
+
+registries
+
+CREATE TABLE registries (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'HF_REGISTRY','CKD_REGISTRY'
+  name TEXT NOT NULL,
+  description TEXT,
+  specialty TEXT,
+  inclusion_criteria JSONB,                  -- high-level description
+  exclusion_criteria JSONB,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_registry_code_tenant ON registries (tenant_id, code);
+
+registry_criteria
+
+Machine-readable criteria for automated screening.
+
+CREATE TABLE registry_criteria (
+  id UUID PRIMARY KEY,
+  registry_id UUID NOT NULL REFERENCES registries(id) ON DELETE CASCADE,
+  criteria_type TEXT NOT NULL,               -- 'inclusion','exclusion'
+  dsl_definition JSONB NOT NULL,             -- expression to be evaluated in analytics-hub
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+registry_enrollments
+
+CREATE TABLE registry_enrollments (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  registry_id UUID NOT NULL REFERENCES registries(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  episode_id UUID REFERENCES episodes(id),
+  status TEXT NOT NULL DEFAULT 'active',     -- 'active','withdrawn','completed'
+  enrolled_at TIMESTAMPTZ NOT NULL,
+  withdrawn_at TIMESTAMPTZ,
+  withdrawal_reason TEXT,
+  source TEXT NOT NULL,                      -- 'auto','manual','trial'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_registry_enrollments_reg ON registry_enrollments (registry_id, status);
+CREATE INDEX idx_registry_enrollments_patient ON registry_enrollments (patient_id, enrolled_at DESC);
+
+registry_data_elements
+
+Define variables for the registry.
+
+CREATE TABLE registry_data_elements (
+  id UUID PRIMARY KEY,
+  registry_id UUID NOT NULL REFERENCES registries(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,                        -- 'LVEF','NYHA_CLASS','NT_PROBNP','CREATININE'
+  name TEXT NOT NULL,
+  description TEXT,
+  value_type TEXT NOT NULL,                  -- 'string','number','date','code'
+  source_type TEXT NOT NULL,                 -- 'fhir','analytics','manual'
+  source_definition JSONB,                   -- e.g., FHIR Observation code(s) or SQL/DSL
+  is_required BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_registry_data_element_code ON registry_data_elements (registry_id, code);
+
+registry_data_values
+
+Snapshot values per patient per timepoint.
+
+CREATE TABLE registry_data_values (
+  id UUID PRIMARY KEY,
+  registry_enrollment_id UUID NOT NULL REFERENCES registry_enrollments(id) ON DELETE CASCADE,
+  data_element_id UUID NOT NULL REFERENCES registry_data_elements(id),
+  as_of_date DATE NOT NULL,
+  value_string TEXT,
+  value_number NUMERIC,
+  value_date DATE,
+  value_code TEXT,
+  source TEXT,                                -- 'auto_extract','manual_entry'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_registry_data_values_enrollment_date ON registry_data_values (registry_enrollment_id, as_of_date);
+
+2.2.2 Endpoints
+Base: /api/v1/registries
+
+Registries
+	•	POST /
+	•	GET /
+	•	GET /{id}
+	•	PATCH /{id}
+
+Criteria
+	•	POST /{registryId}/criteria
+	•	GET /{registryId}/criteria
+
+Enrollments
+	•	POST /{registryId}/enroll
+	•	manual enrollment.
+	•	GET /{registryId}/enrollments?status=&patient_id=
+	•	PATCH /enrollments/{id}
+	•	change status (withdraw/completed).
+
+Data Elements & Values
+	•	POST /{registryId}/data-elements
+	•	GET /{registryId}/data-elements
+	•	POST /enrollments/{enrollmentId}/values
+	•	GET /enrollments/{enrollmentId}/values?from_date=&to_date=
+
+Auto-refresh job
+	•	POST /{registryId}/refresh
+	•	triggers a background job via analytics-hub to update registry_enrollments + data_values.
+
+2.2.3 FHIR Mapping
+	•	Most data values are derived from:
+	•	FHIR Observations,
+	•	FHIR Conditions,
+	•	FHIR Medications,
+	•	FHIR Procedures.
+	•	Registries themselves might map to FHIR ResearchStudy/Group.
+
+⸻
+
+2.3 trial-management-service
+
+Responsibility:
+	•	Model trials, arms, visits, schedules, CRFs.
+	•	Track subject enrollment & participation.
+	•	Link visits to encounters & data.
+
+2.3.1 DB Schema
+Tables:
+	•	trials
+	•	trial_arms
+	•	trial_visits
+	•	trial_subjects
+	•	trial_subject_visits
+	•	trial_crfs (case report forms)
+	•	trial_crf_responses
+	•	trial_protocol_deviations
+
+trials
+
+CREATE TABLE trials (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                     -- 'HF_TRIAL_001'
+  name TEXT NOT NULL,
+  description TEXT,
+  phase TEXT,                             -- 'Phase II','Phase III','Registry'
+  sponsor_org_id UUID REFERENCES network_organizations(id),
+  principal_investigator_user_id UUID,
+  protocol_version TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',   -- 'draft','recruiting','active','completed','terminated'
+  start_date DATE,
+  end_date DATE,
+  target_sample_size INT,
+  inclusion_criteria JSONB,
+  exclusion_criteria JSONB,
+  registry_reference TEXT,                -- e.g. clinicaltrials.gov ID
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_trial_code_tenant ON trials (tenant_id, code);
+
+trial_arms
+
+CREATE TABLE trial_arms (
+  id UUID PRIMARY KEY,
+  trial_id UUID NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,                     -- 'A','B','CONTROL','INTERVENTION'
+  name TEXT NOT NULL,
+  description TEXT,
+  randomization_ratio NUMERIC,            -- e.g., 1,2 for 1:2 randomization
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_trial_arm_code ON trial_arms (trial_id, code);
+
+trial_visits
+
+Defines visit schedule relative to randomization/enrollment.
+
+CREATE TABLE trial_visits (
+  id UUID PRIMARY KEY,
+  trial_id UUID NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,                     -- 'V1','V2','V3'
+  name TEXT NOT NULL,
+  description TEXT,
+  day_offset INT NOT NULL,                -- e.g., 0, 7, 30 relative to reference
+  window_minus INT,                       -- allowed negative deviation (days)
+  window_plus INT,                        -- allowed positive deviation (days)
+  required BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_trial_visit_code ON trial_visits (trial_id, code);
+
+trial_subjects
+
+CREATE TABLE trial_subjects (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  trial_id UUID NOT NULL REFERENCES trials(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  pseudo_id_space_id UUID REFERENCES pseudo_id_spaces(id),
+  pseudo_patient_id TEXT,                 -- if pseudonymized
+  arm_id UUID REFERENCES trial_arms(id),
+  screening_status TEXT NOT NULL DEFAULT 'screening', -- 'screening','screen_failed','enrolled','withdrawn','completed'
+  screening_date DATE,
+  randomization_date DATE,
+  consent_record_id UUID REFERENCES consent_records(id),
+  withdrawal_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_trial_subjects_trial ON trial_subjects (trial_id, screening_status);
+CREATE INDEX idx_trial_subjects_patient ON trial_subjects (patient_id, trial_id);
+
+trial_subject_visits
+
+CREATE TABLE trial_subject_visits (
+  id UUID PRIMARY KEY,
+  trial_subject_id UUID NOT NULL REFERENCES trial_subjects(id) ON DELETE CASCADE,
+  trial_visit_id UUID NOT NULL REFERENCES trial_visits(id),
+  planned_date DATE NOT NULL,
+  actual_date DATE,
+  status TEXT NOT NULL DEFAULT 'planned',  -- 'planned','completed','missed'
+  encounter_id UUID REFERENCES encounters(id),
+  protocol_deviation BOOLEAN DEFAULT FALSE,
+  deviation_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_trial_subject_visits_subject ON trial_subject_visits (trial_subject_id, planned_date);
+
+trial_crfs
+
+CREATE TABLE trial_crfs (
+  id UUID PRIMARY KEY,
+  trial_id UUID NOT NULL REFERENCES trials(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,                       -- 'BASELINE','V1','ADVERSE_EVENT'
+  name TEXT NOT NULL,
+  description TEXT,
+  visit_code TEXT,                          -- link to trial_visits.code when relevant
+  schema JSONB NOT NULL,                    -- form fields, types, constraints
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_trial_crf_code ON trial_crfs (trial_id, code);
+
+trial_crf_responses
+
+CREATE TABLE trial_crf_responses (
+  id UUID PRIMARY KEY,
+  trial_subject_id UUID NOT NULL REFERENCES trial_subjects(id) ON DELETE CASCADE,
+  trial_crf_id UUID NOT NULL REFERENCES trial_crfs(id),
+  trial_subject_visit_id UUID REFERENCES trial_subject_visits(id),
+  responses JSONB NOT NULL,
+  completed_at TIMESTAMPTZ,
+  completed_by_user_id UUID,
+  source TEXT NOT NULL,                      -- 'research_staff','patient_portal','import'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_trial_crf_responses_subj_crf ON trial_crf_responses (trial_subject_id, trial_crf_id);
+
+trial_protocol_deviations
+
+CREATE TABLE trial_protocol_deviations (
+  id UUID PRIMARY KEY,
+  trial_subject_id UUID NOT NULL REFERENCES trial_subjects(id) ON DELETE CASCADE,
+  trial_visit_id UUID REFERENCES trial_visits(id),
+  deviation_date DATE NOT NULL,
+  deviation_type TEXT NOT NULL,             -- 'missed_visit','out_of_window','unauthorized_med','other'
+  description TEXT,
+  severity TEXT,                            -- 'minor','major','critical'
+  reported_by_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_trial_protocol_deviations_subject ON trial_protocol_deviations (trial_subject_id, deviation_date);
+
+2.3.2 Endpoints
+Base: /api/v1/trials
+
+Trials
+	•	POST /
+	•	GET /
+	•	GET /{trialId}
+	•	PATCH /{trialId}
+
+Arms & Visits
+	•	POST /{trialId}/arms
+	•	GET /{trialId}/arms
+	•	POST /{trialId}/visits
+	•	GET /{trialId}/visits
+
+Subjects
+	•	POST /{trialId}/subjects
+	•	create trial_subject (after eligibility & consent).
+	•	GET /{trialId}/subjects?screening_status=&arm_id=
+	•	GET /subjects/{subjectId}
+	•	PATCH /subjects/{subjectId}
+	•	update status, withdrawal, etc.
+
+Subject Visits
+	•	POST /subjects/{subjectId}/visits/generate
+	•	generate planned visits based on visit schedule.
+	•	GET /subjects/{subjectId}/visits
+	•	PATCH /subject-visits/{id}
+	•	mark as completed/missed, link encounter, mark deviation.
+
+CRFs
+	•	POST /{trialId}/crfs
+	•	GET /{trialId}/crfs
+	•	GET /crfs/{crfId}
+
+CRF Responses
+	•	POST /subjects/{subjectId}/crfs/{crfId}/responses
+	•	GET /subjects/{subjectId}/crfs/{crfId}/responses
+	•	PATCH /crf-responses/{id}
+
+⸻
+
+2.4 guideline-engine-service (CDS)
+
+Responsibility:
+	•	Represent clinical guidelines/protocols as machine-readable rules and workflows.
+	•	Evaluate rules at runtime and produce CDS Cards (recommendations, alerts).
+
+2.4.1 DB Schema
+Tables:
+	•	guidelines
+	•	guideline_versions
+	•	cds_rules
+	•	cds_rule_triggers
+	•	cds_evaluations
+
+guidelines
+
+CREATE TABLE guidelines (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                       -- 'HF_CHRONIC','SEPSIS_ED','STROKE_TPA'
+  name TEXT NOT NULL,
+  description TEXT,
+  specialty TEXT,
+  source_reference TEXT,                    -- URL/identifier of original guideline
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_guideline_code_tenant ON guidelines (tenant_id, code);
+
+guideline_versions
+
+CREATE TABLE guideline_versions (
+  id UUID PRIMARY KEY,
+  guideline_id UUID NOT NULL REFERENCES guidelines(id) ON DELETE CASCADE,
+  version TEXT NOT NULL,                    -- 'v1','v1.1','2025'
+  status TEXT NOT NULL DEFAULT 'draft',     -- 'draft','active','deprecated'
+  narrative_summary TEXT,                   -- human-readable summary
+  logic_bundle JSONB NOT NULL,              -- aggregated DSL for all rules/flows
+  effective_from DATE,
+  effective_to DATE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  activated_at TIMESTAMPTZ,
+  deprecated_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX uniq_guideline_version ON guideline_versions (guideline_id, version);
+
+cds_rules
+
+Each version contains individual rules; we can also separate:
+
+CREATE TABLE cds_rules (
+  id UUID PRIMARY KEY,
+  guideline_version_id UUID NOT NULL REFERENCES guideline_versions(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,                        -- 'RULE_HF_START_ACEI','RULE_SEPSIS_LACTATE'
+  name TEXT NOT NULL,
+  description TEXT,
+  trigger_context TEXT NOT NULL,             -- 'OPD_VISIT','IPD_ADMISSION','LAB_RESULT','MED_ORDER'
+  priority TEXT NOT NULL DEFAULT 'info',     -- 'info','warning','critical'
+  logic_expression JSONB NOT NULL,           -- DSL referencing patient data / FHIR / analytics
+  action_suggestions JSONB,                  -- template suggestions
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_cds_rules_guideline ON cds_rules (guideline_version_id, trigger_context);
+
+cds_rule_triggers
+
+Link rules to event types.
+
+CREATE TABLE cds_rule_triggers (
+  id UUID PRIMARY KEY,
+  cds_rule_id UUID NOT NULL REFERENCES cds_rules(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,                  -- 'Encounter.OPD.Created','Order.Created','Observation.New'
+  filter JSONB,                              -- optional filter on event payload
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+cds_evaluations
+
+Log each CDS evaluation.
+
+CREATE TABLE cds_evaluations (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  cds_rule_id UUID NOT NULL REFERENCES cds_rules(id),
+  patient_id UUID REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  admission_id UUID REFERENCES admissions(id),
+  evaluation_time TIMESTAMPTZ NOT NULL,
+  trigger_event_type TEXT,
+  trigger_event_id TEXT,
+  result TEXT NOT NULL,                      -- 'fired','not_fired','error'
+  card_payload JSONB,                        -- CDS card content if fired
+  accepted BOOLEAN,                          -- whether clinician accepted suggestion
+  accepted_at TIMESTAMPTZ,
+  acted_on_resource_ids JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_cds_evaluations_patient ON cds_evaluations (patient_id, evaluation_time DESC);
+
+2.4.2 Endpoints
+Base: /api/v1/guidelines
+
+Guidelines & Versions
+	•	POST /
+	•	GET /
+	•	GET /{guidelineId}
+	•	POST /{guidelineId}/versions
+	•	GET /{guidelineId}/versions
+	•	POST /versions/{versionId}/activate
+	•	PATCH /versions/{versionId}
+
+Rules
+	•	GET /versions/{versionId}/rules
+	•	(Advanced) POST /versions/{versionId}/rules to add/modify rules.
+
+Runtime CDS
+
+Base: /api/v1/cds
+	•	POST /evaluate
+	•	Input:
+	•	trigger_context (e.g. ‘OPD_VISIT’),
+	•	patient_id,
+	•	encounter_id?,
+	•	admission_id?,
+	•	event_type + payload.
+	•	Output:
+	•	list of CDS cards:
+	•	summary,
+	•	detail,
+	•	suggestions,
+	•	guideline references.
+	•	POST /card/{evaluationId}/feedback
+	•	Mark card as accepted/rejected; optional data linking to actions taken.
+
+⸻
+
+2.5 synthetic-data-service
+
+Responsibility:
+	•	Generate synthetic datasets:
+	•	for dev/testing,
+	•	for external partners when raw data can’t be shared.
+	•	Compose from:
+	•	generative models,
+	•	statistical distributions learned from de-identified data.
+
+2.5.1 DB Schema
+Tables:
+	•	synthetic_data_profiles
+	•	synthetic_data_jobs
+	•	synthetic_data_outputs
+
+synthetic_data_profiles
+
+CREATE TABLE synthetic_data_profiles (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                       -- 'HF_SANDBOX','ICU_SIM_2025'
+  name TEXT NOT NULL,
+  description TEXT,
+  target_population JSONB NOT NULL,         -- e.g. { "registry_code": "HF_REGISTRY", "period": {...} }
+  variables JSONB NOT NULL,                 -- list of variables to model (labs, meds, outcomes)
+  method TEXT NOT NULL,                     -- 'GAN','VAEs','copula','rules_based'
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_synth_profile_code_tenant ON synthetic_data_profiles (tenant_id, code);
+
+synthetic_data_jobs
+
+CREATE TABLE synthetic_data_jobs (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  synthetic_data_profile_id UUID NOT NULL REFERENCES synthetic_data_profiles(id),
+  requested_by_user_id UUID NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',    -- 'queued','running','completed','failed'
+  requested_samples INT NOT NULL,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+synthetic_data_outputs
+
+CREATE TABLE synthetic_data_outputs (
+  id UUID PRIMARY KEY,
+  synthetic_data_job_id UUID NOT NULL REFERENCES synthetic_data_jobs(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,                -- 'parquet','csv','fhir_bundle'
+  location TEXT NOT NULL,
+  sample_count INT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.5.2 Endpoints
+Base: /api/v1/synthetic-data
+	•	POST /profiles
+	•	GET /profiles
+	•	GET /profiles/{id}
+
+Jobs:
+	•	POST /jobs
+	•	synthetic_data_profile_code, requested_samples.
+	•	GET /jobs
+	•	GET /jobs/{id}
+	•	GET /jobs/{id}/outputs
+
+Synthetic generation uses de-id mirror / analytics-hub as source of distribution.
+
+⸻
+
+2.6 knowledge-graph-service
+
+Responsibility:
+	•	Maintain a graph of:
+	•	concepts (conditions, meds, labs, procedures),
+	•	relationships (causal, association, contraindication, guideline links),
+	•	patient-specific graph overlays (their personal “clinical story”).
+
+2.6.1 DB Schema (Relational representation of graph)
+Tables:
+	•	kg_nodes
+	•	kg_edges
+	•	patient_kg_nodes
+	•	patient_kg_edges
+
+kg_nodes – global medical concepts.
+
+CREATE TABLE kg_nodes (
+  id UUID PRIMARY KEY,
+  code_system TEXT,                      -- 'SNOMED','ICD10','LOINC','RXNORM','INTERNAL'
+  code TEXT,
+  label TEXT NOT NULL,
+  node_type TEXT NOT NULL,               -- 'condition','lab','medication','procedure','guideline','risk_factor'
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_kg_nodes_code ON kg_nodes (code_system, code);
+
+kg_edges
+
+CREATE TABLE kg_edges (
+  id UUID PRIMARY KEY,
+  source_node_id UUID NOT NULL REFERENCES kg_nodes(id),
+  target_node_id UUID NOT NULL REFERENCES kg_nodes(id),
+  relationship_type TEXT NOT NULL,       -- 'associated_with','contraindicates','treats','is_risk_factor_for','measures'
+  weight NUMERIC,                        -- strength of relationship
+  evidence_level TEXT,                   -- 'RCT','observational','guideline','expert_opinion'
+  evidence_source TEXT,                  -- citation string or reference ID
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_kg_edges_source ON kg_edges (source_node_id, relationship_type);
+CREATE INDEX idx_kg_edges_target ON kg_edges (target_node_id, relationship_type);
+
+patient_kg_nodes – instantiation of concepts in a specific patient.
+
+CREATE TABLE patient_kg_nodes (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  kg_node_id UUID REFERENCES kg_nodes(id),
+  instance_type TEXT NOT NULL,           -- 'diagnosis','lab_result','med_order','visit','event'
+  fhir_resource_type TEXT,
+  fhir_resource_id TEXT,
+  occurred_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_patient_kg_nodes_patient ON patient_kg_nodes (patient_id, occurred_at DESC);
+
+patient_kg_edges
+
+CREATE TABLE patient_kg_edges (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  source_instance_id UUID NOT NULL REFERENCES patient_kg_nodes(id),
+  target_instance_id UUID NOT NULL REFERENCES patient_kg_nodes(id),
+  relationship_type TEXT NOT NULL,       -- 'temporal_before','causal_suspected','co_occurs','same_episode'
+  created_by TEXT NOT NULL,              -- 'rules','llm_agent','user'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_patient_kg_edges_patient ON patient_kg_edges (patient_id);
+
+2.6.2 Endpoints
+Base: /api/v1/kg
+
+Concept graph
+	•	GET /nodes?code=&label=&node_type=
+	•	GET /nodes/{id}
+	•	GET /nodes/{id}/neighbors?relationship_type=&depth=
+
+Patient graph
+	•	GET /patients/{patientId}/nodes?since=&instance_type=
+	•	GET /patients/{patientId}/edges
+	•	GET /patients/{patientId}/subgraph?focus_node_id=&depth=
+
+These power LLM reasoning (“show me how this patient’s AKI relates to meds & procedures”).
+
+⸻
+
+3. Frontend – Phase 6
+
+New major sections:
+	•	Research & registry UI
+	•	Trials UI
+	•	Guideline/CDS UI & config
+	•	Synthetic data UI
+	•	Knowledge graph visualisations
+
+3.1 Research Registry UI
+
+Routes:
+	•	/research/registries
+	•	/research/registries/[registryId]
+	•	/research/registries/[registryId]/enrollments/[enrollmentId]
+
+/research/registries
+	•	List registries:
+	•	name, code, specialty, # active patients.
+
+APIs:
+	•	GET /api/v1/registries
+
+Components:
+	•	RegistryCard
+	•	RegistryStatsSummary
+
+/research/registries/[registryId]
+
+Tabs:
+	1.	Overview – description, inclusion/exclusion, status.
+	2.	Enrollments – table of enrolled patients.
+	3.	Data Elements – list of variables.
+	4.	Analytics – simple registry-level metrics (LOS, mortality, etc. via analytics-hub).
+
+APIs:
+	•	GET /registries/{id}
+	•	GET /registries/{id}/enrollments
+	•	GET /registries/{id}/data-elements
+
+/research/registries/[registryId]/enrollments/[enrollmentId]
+	•	Show:
+	•	patient summary,
+	•	timeline of registry_data_values,
+	•	quick export options (CSV/JSON).
+
+⸻
+
+3.2 Trials UI
+
+Routes:
+	•	/research/trials
+	•	/research/trials/[trialId]
+	•	/research/trials/[trialId]/subjects/[subjectId]
+
+/research/trials
+	•	Table:
+	•	trial code, phase, status, PI, recruiting/not.
+
+APIs:
+	•	GET /trials
+
+/research/trials/[trialId]
+
+Tabs:
+	1.	Overview – protocol summary, criteria, arms, visits.
+	2.	Subjects – enrollment status, arm allocation.
+	3.	Schedule – upcoming visits calendar.
+	4.	CRFs – form definitions.
+
+APIs:
+	•	GET /trials/{id}
+	•	GET /trials/{id}/arms
+	•	GET /trials/{id}/visits
+	•	GET /trials/{id}/subjects
+
+/research/trials/[trialId]/subjects/[subjectId]
+	•	Screen for each subject:
+	•	timeline of visits (planned vs actual),
+	•	CRFs status,
+	•	protocol deviations.
+
+⸻
+
+3.3 Guideline/CDS UI
+
+Routes:
+	•	/cds/guidelines
+	•	/cds/guidelines/[guidelineId]
+	•	/cds/guidelines/[guidelineId]/versions/[versionId]
+
+/cds/guidelines
+	•	List guidelines:
+	•	code, name, specialty, active version.
+
+APIs:
+	•	GET /guidelines
+
+/cds/guidelines/[guidelineId]
+	•	Show guideline metadata + version list.
+
+APIs:
+	•	GET /guidelines/{id}
+	•	GET /guidelines/{id}/versions
+
+/cds/guidelines/[guidelineId]/versions/[versionId]
+
+Tabs:
+	1.	Summary – narrative + coverage (e.g. HF in OPD/IPD).
+	2.	Rules – enumerated rules with trigger context, priority.
+	3.	Analytics – rule firing frequencies, acceptance rates (from cds_evaluations).
+
+APIs:
+	•	GET /guidelines/versions/{versionId}/rules
+	•	GET /cds/evaluations?guideline_version_id=...
+
+Clinician can see how often the system recommends something and how often it’s followed.
+
+⸻
+
+3.4 Synthetic Data & Sandbox UI
+
+Routes:
+	•	/research/synthetic-data
+	•	/research/synthetic-data/profiles/[profileId]
+	•	/research/synthetic-data/jobs/[jobId]
+
+/research/synthetic-data
+	•	List profiles:
+	•	HF sandbox, ICU sim, etc.
+
+APIs:
+	•	GET /synthetic-data/profiles
+
+/research/synthetic-data/profiles/[profileId]
+	•	Show:
+	•	population description,
+	•	variables,
+	•	method.
+	•	Button: “Generate dataset” (choose N samples).
+
+APIs:
+	•	GET /synthetic-data/profiles/{id}
+	•	POST /synthetic-data/jobs
+
+/research/synthetic-data/jobs/[jobId]
+	•	Show job status + download links.
+
+APIs:
+	•	GET /synthetic-data/jobs/{id}
+	•	GET /synthetic-data/jobs/{id}/outputs
+
+⸻
+
+3.5 Knowledge Graph UI
+
+Routes:
+	•	/kg/concepts
+	•	/kg/concepts/[nodeId]
+	•	/kg/patients/[patientId]/graph
+
+/kg/concepts
+	•	Search concepts:
+	•	filter by type (condition, lab, med, procedure).
+
+APIs:
+	•	GET /kg/nodes?label=&node_type=
+
+/kg/concepts/[nodeId]
+	•	Visual graph:
+	•	center node,
+	•	neighbors with edge types.
+
+APIs:
+	•	GET /kg/nodes/{id}
+	•	GET /kg/nodes/{id}/neighbors?depth=1
+
+/kg/patients/[patientId]/graph
+	•	Patient-specific knowledge graph:
+	•	nodes = their diagnoses, meds, labs, events.
+	•	edges show temporal + causal relationships.
+
+APIs:
+	•	GET /kg/patients/{patientId}/subgraph?depth=2
+
+This is also a perfect UI for an explainable agent overlay.
+
+⸻
+
+4. LLM Tools – Phase 6
+
+Tools for:
+	•	Registry & cohort selection.
+	•	Trial screening & monitoring.
+	•	Guideline evaluation & CDS.
+	•	Synthetic data requests.
+	•	Knowledge graph queries.
+
+4.1 Registry & Research Tools
+
+Tool: screen_patient_for_registry
+
+{
+  "name": "screen_patient_for_registry",
+  "description": "Check whether a patient meets the inclusion/exclusion criteria for a specific registry.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "registry_code": { "type": "string" },
+      "patient_id": { "type": "string" }
+    },
+    "required": ["registry_code", "patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "eligible": { "type": "boolean" },
+      "reasons": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}
+
+Implementation uses registry_criteria + analytics-hub.
+
+⸻
+
+Tool: enroll_patient_in_registry
+
+{
+  "name": "enroll_patient_in_registry",
+  "description": "Enroll a patient into a registry if they meet criteria.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "registry_code": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "episode_id": { "type": "string" },
+      "source": { "type": "string", "enum": ["auto","manual"], "default": "manual" }
+    },
+    "required": ["registry_code", "patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "registry_enrollment_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /registries/{id}/enroll.
+
+⸻
+
+4.2 Trial Tools
+
+Tool: screen_patient_for_trial
+
+{
+  "name": "screen_patient_for_trial",
+  "description": "Evaluate whether a patient meets the inclusion/exclusion criteria for a specific trial.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "trial_code": { "type": "string" },
+      "patient_id": { "type": "string" }
+    },
+    "required": ["trial_code", "patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "eligible": { "type": "boolean" },
+      "inclusion_criteria_met": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "exclusion_criteria_triggered": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "notes": { "type": "string" }
+    }
+  }
+}
+
+Uses trials.inclusion_criteria/exclusion_criteria via analytics-hub.
+
+⸻
+
+Tool: create_trial_subject
+
+{
+  "name": "create_trial_subject",
+  "description": "Create a trial subject entry after eligibility and consent are confirmed.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "trial_code": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "pseudo_id_space_code": { "type": "string" },
+      "consent_record_id": { "type": "string" }
+    },
+    "required": ["trial_code", "patient_id", "pseudo_id_space_code", "consent_record_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "trial_subject_id": { "type": "string" },
+      "screening_status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /trials/{id}/subjects.
+
+⸻
+
+Tool: generate_trial_visit_schedule
+
+{
+  "name": "generate_trial_visit_schedule",
+  "description": "Generate a subject-specific visit schedule based on the trial visit definitions.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "trial_subject_id": { "type": "string" },
+      "reference_date": { "type": "string", "format": "date" }
+    },
+    "required": ["trial_subject_id", "reference_date"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "scheduled_visits": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "trial_visit_id": { "type": "string" },
+            "planned_date": { "type": "string", "format": "date" },
+            "window_minus": { "type": "integer" },
+            "window_plus": { "type": "integer" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps → POST /subjects/{subjectId}/visits/generate.
+
+⸻
+
+4.3 Guideline & CDS Tools
+
+Tool: evaluate_guidelines_for_context
+
+{
+  "name": "evaluate_guidelines_for_context",
+  "description": "Evaluate relevant guidelines for a given patient and clinical context and return CDS suggestions.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "trigger_context": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "admission_id": { "type": "string" },
+      "event_type": { "type": "string" },
+      "event_payload": { "type": "object" }
+    },
+    "required": ["trigger_context", "patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "cds_cards": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "evaluation_id": { "type": "string" },
+            "guideline_code": { "type": "string" },
+            "summary": { "type": "string" },
+            "detail": { "type": "string" },
+            "suggested_actions": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "priority": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps → /api/v1/cds/evaluate.
+
+⸻
+
+Tool: record_cds_feedback
+
+{
+  "name": "record_cds_feedback",
+  "description": "Record clinician feedback on a CDS card (accepted/rejected).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "evaluation_id": { "type": "string" },
+      "accepted": { "type": "boolean" },
+      "comment": { "type": "string" }
+    },
+    "required": ["evaluation_id", "accepted"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /cds/card/{evaluationId}/feedback.
+
+⸻
+
+4.4 Synthetic & KG Tools
+
+Tool: request_synthetic_dataset
+
+{
+  "name": "request_synthetic_dataset",
+  "description": "Request generation of a synthetic dataset based on a predefined synthetic data profile.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "synthetic_data_profile_code": { "type": "string" },
+      "requested_samples": { "type": "integer" }
+    },
+    "required": ["synthetic_data_profile_code", "requested_samples"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+          "synthetic_data_job_id": { "type": "string" },
+          "status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /synthetic-data/jobs.
+
+⸻
+
+Tool: query_patient_knowledge_graph
+
+{
+  "name": "query_patient_knowledge_graph",
+  "description": "Fetch a subgraph of the patient’s knowledge graph around a focus node for clinical reasoning.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "focus_node_id": { "type": "string" },
+      "depth": { "type": "integer", "default": 2 }
+    },
+    "required": ["patient_id", "focus_node_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "nodes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "instance_id": { "type": "string" },
+            "kg_node_label": { "type": "string" },
+            "instance_type": { "type": "string" },
+            "occurred_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      },
+      "edges": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "source_instance_id": { "type": "string" },
+            "target_instance_id": { "type": "string" },
+            "relationship_type": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps → GET /kg/patients/{patientId}/subgraph?....
+
+⸻
+
+5. System Prompts for Phase 6 Agents
+
+5.1 Research Registry Agent
+
+You are the Research Registry Agent.
+
+Goals:
+	•	Help researchers define and maintain disease registries.
+	•	Assist clinicians in identifying and enrolling eligible patients.
+
+Rules:
+	1.	When asked if a patient belongs in a registry:
+	•	Use screen_patient_for_registry.
+	•	Clearly explain:
+	•	which inclusion criteria were met,
+	•	which exclusion criteria, if any, were triggered.
+	2.	Only propose enrollment via enroll_patient_in_registry:
+	•	after explaining the registry purpose,
+	•	and after confirming that local governance allows that registry.
+	3.	When summarising a registry:
+	•	emphasise population definition, key data elements, and follow-up cadence.
+	4.	Never promise “automatic” clinical benefit; registries are for tracking and learning, not treatment by themselves.
+
+Tools:
+	•	screen_patient_for_registry
+	•	enroll_patient_in_registry
+
+⸻
+
+5.2 Trial Screening & Coordination Agent
+
+You are the Trial Screening & Coordination Agent.
+
+Goals:
+	•	Help identify potentially eligible patients for trials.
+	•	Support research staff in managing trial subjects and visit schedules.
+
+Rules:
+	1.	For each patient and trial:
+	•	call screen_patient_for_trial,
+	•	present inclusion & exclusion criteria in plain language,
+	•	always mark the result as “preliminary” unless confirmed by a human investigator.
+	2.	You must never directly contact patients or change their care plan.
+	•	You only surface candidates to authorised staff.
+	3.	Before create_trial_subject:
+	•	confirm that documented consent exists (consent_record_id),
+	•	ensure pseudonymization is set up (pseudo_id_space_code).
+	4.	After subject creation:
+	•	call generate_trial_visit_schedule,
+	•	summarise upcoming visits for the research team.
+	5.	Be extremely explicit about protocol deviations:
+	•	they must be recorded, not hidden.
+
+Tools:
+	•	screen_patient_for_trial
+	•	create_trial_subject
+	•	generate_trial_visit_schedule
+
+⸻
+
+5.3 Guideline/CDS Explainer Agent
+
+You are the Guideline/CDS Explainer Agent.
+
+Goals:
+	•	Help clinicians understand guideline-derived suggestions.
+	•	Provide transparent, non-pushy recommendations.
+
+Rules:
+	1.	When CDS is requested for a clinical context:
+	•	call evaluate_guidelines_for_context.
+	•	For each card:
+	•	summarise: what the guideline suggests,
+	•	why it applies now,
+	•	which guideline and version it comes from.
+	2.	Always state:
+	•	“This is a guideline-based suggestion, not a directive”.
+	3.	When clinicians accept or reject a card:
+	•	call record_cds_feedback to record their decision.
+	4.	Never invent a guideline; if no rule fires, say so:
+	•	and fall back on generic reassurance (“Continue using your clinical judgement”).
+
+Tools:
+	•	evaluate_guidelines_for_context
+	•	record_cds_feedback
+
+⸻
+
+5.4 Synthetic Sandbox Agent
+
+You are the Synthetic Sandbox Agent.
+
+Goals:
+	•	Help engineers and researchers get realistic but non-identifiable datasets for development and exploratory analysis.
+
+Rules:
+	1.	When users ask for “example data” or “test data”:
+	•	suggest using synthetic datasets instead of real patient data whenever possible.
+	2.	Map requests to an existing synthetic_data_profile_code when possible:
+	•	e.g., HF sandbox, ICU sim.
+	3.	Use request_synthetic_dataset with an appropriate sample size:
+	•	recommend the minimum size needed for their use case.
+	4.	Always remind users:
+	•	synthetic data is for development and exploratory work,
+	•	performance on synthetic data does not guarantee real-world performance.
+
+Tools:
+	•	request_synthetic_dataset
+
+⸻
+
+5.5 Knowledge Graph Reasoning Agent
+
+You are the Knowledge Graph Reasoning Agent.
+
+Goals:
+	•	Use the patient’s knowledge graph to give grounded, non-hallucinated reasoning about their clinical story.
+
+Rules:
+	1.	When asked “how is X related to Y in this patient?”:
+	•	Identify the relevant nodes in the patient graph.
+	•	Call query_patient_knowledge_graph with an appropriate focus node and depth.
+	2.	Base your explanations on:
+	•	actual edges (relationships) and timestamps,
+	•	not on your own memorised general medicine knowledge (you may use it, but annotate what is from the KG vs general).
+	3.	Be clear when:
+	•	the graph shows association (co-occurrence),
+	•	vs clear causal patterns (e.g., drug started before symptom).
+	4.	If the graph is sparse, say so and avoid overconfident conclusions.
+
+Tools:
+	•	query_patient_knowledge_graph
+
+⸻

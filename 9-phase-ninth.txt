@@ -1,0 +1,1210 @@
+Roger that, commander. Phase “stop letting Excel run the pharmacy.”
+
+We’ll treat this as:
+
+Phase 9 – Pharmacy, Medication Management & Supply Chain
+
+Same pattern:
+	1.	Scope & goals
+	2.	Backend services
+	•	services list
+	•	DB schemas
+	•	endpoints
+	•	FHIR mappings
+	3.	Frontend routes & workflows
+	4.	LLM tools (for agents)
+	5.	System prompts for the different medication agents
+
+⸻
+
+1. Phase 9 – Scope & Design Goals
+
+1.1 What Phase 9 Adds
+
+You already have:
+	•	Medication orders in EHR (from earlier phases).
+	•	MAR & basic administration.
+
+This phase turns pharmacy into a first-class engine:
+	•	Medication master & formulary:
+	•	Molecules, strengths, routes, packs, brand/generic mapping.
+	•	Hospital-specific formulary + restriction rules.
+	•	Inpatient pharmacy workflow:
+	•	Order verification (clinical + pharmacist check).
+	•	Dispense, unit dose, batch/lot tracking, returns.
+	•	Outpatient pharmacy / e-prescribing:
+	•	OPD prescriptions, refill logic, substitution rules.
+	•	Medication reconciliation:
+	•	Home meds vs inpatient vs discharge.
+	•	Clinical decision support (med-related):
+	•	Interactions, allergies, dose ranges, renal/hepatic adjustments.
+	•	Inventory & supply chain:
+	•	Stock levels, purchases, vendors, expiry, recalls, audits.
+	•	AI-native features:
+	•	Reconciliation assistant.
+	•	Dose suggestion (parameterized, not autopilot).
+	•	Interaction explanations.
+	•	Inventory forecasting & purchase suggestions.
+
+1.2 Design Principles
+	•	Separation of concerns:
+	•	Medication knowledge layer vs orders vs pharmacy operations vs inventory.
+	•	FHIR-first where applicable:
+	•	Medication, MedicationRequest, MedicationAdministration,
+MedicationDispense, MedicationStatement, MedicationKnowledge, SupplyDelivery.
+	•	Supply chain is not an afterthought:
+	•	Batches, expiries, vendors, auditing.
+	•	AI-in-the-loop:
+	•	Always suggestions, flags, explanations—not auto-dosing or medication changes without human confirmation.
+
+⸻
+
+2. Backend – Services & Data Model
+
+New services:
+	1.	medication-catalog-service
+	2.	formulary-service
+	3.	medication-order-service (ties to earlier Order phase)
+	4.	pharmacy-verification-dispense-service
+	5.	mar-service (Medication Administration Record – already partially there, we extend)
+	6.	medication-reconciliation-service
+	7.	pharmacy-inventory-service
+	8.	pharmacy-ai-orchestrator-service
+
+Assume existing:
+	•	patients, encounters, episodes, practitioners, departments, locations, fhir-service, event bus.
+
+⸻
+
+2.1 medication-catalog-service
+
+Responsible for:
+	•	Core medication master: APIs, DB for drug molecules, forms, strengths.
+	•	Mappings to clinical coding systems & knowledge bases.
+
+2.1.1 DB Schema
+Tables:
+	•	medication_molecules
+	•	medication_products
+	•	medication_routes
+	•	medication_dose_forms
+
+medication_molecules
+
+CREATE TABLE medication_molecules (
+  id UUID PRIMARY KEY,
+  tenant_id UUID,
+  global_code TEXT,                        -- e.g. RxNorm / ATC-like code
+  name TEXT NOT NULL,                      -- 'Paracetamol'
+  synonyms TEXT[],
+  atc_code TEXT,
+  drug_class TEXT,                         -- 'Analgesic','ACE inhibitor'
+  is_controlled_substance BOOLEAN DEFAULT FALSE,
+  is_high_alert BOOLEAN DEFAULT FALSE,     -- e.g. narrow therapeutic index
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_medication_molecules_name
+  ON medication_molecules USING gin(to_tsvector('english', name));
+
+medication_routes
+
+CREATE TABLE medication_routes (
+  id UUID PRIMARY KEY,
+  code TEXT NOT NULL,                      -- 'PO','IV','IM','SC','TOP','SL'
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_medication_routes_code
+  ON medication_routes(code);
+
+medication_dose_forms
+
+CREATE TABLE medication_dose_forms (
+  id UUID PRIMARY KEY,
+  code TEXT NOT NULL,                      -- 'TAB','CAP','SUSP','INJ','SR_TAB'
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_medication_dose_forms_code
+  ON medication_dose_forms(code);
+
+medication_products
+
+CREATE TABLE medication_products (
+  id UUID PRIMARY KEY,
+  tenant_id UUID,
+  molecule_id UUID NOT NULL REFERENCES medication_molecules(id),
+  brand_name TEXT,                         -- 'Crocin 500'
+  strength TEXT,                           -- '500 mg'
+  strength_numeric NUMERIC,                -- 500
+  strength_unit TEXT,                      -- 'mg'
+  dose_form_id UUID REFERENCES medication_dose_forms(id),
+  route_id UUID REFERENCES medication_routes(id),
+  pack_size INT,                           -- 10 tablets, etc.
+  pack_unit TEXT,                          -- 'TAB','VIAL'
+  is_generic BOOLEAN DEFAULT FALSE,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_medication_products_molecule
+  ON medication_products(molecule_id);
+
+CREATE INDEX idx_medication_products_name
+  ON medication_products USING gin(to_tsvector('english', brand_name));
+
+2.1.2 FHIR Mapping
+	•	medication_molecules / medication_products → FHIR Medication & MedicationKnowledge:
+	•	code = drug code / name.
+	•	ingredient linking to molecule.
+	•	doseForm, amount.
+
+2.1.3 Endpoints
+Base: /api/v1/medications/catalog
+	•	GET /molecules?search_text=
+	•	GET /products?search_text=&molecule_id=&route=&form=
+	•	GET /products/{id}
+
+⸻
+
+2.2 formulary-service
+
+Responsible for:
+	•	Hospital/tenant-specific formulary, restrictions, substitution rules.
+
+2.2.1 DB Schema
+Tables:
+	•	formulary_entries
+	•	formulary_restrictions
+	•	formulary_substitution_rules
+
+formulary_entries
+
+CREATE TABLE formulary_entries (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  medication_product_id UUID NOT NULL REFERENCES medication_products(id),
+  is_formulary BOOLEAN NOT NULL DEFAULT TRUE,
+  restriction_level TEXT DEFAULT 'none',    -- 'none','restricted','non_formulary'
+  default_route_id UUID REFERENCES medication_routes(id),
+  default_frequency TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_formulary_entry
+  ON formulary_entries(tenant_id, medication_product_id);
+
+formulary_restrictions
+
+CREATE TABLE formulary_restrictions (
+  id UUID PRIMARY KEY,
+  formulary_entry_id UUID NOT NULL REFERENCES formulary_entries(id) ON DELETE CASCADE,
+  restriction_type TEXT NOT NULL,           -- 'specialist_only','indication_based'
+  allowed_specialties TEXT[],               -- e.g. ['Oncology','Cardiology']
+  indication_regex TEXT,                    -- optional; matches indication text
+  approval_required BOOLEAN DEFAULT FALSE,
+  approval_role TEXT,                       -- 'pharmacy_director','ID_specialist'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+formulary_substitution_rules
+
+CREATE TABLE formulary_substitution_rules (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  from_molecule_id UUID NOT NULL REFERENCES medication_molecules(id),
+  to_molecule_id UUID NOT NULL REFERENCES medication_molecules(id),
+  rule_type TEXT NOT NULL,                  -- 'automatic_generic','therapeutic'
+  conditions JSONB,                         -- e.g. { "route": "PO", "indication_contains": "hypertension" }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.2.2 FHIR Mapping
+	•	Indirect: influences MedicationRequest by:
+	•	mapping non-formulary → formulary,
+	•	adding notes/authorization.
+
+2.2.3 Endpoints
+Base: /api/v1/formulary
+	•	GET /entries?is_formulary=&search_text=
+	•	GET /entries/{id}
+	•	GET /alternatives?product_id=&molecule_id=
+
+⸻
+
+2.3 medication-order-service
+
+You already have generic order handling in earlier phases. Here we make medications explicit and FHIR-aligned.
+
+2.3.1 DB Schema
+Tables:
+	•	medication_orders (clinician intent; basically MedicationRequest)
+
+medication_orders
+
+CREATE TABLE medication_orders (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  episode_id UUID REFERENCES episodes(id),
+  prescriber_id UUID REFERENCES practitioners(id),
+  department_id UUID REFERENCES departments(id),
+  medication_product_id UUID REFERENCES medication_products(id),
+  molecule_id UUID REFERENCES medication_molecules(id),
+  order_type TEXT NOT NULL,                -- 'inpatient','outpatient','discharge'
+  status TEXT NOT NULL DEFAULT 'active',   -- 'active','on_hold','cancelled','completed'
+  intent TEXT NOT NULL DEFAULT 'order',    -- 'order','plan','proposal'
+  dose_amount_numeric NUMERIC,
+  dose_amount_unit TEXT,                   -- 'mg'
+  dose_form_id UUID REFERENCES medication_dose_forms(id),
+  route_id UUID REFERENCES medication_routes(id),
+  frequency TEXT,                          -- 'BID','TID','Q6H'
+  as_needed BOOLEAN DEFAULT FALSE,
+  as_needed_reason TEXT,
+  start_datetime TIMESTAMPTZ,
+  end_datetime TIMESTAMPTZ,
+  indication TEXT,
+  instructions_for_patient TEXT,
+  instructions_for_pharmacist TEXT,
+  is_prn BOOLEAN DEFAULT FALSE,
+  linked_discharge_order_id UUID,          -- for discharge scripts
+  fhir_medication_request_id TEXT,
+  formulary_status TEXT,                   -- 'formulary','non_formulary','substituted'
+  substitution_details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_medication_orders_patient
+  ON medication_orders(patient_id, created_at DESC);
+
+CREATE INDEX idx_medication_orders_status
+  ON medication_orders(status, start_datetime);
+
+2.3.2 FHIR Mapping
+	•	medication_orders ↔ FHIR MedicationRequest:
+	•	status, intent, medication[x], dosageInstruction, dispenseRequest.
+
+2.3.3 Endpoints
+Base: /api/v1/medication-orders
+	•	POST /
+	•	create medication order (from OPD/IPD UI or LLM tool).
+	•	GET /?patient_id=&encounter_id=&status=&order_type=
+	•	GET /{id}
+	•	PATCH /{id} (modify, cancel, hold).
+
+⸻
+
+2.4 pharmacy-verification-dispense-service
+
+Responsible for:
+	•	Inpatient verification queue.
+	•	Dispense tasks + log.
+
+2.4.1 DB Schema
+Tables:
+	•	pharmacy_verification_queue
+	•	medication_dispensations (MedicationDispense)
+	•	medication_dispensation_items (for multi-item dispenses)
+
+pharmacy_verification_queue
+
+CREATE TABLE pharmacy_verification_queue (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  medication_order_id UUID NOT NULL REFERENCES medication_orders(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  status TEXT NOT NULL DEFAULT 'pending',  -- 'pending','under_review','approved','rejected'
+  pharmacist_id UUID REFERENCES practitioners(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  review_notes TEXT,
+  rejection_reason TEXT,
+  clinical_checks JSONB                     -- e.g. [ {"type":"interaction","severity":"major","details":"..."} ]
+);
+
+CREATE INDEX idx_pharmacy_verification_queue_status
+  ON pharmacy_verification_queue(status, created_at);
+
+medication_dispensations
+
+CREATE TABLE medication_dispensations (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  medication_order_id UUID REFERENCES medication_orders(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  dispensed_by_user_id UUID,
+  dispensed_at TIMESTAMPTZ NOT NULL,
+  destination_location_id UUID REFERENCES locations(id),     -- ward/OPD/patient home
+  status TEXT NOT NULL DEFAULT 'completed',                 -- 'preparation','completed','returned','cancelled'
+  comments TEXT,
+  fhir_medication_dispense_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_medication_dispensations_patient
+  ON medication_dispensations(patient_id, dispensed_at DESC);
+
+medication_dispensation_items
+
+CREATE TABLE medication_dispensation_items (
+  id UUID PRIMARY KEY,
+  medication_dispensation_id UUID NOT NULL REFERENCES medication_dispensations(id) ON DELETE CASCADE,
+  medication_product_id UUID NOT NULL REFERENCES medication_products(id),
+  quantity_dispensed NUMERIC NOT NULL,
+  quantity_unit TEXT,                               -- 'TAB','ML'
+  inventory_batch_id UUID REFERENCES inventory_batches(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.4.2 FHIR Mapping
+	•	medication_dispensations ↔ FHIR MedicationDispense.
+
+2.4.3 Endpoints
+Base: /api/v1/pharmacy/verification & /api/v1/pharmacy/dispense
+
+Verification:
+	•	GET /?status=pending
+	•	POST /{queueId}/approve
+	•	POST /{queueId}/reject
+
+Dispense:
+	•	POST /dispense
+	•	create dispensation for order(s).
+	•	GET /dispensations?patient_id=&from=&to=
+	•	GET /dispensations/{id}
+
+⸻
+
+2.5 mar-service (Medication Administration Record)
+
+You had core MAR earlier; here’s the full schema refinement.
+
+2.5.1 DB Schema
+Tables:
+	•	medication_administrations
+
+medication_administrations
+
+CREATE TABLE medication_administrations (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  medication_order_id UUID REFERENCES medication_orders(id),
+  medication_product_id UUID REFERENCES medication_products(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  scheduled_time TIMESTAMPTZ,
+  administration_time TIMESTAMPTZ,
+  administered_by_user_id UUID,
+  dose_given_numeric NUMERIC,
+  dose_given_unit TEXT,
+  route_id UUID REFERENCES medication_routes(id),
+  status TEXT NOT NULL DEFAULT 'scheduled',      -- 'scheduled','completed','skipped','refused','partial'
+  reason_skipped TEXT,
+  comments TEXT,
+  fhir_medication_administration_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_medication_admin_patient
+  ON medication_administrations(patient_id, scheduled_time);
+
+CREATE INDEX idx_medication_admin_order
+  ON medication_administrations(medication_order_id, scheduled_time);
+
+2.5.2 FHIR Mapping
+	•	medication_administrations ↔ FHIR MedicationAdministration.
+
+2.5.3 Endpoints
+Base: /api/v1/mar
+	•	GET /?patient_id=&encounter_id=&date=
+	•	POST /administer
+	•	PATCH /{id} (update as completed/skipped/refused).
+
+⸻
+
+2.6 medication-reconciliation-service
+
+Responsible for:
+	•	Home medication list at admission.
+	•	Reconciliation at transfer & discharge.
+
+2.6.1 DB Schema
+Tables:
+	•	medication_history_sources
+	•	medication_reconciliation_sessions
+	•	medication_reconciliation_lines
+
+medication_history_sources
+
+CREATE TABLE medication_history_sources (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  source_type TEXT NOT NULL,                     -- 'patient','caregiver','external_record','pharmacy'
+  description TEXT,
+  recorded_by_user_id UUID,
+  recorded_at TIMESTAMPTZ NOT NULL,
+  raw_data JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+medication_reconciliation_sessions
+
+CREATE TABLE medication_reconciliation_sessions (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  reconciliation_type TEXT NOT NULL,            -- 'admission','transfer','discharge'
+  status TEXT NOT NULL DEFAULT 'in_progress',   -- 'in_progress','completed'
+  performed_by_user_id UUID,
+  performed_at TIMESTAMPTZ,
+  comments TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_medication_recon_sessions_patient
+  ON medication_reconciliation_sessions(patient_id, created_at DESC);
+
+medication_reconciliation_lines
+
+CREATE TABLE medication_reconciliation_lines (
+  id UUID PRIMARY KEY,
+  reconciliation_session_id UUID NOT NULL REFERENCES medication_reconciliation_sessions(id) ON DELETE CASCADE,
+  source_medication_statement_id TEXT,          -- pointer to FHIR MedicationStatement / external
+  medication_product_id UUID REFERENCES medication_products(id),
+  molecule_id UUID REFERENCES medication_molecules(id),
+  home_regimen TEXT,                            -- 'Paracetamol 500mg TID'
+  decision TEXT NOT NULL,                       -- 'continue','modify','stop','new'
+  decision_reason TEXT,
+  linked_medication_order_id UUID REFERENCES medication_orders(id),
+  comments TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.6.2 FHIR Mapping
+	•	MedicationStatement for pre-admission meds.
+	•	Reconciliation decisions may be included as extensions or List resource.
+
+2.6.3 Endpoints
+Base: /api/v1/medication-reconciliation
+	•	POST /sessions
+	•	GET /sessions?patient_id=&encounter_id=&type=
+	•	GET /sessions/{id}
+	•	POST /sessions/{id}/lines
+	•	PATCH /sessions/{id} (mark completed).
+
+⸻
+
+2.7 pharmacy-inventory-service
+
+Responsible for:
+	•	Stock levels, batches, expiry.
+	•	Purchase orders, vendor relationships.
+
+2.7.1 DB Schema
+Tables:
+	•	inventory_locations
+	•	inventory_batches
+	•	inventory_transactions
+	•	vendors
+	•	purchase_orders
+	•	purchase_order_lines
+
+inventory_locations
+
+CREATE TABLE inventory_locations (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                     -- 'MAIN_PHARM','WARD_3_STOCK'
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,                     -- 'pharmacy_store','ward_cupboard'
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_inventory_locations_code
+  ON inventory_locations(tenant_id, code);
+
+inventory_batches
+
+CREATE TABLE inventory_batches (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  medication_product_id UUID NOT NULL REFERENCES medication_products(id),
+  batch_number TEXT,
+  expiry_date DATE,
+  current_quantity NUMERIC NOT NULL,
+  quantity_unit TEXT,                     -- 'TAB','VIAL'
+  location_id UUID NOT NULL REFERENCES inventory_locations(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_inventory_batches_product_location
+  ON inventory_batches(medication_product_id, location_id);
+
+CREATE INDEX idx_inventory_batches_expiry
+  ON inventory_batches(expiry_date);
+
+inventory_transactions
+
+CREATE TABLE inventory_transactions (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  inventory_batch_id UUID NOT NULL REFERENCES inventory_batches(id),
+  transaction_type TEXT NOT NULL,          -- 'receive','dispense','transfer_out','transfer_in','adjustment','return'
+  quantity_delta NUMERIC NOT NULL,         -- positive or negative
+  reason TEXT,
+  related_dispensation_id UUID REFERENCES medication_dispensations(id),
+  related_purchase_order_line_id UUID REFERENCES purchase_order_lines(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  created_by_user_id UUID
+);
+
+CREATE INDEX idx_inventory_transactions_batch
+  ON inventory_transactions(inventory_batch_id, created_at);
+
+vendors
+
+CREATE TABLE vendors (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  name TEXT NOT NULL,
+  code TEXT,
+  contact_details JSONB,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+purchase_orders
+
+CREATE TABLE purchase_orders (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  vendor_id UUID NOT NULL REFERENCES vendors(id),
+  po_number TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft',     -- 'draft','sent','partially_received','completed','cancelled'
+  ordered_at TIMESTAMPTZ,
+  expected_delivery_date DATE,
+  created_by_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_purchase_orders_po_number
+  ON purchase_orders(tenant_id, po_number);
+
+purchase_order_lines
+
+CREATE TABLE purchase_order_lines (
+  id UUID PRIMARY KEY,
+  purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  medication_product_id UUID NOT NULL REFERENCES medication_products(id),
+  quantity_ordered NUMERIC NOT NULL,
+  quantity_received NUMERIC DEFAULT 0,
+  quantity_unit TEXT,
+  unit_price NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.7.2 FHIR Mapping
+	•	Inventory & PO map loosely to SupplyRequest, SupplyDelivery, but this is mostly internal.
+
+2.7.3 Endpoints
+Base: /api/v1/pharmacy/inventory
+	•	GET /stock-levels?location_id=&product_id=
+	•	GET /batches?product_id=&location_id=&expiring_before=
+	•	POST /transactions (adjustments etc.)
+
+POs: /api/v1/pharmacy/purchase-orders
+	•	POST /
+	•	GET /?status=&vendor_id=
+	•	POST /{id}/receive (creates batches + transactions).
+
+⸻
+
+2.8 pharmacy-ai-orchestrator-service
+
+Responsible for:
+	•	Interaction checks.
+	•	Dose suggestions.
+	•	Inventory forecasting.
+	•	Reconciliation assistance.
+
+2.8.1 DB Schema
+Tables:
+	•	pharmacy_ai_tasks
+	•	pharmacy_ai_outputs
+
+pharmacy_ai_tasks
+
+CREATE TABLE pharmacy_ai_tasks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID REFERENCES patients(id),
+  medication_order_id UUID REFERENCES medication_orders(id),
+  task_type TEXT NOT NULL,                    -- 'interaction_check','dose_suggestion','reconciliation_assist','inventory_forecast'
+  status TEXT NOT NULL DEFAULT 'queued',      -- 'queued','running','completed','failed'
+  requested_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+pharmacy_ai_outputs
+
+CREATE TABLE pharmacy_ai_outputs (
+  id UUID PRIMARY KEY,
+  pharmacy_ai_task_id UUID NOT NULL REFERENCES pharmacy_ai_tasks(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,                  -- 'interaction_summary','dose_recommendation','reconciliation_proposal','forecast'
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+
+⸻
+
+3. Frontend – Pharmacy & Medication Workflows
+
+Key UI zones:
+	1.	Clinician side (within chart):
+	•	Medication ordering.
+	•	MAR views.
+	•	Reconciliation views.
+	2.	Pharmacy side:
+	•	Verification queue.
+	•	Dispensing console.
+	•	Inventory & purchase orders.
+
+3.1 Clinician – Medication UI (Chart)
+
+Routes (within patient chart):
+	•	/patient/[patientId]/medications
+	•	/patient/[patientId]/medications/order
+	•	/patient/[patientId]/medications/reconciliation
+
+Medication summary
+	•	Active meds (inpatient & outpatient).
+	•	Historical meds timeline.
+	•	Reconciliation status indicator.
+
+Order screen
+	•	Search medication by:
+	•	brand, generic, indication (“fever” → paracetamol).
+	•	Default dosing suggestions (age/weight-based) with visible logic.
+	•	Interaction & allergy warnings inline.
+
+APIs:
+	•	GET /medication-orders?patient_id=...
+	•	POST /medication-orders
+
+⸻
+
+3.2 Nursing – MAR
+
+Route:
+	•	/mar/ward/[wardId]
+	•	/patient/[patientId]/mar
+
+Features:
+	•	Calendar/grid per patient:
+	•	meds vs scheduled times.
+	•	Quick actions:
+	•	mark as given/refused/skipped,
+	•	capture reason.
+
+APIs:
+	•	GET /mar?patient_id=&date=
+	•	POST /mar/administer
+	•	PATCH /mar/{id}
+
+⸻
+
+3.3 Pharmacy – Verification & Dispensing
+
+Routes:
+	•	/pharmacy/verification
+	•	/pharmacy/dispensing
+	•	/pharmacy/inventory
+	•	/pharmacy/purchase-orders
+
+Verification queue
+	•	List of new/modified medication orders.
+	•	Column with:
+	•	patient, ward,
+	•	order details,
+	•	interaction flags (severity),
+	•	renal/hepatic function flags.
+
+Actions:
+	•	Approve, reject, query prescriber.
+
+APIs:
+	•	GET /pharmacy/verification?status=pending
+	•	POST /pharmacy/verification/{id}/approve
+
+Dispensing console
+	•	See dispensation requests (per ward/patient).
+	•	Create dispensation:
+	•	choose batches (FEFO).
+	•	auto-create inventory transactions.
+
+APIs:
+	•	POST /pharmacy/dispense
+	•	GET /pharmacy/dispensations?from=&to=
+
+Inventory dashboards
+	•	Low stock, expiring soon, usage charts.
+
+APIs:
+	•	GET /pharmacy/inventory/stock-levels
+	•	GET /pharmacy/inventory/batches?expiring_before=...
+
+⸻
+
+4. LLM Tools – Pharmacy & Supply Chain
+
+4.1 Medication Ordering Agent Tools
+
+Tool: search_medication_products
+
+{
+  "name": "search_medication_products",
+  "description": "Search medication products and molecules by name or indication.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "search_text": { "type": "string" },
+      "route_code": { "type": "string" }
+    },
+    "required": ["search_text"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "products": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "product_id": { "type": "string" },
+            "brand_name": { "type": "string" },
+            "molecule_name": { "type": "string" },
+            "strength": { "type": "string" },
+            "route_code": { "type": "string" },
+            "is_formulary": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+Tool: create_medication_order
+
+{
+  "name": "create_medication_order",
+  "description": "Create a medication order for a patient (inpatient or outpatient).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "order_type": {
+        "type": "string",
+        "enum": ["inpatient", "outpatient", "discharge"]
+      },
+      "medication_product_id": { "type": "string" },
+      "dose_amount_numeric": { "type": "number" },
+      "dose_amount_unit": { "type": "string" },
+      "route_code": { "type": "string" },
+      "frequency": { "type": "string" },
+      "start_datetime": { "type": "string", "format": "date-time" },
+      "end_datetime": { "type": "string", "format": "date-time" },
+      "indication": { "type": "string" },
+      "as_needed": { "type": "boolean" },
+      "as_needed_reason": { "type": "string" }
+    },
+    "required": [
+      "patient_id",
+      "order_type",
+      "medication_product_id",
+      "dose_amount_numeric",
+      "dose_amount_unit",
+      "route_code",
+      "frequency",
+      "indication"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "medication_order_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+
+⸻
+
+4.2 Medication Safety & Reconciliation Tools
+
+Tool: get_patient_active_medications
+
+{
+  "name": "get_patient_active_medications",
+  "description": "Get active medication orders for a patient, including home meds if available.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" }
+    },
+    "required": ["patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "medications": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "medication_order_id": { "type": "string" },
+            "molecule_name": { "type": "string" },
+            "product_name": { "type": "string" },
+            "dose": { "type": "string" },
+            "route": { "type": "string" },
+            "frequency": { "type": "string" },
+            "order_type": { "type": "string" },
+            "status": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+Tool: request_pharmacy_ai_task
+
+{
+  "name": "request_pharmacy_ai_task",
+  "description": "Request AI analysis for medication safety (interactions, dose suggestion, reconciliation assistance, inventory forecast).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "medication_order_id": { "type": "string" },
+      "task_type": {
+        "type": "string",
+        "enum": [
+          "interaction_check",
+          "dose_suggestion",
+          "reconciliation_assist",
+          "inventory_forecast"
+        ]
+      }
+    },
+    "required": ["task_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "pharmacy_ai_task_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: get_pharmacy_ai_output
+
+{
+  "name": "get_pharmacy_ai_output",
+  "description": "Fetch AI results for a pharmacy AI task.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "pharmacy_ai_task_id": { "type": "string" }
+    },
+    "required": ["pharmacy_ai_task_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "outputs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "output_type": { "type": "string" },
+            "payload": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+4.3 Inventory & Supply Chain Tools
+
+Tool: get_medication_stock_levels
+
+{
+  "name": "get_medication_stock_levels",
+  "description": "Fetch current stock levels for a medication product across locations.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "medication_product_id": { "type": "string" }
+    },
+    "required": ["medication_product_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "locations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "location_id": { "type": "string" },
+            "location_name": { "type": "string" },
+            "total_quantity": { "type": "number" },
+            "unit": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: list_expiring_batches
+
+{
+  "name": "list_expiring_batches",
+  "description": "List batches of a medication product that are nearing expiry.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "medication_product_id": { "type": "string" },
+      "days_threshold": { "type": "integer", "default": 30 }
+    },
+    "required": ["medication_product_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "batches": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "batch_id": { "type": "string" },
+            "batch_number": { "type": "string" },
+            "expiry_date": { "type": "string", "format": "date" },
+            "location_name": { "type": "string" },
+            "current_quantity": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+5. System Prompts – Pharmacy & Medication Agents
+
+5.1 Medication Ordering Co-Pilot (Prescriber-Facing)
+
+You are the Medication Ordering Co-Pilot.
+
+Goals:
+	•	Help prescribers choose safe, effective medication regimens.
+	•	Minimise errors, interactions, and non-formulary friction.
+
+Rules:
+	1.	From the clinician’s question, identify:
+	•	target problem (e.g., pain, hypertension, infection),
+	•	key patient parameters (age, weight, renal/hepatic function, allergies, pregnancy).
+	2.	Use search_medication_products to map conceptual choices to actual formulary products.
+	3.	For each candidate regimen:
+	•	propose:
+	•	medication product,
+	•	dose, route, frequency, duration,
+	•	why this is appropriate (1–2 lines).
+	4.	Before calling create_medication_order:
+	•	use get_patient_active_medications to check for duplicates or conflicts,
+	•	optionally trigger request_pharmacy_ai_task with interaction_check,
+	•	summarise any major interactions or issues.
+	5.	Output:
+	•	the regimen you propose,
+	•	explicit confirmation question to the prescriber,
+	•	then call create_medication_order if they confirm.
+	6.	Never adjust doses automatically based solely on estimated renal/hepatic function; always explain your reasoning and leave final choice to the prescriber.
+
+Tools:
+	•	search_medication_products
+	•	get_patient_active_medications
+	•	request_pharmacy_ai_task
+	•	get_pharmacy_ai_output
+	•	create_medication_order
+
+⸻
+
+5.2 Medication Safety Agent (Clinical Pharmacist Co-Pilot)
+
+You are the Medication Safety Agent supporting clinical pharmacists.
+
+Goals:
+	•	Assist pharmacists in verification of medication orders.
+	•	Surface interactions, dose issues and guideline deviations clearly.
+
+Rules:
+	1.	For a given medication order:
+	•	retrieve the full active med list via get_patient_active_medications,
+	•	consider demographics and comorbidities available in the chart (renal function, liver function, diagnoses).
+	2.	Use request_pharmacy_ai_task with interaction_check and dose_suggestion as needed.
+	3.	Present:
+	•	a structured list of:
+	•	major issues,
+	•	moderate issues,
+	•	minor notes.
+	4.	Provide alternative suggestions when:
+	•	less risky alternatives exist,
+	•	simpler regimens could improve adherence.
+	5.	Do not approve or reject orders directly; the pharmacist decides.
+Instead, phrase recommendations as:
+	•	“Suggest: reduce dose to ___ because ___.”
+	6.	Be especially conservative with:
+	•	paediatrics,
+	•	older adults,
+	•	pregnancy,
+	•	narrow therapeutic index drugs.
+
+Tools:
+	•	get_patient_active_medications
+	•	request_pharmacy_ai_task
+	•	get_pharmacy_ai_output
+
+⸻
+
+5.3 Medication Reconciliation Agent
+
+You are the Medication Reconciliation Agent.
+
+Goals:
+	•	Help clinicians reconcile a patient’s home medications with hospital orders at admission, transfer, and discharge.
+
+Rules:
+	1.	Aggregate medication information from:
+	•	home medication lists,
+	•	external records (when available),
+	•	current inpatient orders.
+	2.	Present a table of:
+	•	Each medication/regimen,
+	•	Source (patient, pharmacy, external record),
+	•	Your understanding of:
+	•	recommended decision: continue / modify / stop / new,
+	•	rationale in 1 line.
+	3.	Use request_pharmacy_ai_task with reconciliation_assist when:
+	•	there is high polypharmacy,
+	•	multiple sources conflict.
+	4.	Generate human-readable suggestions but do not implement changes directly:
+	•	output explicit actions for the clinician/pharmacist to confirm.
+	5.	Avoid removing long-standing meds (e.g., chronic disease control) without strongly justified reasoning.
+
+Tools:
+	•	get_patient_active_medications
+	•	request_pharmacy_ai_task
+	•	get_pharmacy_ai_output
+	•	endpoints around medication_reconciliation_sessions (for saving results)
+
+⸻
+
+5.4 Medication Explainer Agent (Patient-Facing)
+
+You are the Medication Explainer Agent for patients.
+
+Goals:
+	•	Explain current medications, purposes, and key precautions in simple language.
+
+Rules:
+	1.	Use get_patient_active_medications to fetch the actual current regimen.
+	2.	For each medication:
+	•	name (generic + brand),
+	•	what it’s generally used for,
+	•	how and when to take it,
+	•	2–3 important cautions (food, driving, missed doses).
+	3.	Avoid:
+	•	detailed probabilistic side effect stats (“2% risk of…”),
+	•	rare side effects that are not clinically relevant for patient education unless asked.
+	4.	Encourage adherence and follow-up:
+	•	“Do not stop this medicine without talking to your doctor.”
+	5.	If a medication requires lab monitoring (e.g., INR, lithium levels), mention this simply and clearly.
+
+Tools:
+	•	get_patient_active_medications
+
+⸻
+
+5.5 Inventory Planning Agent
+
+You are the Pharmacy Inventory Planning Agent.
+
+Goals:
+	•	Assist pharmacy managers in managing stock, avoiding stock-outs and wastage.
+
+Rules:
+	1.	Use get_medication_stock_levels and list_expiring_batches to fetch:
+	•	current stock across locations,
+	•	batches nearing expiry.
+	2.	When asked about a product:
+	•	summarise:
+	•	total stock,
+	•	distribution by location,
+	•	earliest expiry dates and quantities.
+	3.	For planning:
+	•	use historical usage data (from dispensation & administration logs) to:
+	•	estimate average daily usage,
+	•	flag potential stock-outs.
+	4.	Suggest:
+	•	transfers between locations (e.g., move stock from low-use ward to high-use ward),
+	•	approximate quantities for next purchase order, based on lead times and desired safety stock.
+	5.	Be conservative: err slightly on avoiding stock-outs over minimal inventory, but always present your assumptions.
+
+Tools:
+	•	get_medication_stock_levels
+	•	list_expiring_batches
+	•	internal analytic endpoints for historical usage
+
+⸻

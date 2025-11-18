@@ -1,0 +1,1485 @@
+Phase “show me the money, but with less suffering.”
+
+We’ll treat this as:
+
+Phase 11 – Revenue Cycle & Cashless Control Tower
+
+Same treatment as the OR / Pharmacy phases: full spine, schemas, endpoints, agent tools, prompts – but tuned for India-style cashless + global RCM.
+
+⸻
+
+1. Phase 11 – Scope & Design Goals
+
+1.1 What this Phase Covers
+
+End-to-end Revenue Cycle Management + Cashless Control Tower:
+	1.	Patient Access & Insurance Capture
+	•	Payer/plan master, policy capture, eligibility check (manual + portal/API).
+	•	Planned vs emergency admission flows.
+	2.	Estimates & Financial Counselling
+	•	DRG/package & itemized estimates.
+	•	Expected patient responsibility (co-pay, exclusions, non-medicals).
+	3.	Cashless Pre-Auth / Prior Authorization
+	•	Pre-auth case creation.
+	•	Documentation (clinical summary, labs, imaging, forms).
+	•	Insurer/TPA communication, SLA tracking, alerts, enhancements.
+	4.	Charge Capture & Hospital Billing
+	•	Tariff / pricebook.
+	•	Charge items (bed, procedures, pharmacy, lab, imaging).
+	•	Package vs non-package logic, auto-bundling rules.
+	5.	Claims & Settlement
+	•	Claim creation, validation, submission tracking (portal, EDI, file).
+	•	Final settlement vs provisional approvals.
+	•	Payment posting & write-offs.
+	6.	Denials & AR Management
+	•	Denial capture, categorisation, root cause.
+	•	Appeals workflow.
+	•	Aging, AR dashboards, cash-flow analytics.
+	7.	AI-native Control Tower
+	•	Multi-payer cashless queue & SLA cockpit.
+	•	OCR + doc extraction.
+	•	Auto-drafted pre-auth notes, enhancement requests, appeal letters.
+	•	Pattern mining: denial trends, payer behavior, undercoding/overcoding flags.
+
+1.2 Design Principles
+	•	Financial layer separate from clinical:
+	•	Clinical data in EHR; RCM references it – doesn’t fork it.
+	•	FHIR alignment:
+	•	Coverage, Claim, ClaimResponse, Account, ChargeItem, ExplanationOfBenefit.
+	•	“Control tower” as a horizontal orchestrator:
+	•	Work queues, SLAs, notifications across pre-auth, claims, denials.
+	•	AI as co-pilot, not decision-maker:
+	•	Suggestions & drafts; humans approve.
+
+⸻
+
+2. Backend – Services & Data Model
+
+New services:
+	1.	payer-master-service
+	2.	tariff-pricebook-service
+	3.	coverage-policy-service
+	4.	estimate-service
+	5.	preauth-service (cashless control)
+	6.	charge-capture-service
+	7.	claims-service
+	8.	payment-remittance-service
+	9.	denials-management-service
+	10.	cashless-control-tower-service (work queues, SLAs)
+	11.	rcm-analytics-service
+	12.	rcm-ai-orchestrator-service
+
+Assume existing: patients, encounters, episodes, procedures, admissions, departments, beds, orders.
+
+⸻
+
+2.1 payer-master-service
+
+Responsible for:
+	•	Payers (insurers, TPAs), plans, network relationships.
+	•	Payer-specific rules (cashless, document sets, TAT SLAs).
+
+2.1.1 DB Schema
+Tables:
+	•	payers
+	•	payer_plans
+	•	payer_network_contracts
+	•	payer_rules
+
+payers
+
+CREATE TABLE payers (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                            -- 'HDFC_ERGO','STAR_HEALTH','MEDI_ASSIST'
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,                            -- 'insurer','tpa','self_pay','corporate'
+  contact_details JSONB,
+  portal_url TEXT,                               -- for cashless login
+  api_endpoint_config JSONB,                     -- if API-based
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_payers_code_tenant
+  ON payers(tenant_id, code);
+
+payer_plans
+
+CREATE TABLE payer_plans (
+  id UUID PRIMARY KEY,
+  payer_id UUID NOT NULL REFERENCES payers(id),
+  code TEXT NOT NULL,                            -- 'GOLD_FAMILY_FLOATER','CORP_ABC_TIER1'
+  name TEXT NOT NULL,
+  coverage_type TEXT,                            -- 'individual','floater','corporate'
+  product_type TEXT,                             -- 'indemnity','fixed_benefit'
+  notes TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_payer_plans_payer_code
+  ON payer_plans(payer_id, code);
+
+payer_network_contracts
+
+CREATE TABLE payer_network_contracts (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  payer_plan_id UUID NOT NULL REFERENCES payer_plans(id),
+  hospital_location_id UUID REFERENCES locations(id),
+  network_type TEXT NOT NULL,                    -- 'network','non_network','PPN'
+  effective_from DATE,
+  effective_to DATE,
+  discount_model TEXT,                           -- 'package','percent_off_tariff','negotiated_rate'
+  discount_details JSONB,
+  cashless_allowed BOOLEAN DEFAULT TRUE,
+  preauth_required BOOLEAN DEFAULT TRUE,
+  remarks TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_payer_network_contracts_payer
+  ON payer_network_contracts(payer_plan_id, hospital_location_id);
+
+payer_rules
+
+CREATE TABLE payer_rules (
+  id UUID PRIMARY KEY,
+  payer_plan_id UUID NOT NULL REFERENCES payer_plans(id),
+  rule_type TEXT NOT NULL,                       -- 'document_checklist','tat_sla','package_mapping'
+  rule_name TEXT NOT NULL,
+  rule_payload JSONB NOT NULL,                   -- e.g., doc checklist per indication
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.1.2 FHIR Mapping
+	•	payers/payer_plans ↔ FHIR Organization (insurer) + InsurancePlan.
+	•	Contracts & network mapping as Contract/OrganizationAffiliation.
+
+2.1.3 Endpoints
+Base: /api/v1/payers
+	•	GET /?search_text=&type=
+	•	GET /{id}
+	•	GET /{id}/plans
+	•	GET /plans/{planId}
+	•	GET /plans/{planId}/network-contracts?location_id=
+
+⸻
+
+2.2 tariff-pricebook-service
+
+Responsible for:
+	•	Tariff master: procedures, beds, services, consumables.
+	•	Payer-specific pricebooks / packages.
+
+2.2.1 DB Schema
+Tables:
+	•	service_items
+	•	tariff_groups
+	•	tariff_rates
+	•	package_definitions
+	•	package_inclusions
+
+service_items
+
+CREATE TABLE service_items (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'PROC_LAP_APPEND','BED_GEN','CONS_SYR_5ML'
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,                    -- 'procedure','bed','consultation','lab','imaging','consumable','package'
+  description TEXT,
+  clinical_code TEXT,                        -- ICD10-PCS/CPT/SNOMED for procedures
+  unit TEXT NOT NULL,                        -- 'DAY','SERVICE','UNIT','HOUR'
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_service_items_code_tenant
+  ON service_items(tenant_id, code);
+
+tariff_groups
+
+CREATE TABLE tariff_groups (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'DEFAULT_CASH','CORP_ABC','STAR_HEALTH'
+  name TEXT NOT NULL,
+  payer_plan_id UUID REFERENCES payer_plans(id),
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_tariff_groups_code_tenant
+  ON tariff_groups(tenant_id, code);
+
+tariff_rates
+
+CREATE TABLE tariff_rates (
+  id UUID PRIMARY KEY,
+  tariff_group_id UUID NOT NULL REFERENCES tariff_groups(id),
+  service_item_id UUID NOT NULL REFERENCES service_items(id),
+  base_rate NUMERIC NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'INR',
+  effective_from DATE,
+  effective_to DATE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_tariff_rates_combo
+  ON tariff_rates(tariff_group_id, service_item_id, effective_from);
+
+package_definitions
+
+CREATE TABLE package_definitions (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                         -- 'PKG_LAP_APPEND_STAR','PKG_CSECTION_GOLD'
+  name TEXT NOT NULL,
+  procedure_catalog_id UUID REFERENCES surgery_procedure_catalog(id),
+  payer_plan_id UUID REFERENCES payer_plans(id),
+  tariff_group_id UUID REFERENCES tariff_groups(id),
+  package_rate NUMERIC NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'INR',
+  length_of_stay_days INT,
+  notes TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_package_definitions_code_tenant
+  ON package_definitions(tenant_id, code);
+
+package_inclusions
+
+CREATE TABLE package_inclusions (
+  id UUID PRIMARY KEY,
+  package_definition_id UUID NOT NULL REFERENCES package_definitions(id) ON DELETE CASCADE,
+  inclusion_type TEXT NOT NULL,              -- 'service_item','generic_rule'
+  service_item_id UUID REFERENCES service_items(id),
+  rule_payload JSONB,                        -- e.g., 'all lab tests except...', 'max X days ICU'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.2.2 FHIR Mapping
+	•	service_items ↔ FHIR ChargeItemDefinition.
+	•	Packages map to PlanDefinition or InsurancePlan benefit.
+
+2.2.3 Endpoints
+Base: /api/v1/tariffs
+	•	GET /service-items?category=&search_text=
+	•	GET /tariff-groups
+	•	GET /rates?tariff_group_id=&service_item_id=
+	•	GET /packages?procedure_id=&payer_plan_id=
+
+⸻
+
+2.3 coverage-policy-service
+
+Responsible for:
+	•	Patient-level Coverage (policy details).
+	•	Mapping to payer plan & network contract.
+
+2.3.1 DB Schema
+Tables:
+	•	coverages
+	•	coverage_benefit_limits
+
+coverages
+
+CREATE TABLE coverages (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  payer_plan_id UUID NOT NULL REFERENCES payer_plans(id),
+  policy_number TEXT NOT NULL,
+  insured_person_name TEXT,
+  relationship_to_insured TEXT,                 -- 'self','spouse','child'
+  sum_insured NUMERIC,
+  remaining_eligible_amount NUMERIC,            -- optional; may be approximate
+  valid_from DATE,
+  valid_to DATE,
+  network_contract_id UUID REFERENCES payer_network_contracts(id),
+  is_primary BOOLEAN DEFAULT TRUE,
+  verification_status TEXT DEFAULT 'unverified', -- 'unverified','verified','invalid'
+  verification_details JSONB,
+  fhir_coverage_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_coverages_patient
+  ON coverages(patient_id, is_primary DESC);
+
+coverage_benefit_limits
+
+CREATE TABLE coverage_benefit_limits (
+  id UUID PRIMARY KEY,
+  coverage_id UUID NOT NULL REFERENCES coverages(id) ON DELETE CASCADE,
+  benefit_type TEXT NOT NULL,                    -- 'room_rent','icd_block','procedure_category'
+  benefit_code TEXT,                             -- e.g., 'single_ac_room','cardiac'
+  limit_type TEXT NOT NULL,                      -- 'per_day','per_event','overall'
+  limit_amount NUMERIC,
+  currency TEXT DEFAULT 'INR',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.3.2 FHIR Mapping
+	•	coverages ↔ FHIR Coverage.
+	•	Benefit limits encode into Coverage.costToBeneficiary and extensions.
+
+2.3.3 Endpoints
+Base: /api/v1/coverages
+	•	POST / (capture insurance at registration/admission).
+	•	GET /?patient_id=&active_only=
+	•	PATCH /{id} (update verification, network status).
+
+⸻
+
+2.4 estimate-service
+
+Responsible for:
+	•	Pre-admission / pre-surgery financial estimates.
+	•	Package vs itemised, patient share vs payer share.
+
+2.4.1 DB Schema
+Tables:
+	•	financial_estimates
+	•	financial_estimate_lines
+
+financial_estimates
+
+CREATE TABLE financial_estimates (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  episode_id UUID REFERENCES episodes(id),
+  coverage_id UUID REFERENCES coverages(id),
+  procedure_catalog_id UUID REFERENCES surgery_procedure_catalog(id),
+  tariff_group_id UUID REFERENCES tariff_groups(id),
+  estimate_type TEXT NOT NULL,                  -- 'opd_procedure','ipd_package','ipd_itemised'
+  estimated_total NUMERIC NOT NULL,
+  estimated_payer_amount NUMERIC,
+  estimated_patient_amount NUMERIC,
+  currency TEXT DEFAULT 'INR',
+  assumptions JSONB,                            -- e.g., LOS=3d, ward type
+  status TEXT NOT NULL DEFAULT 'draft',         -- 'draft','final','expired'
+  valid_until TIMESTAMPTZ,
+  created_by_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_financial_estimates_patient
+  ON financial_estimates(patient_id, created_at DESC);
+
+financial_estimate_lines
+
+CREATE TABLE financial_estimate_lines (
+  id UUID PRIMARY KEY,
+  financial_estimate_id UUID NOT NULL REFERENCES financial_estimates(id) ON DELETE CASCADE,
+  service_item_id UUID REFERENCES service_items(id),
+  description TEXT,
+  quantity NUMERIC,
+  unit_rate NUMERIC,
+  total_amount NUMERIC,
+  coverage_category TEXT,                       -- 'payer','patient','non_medical','exclusion'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_financial_estimate_lines_estimate
+  ON financial_estimate_lines(financial_estimate_id);
+
+2.4.2 Endpoints
+Base: /api/v1/estimates
+	•	POST / (compute estimate given procedure, ward type, coverage).
+	•	GET /?patient_id=&encounter_id=
+	•	GET /{id}.
+
+⸻
+
+2.5 preauth-service (Cashless Pre-Auth)
+
+This is the heart of cashless control.
+
+Responsible for:
+	•	Pre-auth cases, document checklist, submissions to payer/TPA, status + SLA.
+
+2.5.1 DB Schema
+Tables:
+	•	preauth_cases
+	•	preauth_documents
+	•	preauth_events
+	•	preauth_ai_tasks / preauth_ai_outputs (or reuse global rcm_ai)
+
+preauth_cases
+
+CREATE TABLE preauth_cases (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  coverage_id UUID NOT NULL REFERENCES coverages(id),
+  surgery_request_id UUID REFERENCES surgery_requests(id),
+  admission_id UUID REFERENCES encounters(id),          -- IP encounter
+  preauth_type TEXT NOT NULL,                           -- 'initial','enhancement','final'
+  indication TEXT NOT NULL,
+  estimated_cost NUMERIC,
+  requested_amount NUMERIC,
+  approved_amount NUMERIC,
+  status TEXT NOT NULL DEFAULT 'draft',                 -- 'draft','submitted','queried','approved','partially_approved','rejected','closed'
+  payer_reference_number TEXT,                          -- TPA ref no.
+  payer_plan_id UUID REFERENCES payer_plans(id),
+  sla_due_at TIMESTAMPTZ,                               -- from payer_rules TAT
+  assigned_queue_id UUID,                               -- control tower queue
+  assigned_user_id UUID,
+  priority TEXT DEFAULT 'normal',                       -- 'normal','high','critical'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_preauth_cases_patient
+  ON preauth_cases(patient_id, created_at DESC);
+
+CREATE INDEX idx_preauth_cases_status
+  ON preauth_cases(status, sla_due_at);
+
+preauth_documents
+
+CREATE TABLE preauth_documents (
+  id UUID PRIMARY KEY,
+  preauth_case_id UUID NOT NULL REFERENCES preauth_cases(id) ON DELETE CASCADE,
+  document_type TEXT NOT NULL,                        -- 'id_proof','policy_copy','consultation_note','lab_report','imaging_report','estimate'
+  file_storage_uri TEXT NOT NULL,                    -- S3 or blob URI
+  uploaded_by_user_id UUID,
+  uploaded_at TIMESTAMPTZ DEFAULT now(),
+  ocr_status TEXT DEFAULT 'pending',                 -- 'pending','processed','failed'
+  ocr_extracted_json JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_preauth_documents_case
+  ON preauth_documents(preauth_case_id);
+
+preauth_events
+
+CREATE TABLE preauth_events (
+  id UUID PRIMARY KEY,
+  preauth_case_id UUID NOT NULL REFERENCES preauth_cases(id) ON DELETE CASCADE,
+  event_time TIMESTAMPTZ NOT NULL,
+  event_type TEXT NOT NULL,                  -- 'created','submitted','queried','approved','rejected','enhancement_requested','call_log'
+  actor_type TEXT,                           -- 'system','payer','tpa','user'
+  actor_id UUID,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_preauth_events_case
+  ON preauth_events(preauth_case_id, event_time);
+
+2.5.2 FHIR Mapping
+	•	preauth_cases ↔ FHIR Claim with use = preauthorization
+	•	status, item, diagnosis, careTeam.
+	•	Responses ↔ FHIR ClaimResponse.
+
+2.5.3 Endpoints
+Base: /api/v1/preauth
+	•	POST /cases
+	•	GET /cases?patient_id=&status=&payer_id=&queue_id=
+	•	GET /cases/{id}
+	•	PATCH /cases/{id} (status updates, approved amount).
+	•	POST /cases/{id}/documents (file metadata; upload via pre-signed URL).
+	•	POST /cases/{id}/submit
+	•	POST /cases/{id}/events
+
+⸻
+
+2.6 charge-capture-service
+
+Responsible for:
+	•	Itemised charges for an encounter (IP/OP).
+	•	Link to tariff & package.
+
+2.6.1 DB Schema
+Tables:
+	•	accounts (per episode/encounter)
+	•	charges
+	•	charge_packages (link to package_definition)
+
+accounts
+
+CREATE TABLE accounts (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  episode_id UUID REFERENCES episodes(id),
+  coverage_id UUID REFERENCES coverages(id),
+  account_type TEXT NOT NULL,                   -- 'ip','op','daycare'
+  status TEXT NOT NULL DEFAULT 'open',          -- 'open','finalising','closed'
+  total_charges NUMERIC DEFAULT 0,
+  total_adjustments NUMERIC DEFAULT 0,
+  total_payer_responsibility NUMERIC DEFAULT 0,
+  total_patient_responsibility NUMERIC DEFAULT 0,
+  currency TEXT DEFAULT 'INR',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_accounts_patient
+  ON accounts(patient_id, created_at DESC);
+
+charges
+
+CREATE TABLE charges (
+  id UUID PRIMARY KEY,
+  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  service_item_id UUID NOT NULL REFERENCES service_items(id),
+  charge_date TIMESTAMPTZ NOT NULL,
+  quantity NUMERIC NOT NULL,
+  unit_rate NUMERIC NOT NULL,
+  gross_amount NUMERIC NOT NULL,
+  coverage_category TEXT,                 -- 'payer','patient','non_medical'
+  is_package_component BOOLEAN DEFAULT FALSE,
+  package_definition_id UUID REFERENCES package_definitions(id),
+  department_id UUID REFERENCES departments(id),
+  ordering_practitioner_id UUID REFERENCES practitioners(id),
+  charge_source TEXT,                     -- 'manual','order_auto','import'
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_charges_account
+  ON charges(account_id, charge_date);
+
+charge_packages
+
+CREATE TABLE charge_packages (
+  id UUID PRIMARY KEY,
+  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  package_definition_id UUID NOT NULL REFERENCES package_definitions(id),
+  package_rate NUMERIC NOT NULL,
+  coverage_category TEXT,                 -- typically 'payer'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.6.2 FHIR Mapping
+	•	charges ↔ FHIR ChargeItem.
+	•	accounts ↔ FHIR Account.
+
+2.6.3 Endpoints
+Base: /api/v1/accounts + /api/v1/charges
+	•	POST /accounts
+	•	GET /accounts?patient_id=&encounter_id=
+	•	POST /charges (single/bulk).
+	•	GET /charges?account_id=
+
+⸻
+
+2.7 claims-service
+
+Responsible for:
+	•	Claim creation, validation, bundling, generation (EDI/XML/PDF).
+
+2.7.1 DB Schema
+Tables:
+	•	claims
+	•	claim_lines
+
+claims
+
+CREATE TABLE claims (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  account_id UUID NOT NULL REFERENCES accounts(id),
+  coverage_id UUID NOT NULL REFERENCES coverages(id),
+  payer_id UUID NOT NULL REFERENCES payers(id),
+  payer_plan_id UUID REFERENCES payer_plans(id),
+  claim_number TEXT,
+  claim_type TEXT NOT NULL,                      -- 'institutional','professional'
+  use TEXT NOT NULL,                             -- 'preauthorization','claim'
+  status TEXT NOT NULL DEFAULT 'draft',          -- 'draft','submitted','in_review','paid','partially_paid','denied','cancelled'
+  total_claimed_amount NUMERIC,
+  total_approved_amount NUMERIC,
+  total_patient_responsibility NUMERIC,
+  currency TEXT DEFAULT 'INR',
+  submission_channel TEXT,                       -- 'portal','EDI','email'
+  submission_reference TEXT,
+  submission_date TIMESTAMPTZ,
+  fhir_claim_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_claims_payer_status
+  ON claims(payer_id, status, submission_date);
+
+CREATE INDEX idx_claims_account
+  ON claims(account_id);
+
+claim_lines
+
+CREATE TABLE claim_lines (
+  id UUID PRIMARY KEY,
+  claim_id UUID NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+  charge_id UUID REFERENCES charges(id),
+  line_number INT,
+  service_item_id UUID REFERENCES service_items(id),
+  service_date_from DATE,
+  service_date_to DATE,
+  quantity NUMERIC,
+  unit_price NUMERIC,
+  line_amount NUMERIC,
+  diagnosis_codes TEXT[],                       -- ICD-10 codes
+  procedure_codes TEXT[],                       -- if line-specific
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_claim_lines_claim
+  ON claim_lines(claim_id, line_number);
+
+2.7.2 FHIR Mapping
+	•	claims/claim_lines ↔ FHIR Claim (with item array).
+	•	Responses ↔ ClaimResponse.
+
+2.7.3 Endpoints
+Base: /api/v1/claims
+	•	POST / (generate claim from account & coverage).
+	•	GET /?payer_id=&status=&date_from=&date_to=
+	•	GET /{id}
+	•	PATCH /{id} (status updates, claim_number).
+	•	POST /{id}/export (generate JSON/EDI/PDF payload).
+
+⸻
+
+2.8 payment-remittance-service
+
+Responsible for:
+	•	Posting remittances (EOB/ERA).
+	•	Matching to claims, accounts.
+
+2.8.1 DB Schema
+Tables:
+	•	remittances
+	•	remittance_lines
+
+remittances
+
+CREATE TABLE remittances (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  payer_id UUID REFERENCES payers(id),
+  payment_reference TEXT NOT NULL,               -- NEFT/RTGS/cheque no.
+  payment_date TIMESTAMPTZ NOT NULL,
+  total_payment_amount NUMERIC NOT NULL,
+  currency TEXT DEFAULT 'INR',
+  remittance_source TEXT,                        -- 'manual','ERA','upload'
+  raw_data_uri TEXT,                             -- original file/object
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_remittances_payer_date
+  ON remittances(payer_id, payment_date);
+
+remittance_lines
+
+CREATE TABLE remittance_lines (
+  id UUID PRIMARY KEY,
+  remittance_id UUID NOT NULL REFERENCES remittances(id) ON DELETE CASCADE,
+  claim_id UUID REFERENCES claims(id),
+  claim_number TEXT,
+  paid_amount NUMERIC,
+  patient_responsibility_amount NUMERIC,
+  denial_code TEXT,
+  denial_reason TEXT,
+  adjustment_codes TEXT[],                       -- e.g., CO45 etc.
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_remittance_lines_claim
+  ON remittance_lines(claim_id);
+
+2.8.2 Endpoints
+Base: /api/v1/remittances
+	•	POST / (create remittance batch).
+	•	POST /{id}/lines (link claims).
+	•	GET /?payer_id=&date_from=&date_to=
+
+⸻
+
+2.9 denials-management-service
+
+Responsible for:
+	•	Denial capture, classification, workflow for appeals.
+
+2.9.1 DB Schema
+Tables:
+	•	denials
+	•	denial_actions
+
+denials
+
+CREATE TABLE denials (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  claim_id UUID NOT NULL REFERENCES claims(id),
+  remittance_line_id UUID REFERENCES remittance_lines(id),
+  denial_code TEXT,
+  denial_category TEXT,                          -- 'authorization','medical_necessity','coding','timely_filing','documentation'
+  denial_reason TEXT,
+  amount_denied NUMERIC,
+  status TEXT NOT NULL DEFAULT 'open',           -- 'open','in_appeal','resolved','written_off'
+  root_cause TEXT,                               -- 'missing_document','wrong_code','payer_error'
+  assigned_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_denials_status
+  ON denials(status, created_at);
+
+denial_actions
+
+CREATE TABLE denial_actions (
+  id UUID PRIMARY KEY,
+  denial_id UUID NOT NULL REFERENCES denials(id) ON DELETE CASCADE,
+  action_time TIMESTAMPTZ NOT NULL,
+  action_type TEXT NOT NULL,                     -- 'appeal_filed','info_submitted','call_log','writeoff'
+  actor_id UUID,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_denial_actions_denial
+  ON denial_actions(denial_id, action_time);
+
+2.9.2 Endpoints
+Base: /api/v1/denials
+	•	GET /?status=&payer_id=&category=&age_bucket=
+	•	GET /{id}
+	•	PATCH /{id} (status, assignment, root cause).
+	•	POST /{id}/actions.
+
+⸻
+
+2.10 cashless-control-tower-service
+
+Responsible for:
+	•	Cross-cutting work queues, SLAs, notifications for:
+	•	pre-auth,
+	•	claims,
+	•	denials,
+	•	high-risk AR.
+
+2.10.1 DB Schema
+Tables:
+	•	work_queues
+	•	work_items
+	•	sla_rules
+
+work_queues
+
+CREATE TABLE work_queues (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                          -- 'PREAUTH_NEW','PREAUTH_QUERY','CLAIMS_TO_SUBMIT','DENIALS_HIGH_VALUE'
+  name TEXT NOT NULL,
+  description TEXT,
+  domain TEXT NOT NULL,                        -- 'preauth','claims','denials','ar'
+  filter_config JSONB,                         -- definition of items included
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_work_queues_code_tenant
+  ON work_queues(tenant_id, code);
+
+work_items
+
+CREATE TABLE work_items (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  work_queue_id UUID NOT NULL REFERENCES work_queues(id),
+  domain TEXT NOT NULL,                        -- 'preauth','claim','denial'
+  entity_id UUID NOT NULL,                     -- preauth_case_id / claim_id / denial_id
+  priority TEXT DEFAULT 'normal',              -- 'low','normal','high','critical'
+  status TEXT NOT NULL DEFAULT 'open',         -- 'open','in_progress','completed','snoozed'
+  assigned_user_id UUID,
+  due_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_work_items_queue_status
+  ON work_items(work_queue_id, status, due_at);
+
+sla_rules
+
+CREATE TABLE sla_rules (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  domain TEXT NOT NULL,                        -- 'preauth','claims','denials'
+  name TEXT NOT NULL,
+  condition_config JSONB,                      -- e.g. { "preauth_type":"initial","payer_id":... }
+  tat_hours INT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.10.2 Endpoints
+Base: /api/v1/control-tower
+	•	GET /queues
+	•	GET /queues/{id}/items?status=&assignee=
+	•	PATCH /work-items/{id} (assign, status, snooze).
+
+⸻
+
+2.11 rcm-ai-orchestrator-service
+
+Responsible for:
+	•	OCR, doc extraction, summaries.
+	•	Coding suggestions.
+	•	Denial root-cause classification.
+	•	Analytics summarisation.
+
+2.11.1 DB Schema
+Tables:
+	•	rcm_ai_tasks
+	•	rcm_ai_outputs
+
+rcm_ai_tasks
+
+CREATE TABLE rcm_ai_tasks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  domain TEXT NOT NULL,                       -- 'preauth','claim_coding','denial','analytics'
+  preauth_case_id UUID REFERENCES preauth_cases(id),
+  claim_id UUID REFERENCES claims(id),
+  denial_id UUID REFERENCES denials(id),
+  document_id UUID REFERENCES preauth_documents(id),
+  task_type TEXT NOT NULL,                    -- 'doc_ocr','clinical_summary','coding_suggestion','denial_classification','appeal_draft'
+  status TEXT NOT NULL DEFAULT 'queued',      -- 'queued','running','completed','failed'
+  requested_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+rcm_ai_outputs
+
+CREATE TABLE rcm_ai_outputs (
+  id UUID PRIMARY KEY,
+  rcm_ai_task_id UUID NOT NULL REFERENCES rcm_ai_tasks(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,                  -- 'structured_ocr','summary','code_suggestions','denial_category','appeal_text'
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+
+⸻
+
+3. Frontend – RCM & Cashless Workflows
+
+3.1 Front Office / Admission UI
+
+Routes:
+	•	/fo/registration
+	•	/fo/patient/[patientId]/financials
+
+Features:
+	•	Capture policy & coverage:
+	•	payer, plan, policy, sum insured, card photo upload.
+	•	Eligibility & network:
+	•	show if hospital is network / cashless allowed.
+	•	Estimate:
+	•	package vs itemised; patient share vs payer.
+
+APIs:
+	•	POST /coverages
+	•	GET /tariffs/packages
+	•	POST /estimates
+
+⸻
+
+3.2 Cashless Control Tower UI
+
+Routes:
+	•	/control-tower/preauth
+	•	/preauth/case/[preauthCaseId]
+
+Queue view
+	•	Multiple tabs: New, In Progress, Queried, SLA Breach Risk.
+	•	Columns:
+	•	patient, payer, ref no, type (initial/enhancement/final), estimate, status, SLA countdown.
+
+Case detail
+	•	Left: clinical & financial context:
+	•	diagnosis, planned procedure, labs/imaging summary, estimate lines.
+	•	Right:
+	•	document checklist (required vs uploaded vs missing),
+	•	event timeline,
+	•	pre-auth AI summary draft.
+
+APIs:
+	•	GET /control-tower/queues
+	•	GET /control-tower/queues/{id}/items
+	•	GET /preauth/cases/{id}
+	•	POST /preauth/cases/{id}/submit
+
+⸻
+
+3.3 Billing / Inpatient Financials UI
+
+Routes:
+	•	/billing/accounts
+	•	/billing/account/[accountId]
+
+Features:
+	•	Live account snapshot:
+	•	charges so far, package vs actual, non-medicals.
+	•	Ability to:
+	•	add/edit charges,
+	•	run “coverage split” (payer vs patient).
+	•	On discharge:
+	•	generate final bill, final cashless settlement, and patient bill.
+
+APIs:
+	•	GET /accounts?patient_id=
+	•	GET /charges?account_id=
+	•	POST /charges
+
+⸻
+
+3.4 Claims Team UI
+
+Routes:
+	•	/claims/worklist
+	•	/claims/[claimId]
+
+Features:
+	•	Worklist:
+	•	claims to create, to submit, in-review, pending documents.
+	•	Claim detail:
+	•	lines, mapping to charges, status, submission info.
+	•	AI:
+	•	coding suggestions, missing documentation hints.
+
+APIs:
+	•	GET /claims?status=
+	•	POST /claims
+	•	POST /claims/{id}/export
+
+⸻
+
+3.5 Denials & AR UI
+
+Routes:
+	•	/denials/worklist
+	•	/denials/[denialId]
+	•	/ar/dashboard
+
+Features:
+	•	Denials worklist by category and payer.
+	•	Denial detail:
+	•	original claim, remittance line, AI classification, suggested appeal draft.
+	•	AR dashboard:
+	•	aging buckets, top denying payers, denial trends.
+
+APIs:
+	•	GET /denials?status=&category=
+	•	PATCH /denials/{id}
+	•	POST /denials/{id}/actions
+
+⸻
+
+4. LLM Tools – RCM & Cashless Agents
+
+4.1 Cashless Pre-Auth Tools
+
+Tool: get_preauth_case
+
+{
+  "name": "get_preauth_case",
+  "description": "Fetch details of a preauth case including patient, coverage, estimate and current status.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "preauth_case_id": { "type": "string" }
+    },
+    "required": ["preauth_case_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "case": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "preauth_type": { "type": "string" },
+          "patient_summary": { "type": "object" },
+          "coverage_summary": { "type": "object" },
+          "clinical_summary": { "type": "object" },
+          "estimate_summary": { "type": "object" }
+        }
+      }
+    }
+  }
+}
+
+Tool: list_preauth_documents
+
+{
+  "name": "list_preauth_documents",
+  "description": "List uploaded documents for a preauth case with OCR extraction status.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "preauth_case_id": { "type": "string" }
+    },
+    "required": ["preauth_case_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "documents": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "document_id": { "type": "string" },
+            "document_type": { "type": "string" },
+            "ocr_status": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: request_rcm_ai_task
+
+{
+  "name": "request_rcm_ai_task",
+  "description": "Request an AI task for RCM such as OCR, clinical summary, coding suggestion, or appeal draft.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "domain": {
+        "type": "string",
+        "enum": ["preauth", "claim_coding", "denial", "analytics"]
+      },
+      "task_type": {
+        "type": "string",
+        "enum": [
+          "doc_ocr",
+          "clinical_summary",
+          "coding_suggestion",
+          "denial_classification",
+          "appeal_draft"
+        ]
+      },
+      "preauth_case_id": { "type": "string" },
+      "claim_id": { "type": "string" },
+      "denial_id": { "type": "string" },
+      "document_id": { "type": "string" }
+    },
+    "required": ["domain", "task_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "rcm_ai_task_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: get_rcm_ai_output
+
+{
+  "name": "get_rcm_ai_output",
+  "description": "Fetch the output of a previously requested RCM AI task.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "rcm_ai_task_id": { "type": "string" }
+    },
+    "required": ["rcm_ai_task_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "outputs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "output_type": { "type": "string" },
+            "payload": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+4.2 Estimate & Financial Counselling Tools
+
+Tool: create_financial_estimate
+
+{
+  "name": "create_financial_estimate",
+  "description": "Create a financial estimate for a patient based on procedure and coverage.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "coverage_id": { "type": "string" },
+      "procedure_catalog_id": { "type": "string" },
+      "estimate_type": {
+        "type": "string",
+        "enum": ["opd_procedure", "ipd_package", "ipd_itemised"]
+      },
+      "assumptions": { "type": "object" }
+    },
+    "required": ["patient_id", "procedure_catalog_id", "estimate_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "financial_estimate_id": { "type": "string" },
+      "estimated_total": { "type": "number" },
+      "estimated_payer_amount": { "type": "number" },
+      "estimated_patient_amount": { "type": "number" },
+      "currency": { "type": "string" }
+    }
+  }
+}
+
+
+⸻
+
+4.3 Claims & Denials Tools
+
+Tool: get_claim_with_lines
+
+{
+  "name": "get_claim_with_lines",
+  "description": "Get claim header and line-level details for review.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "claim_id": { "type": "string" }
+    },
+    "required": ["claim_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "claim": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "claim_type": { "type": "string" },
+          "total_claimed_amount": { "type": "number" },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line_number": { "type": "integer" },
+                "service_item_code": { "type": "string" },
+                "service_item_name": { "type": "string" },
+                "line_amount": { "type": "number" },
+                "diagnosis_codes": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: get_denial_details
+
+{
+  "name": "get_denial_details",
+  "description": "Fetch denial details for a claim including reasons and amounts.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "denial_id": { "type": "string" }
+    },
+    "required": ["denial_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "denial": {
+        "type": "object",
+        "properties": {
+          "denial_code": { "type": "string" },
+          "denial_category": { "type": "string" },
+          "denial_reason": { "type": "string" },
+          "amount_denied": { "type": "number" },
+          "claim_id": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+4.4 Control Tower Work Queue Tools
+
+Tool: list_work_items
+
+{
+  "name": "list_work_items",
+  "description": "List open work items for a given queue in the cashless control tower.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "work_queue_id": { "type": "string" },
+      "status": { "type": "string" },
+      "assignee": { "type": "string" }
+    },
+    "required": ["work_queue_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "work_item_id": { "type": "string" },
+            "domain": { "type": "string" },
+            "entity_id": { "type": "string" },
+            "priority": { "type": "string" },
+            "due_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: update_work_item
+
+{
+  "name": "update_work_item",
+  "description": "Update status or assignee of a work item in the control tower.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "work_item_id": { "type": "string" },
+      "status": { "type": "string" },
+      "assigned_user_id": { "type": "string" }
+    },
+    "required": ["work_item_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "work_item_id": { "type": "string" },
+      "status": { "type": "string" },
+      "assigned_user_id": { "type": "string" }
+    }
+  }
+}
+
+
+⸻
+
+5. System Prompts – RCM & Cashless Agents
+
+5.1 Cashless Pre-Auth Agent
+
+You are the Cashless Pre-Auth Agent in the Revenue Cycle team.
+
+Goals:
+	•	Help RCM staff prepare high-quality, complete pre-auth submissions.
+	•	Minimise queries and rejections by surfacing missing documents and unclear clinical stories.
+
+Rules:
+	1.	Always begin by pulling the case via get_preauth_case and listing key facts:
+	•	indication for admission/procedure,
+	•	co-morbidities,
+	•	planned procedure,
+	•	estimated cost vs sum insured,
+	•	coverage/network status.
+	2.	Use list_preauth_documents and request_rcm_ai_task (doc_ocr & clinical_summary) to:
+	•	read hospital clinical docs,
+	•	assemble a concise but complete clinical narrative:
+	•	chief complaint,
+	•	relevant history,
+	•	key exam findings,
+	•	important labs/imaging,
+	•	plan/procedure.
+	3.	Cross-check against payer_rules (document checklist, if exposed) and explicitly flag:
+	•	missing mandatory documents,
+	•	unclear indication,
+	•	mismatch between planned procedure and diagnosis.
+	4.	Generate two separate outputs:
+	•	Internal note: reasoning, risk assessment, cost/benefit context.
+	•	Payer-facing summary: crisp, formal, clinically accurate, with no internal jargon.
+	5.	Never fabricate labs or imaging; if not available, say “not available in record” instead of guessing.
+	6.	If estimate suggests patient share > threshold (e.g., exhaustion of SI):
+	•	clearly highlight this for financial counselling.
+
+Tools:
+	•	get_preauth_case
+	•	list_preauth_documents
+	•	request_rcm_ai_task
+	•	get_rcm_ai_output
+	•	create_financial_estimate (if estimate is missing)
+
+⸻
+
+5.2 Financial Counsellor Agent (Patient-Facing)
+
+You are the Financial Counsellor Agent assisting front-office staff when they talk to patients or relatives.
+
+Goals:
+	•	Explain expected costs and insurance coverage in plain language.
+	•	Reduce surprises at discharge.
+
+Rules:
+	1.	Use create_financial_estimate or retrieve an existing estimate to get:
+	•	total expected cost,
+	•	expected insurer share,
+	•	expected patient share,
+	•	key assumptions (room type, length of stay, procedures).
+	2.	Translate this into simple sentences:
+	•	“Based on your current plan and our standard package for [procedure], we estimate…”
+	3.	Explicitly mention:
+	•	what is usually not covered (non-medical items, upgrades, extra days).
+	4.	Never promise exact amounts; phrase as estimates:
+	•	“This is an estimate; actual amounts may vary based on treatment and stay.”
+	5.	Encourage patients/relatives to ask questions; suggest follow-up with the billing desk for written copies.
+
+Tools:
+	•	create_financial_estimate
+	•	read-only coverage & package info
+
+⸻
+
+5.3 Claims Coding & Packaging Agent
+
+You are the Claims Coding & Packaging Agent.
+
+Goals:
+	•	Help claims teams construct optimised yet compliant claims.
+	•	Reduce undercoding/overcoding and missing documentation.
+
+Rules:
+	1.	Pull claim data via get_claim_with_lines:
+	•	lines, amounts, diagnosis codes, procedures.
+	2.	Combine with clinical EHR context (problems, procedures, labs, imaging) via read-only tools.
+	3.	Highlight:
+	•	missing or inconsistent diagnosis/procedure codes,
+	•	lines that likely need different coding (e.g., ICU vs ward),
+	•	services that seem clinically indicated but unbilled (flag only; do not auto-add).
+	4.	Use request_rcm_ai_task with coding_suggestion to:
+	•	suggest ICD/ICD-10-PCS/CPT-like codes,
+	•	but always:
+	•	explain your reasoning,
+	•	explicitly mark them as suggestions for human coder review.
+	5.	Be conservative:
+	•	do not suggest codes unsupported by documented clinical facts.
+
+Tools:
+	•	get_claim_with_lines
+	•	request_rcm_ai_task
+	•	get_rcm_ai_output
+
+⸻
+
+5.4 Denial Management Agent
+
+You are the Denial Management Agent.
+
+Goals:
+	•	Help RCM staff understand denials and plan effective appeals.
+
+Rules:
+	1.	Use get_denial_details and claim retrieval tools to see:
+	•	denial code, category, reason, amount,
+	•	related claim & lines.
+	2.	Use request_rcm_ai_task with denial_classification to:
+	•	classify denial into root cause buckets (auth/doc/coding/medical/payer),
+	•	surface any patterns (e.g., repeating across this payer).
+	3.	Draft:
+	•	a concise root cause summary (internal),
+	•	an appeal draft addressed to payer if appropriate, using appeal_draft task.
+	4.	Appeals must:
+	•	be factual,
+	•	reference specific documentation (discharge summary, imaging, labs),
+	•	avoid emotional or accusatory language.
+	5.	If denial is clearly valid (e.g., beyond timely filing, obvious non-covered item):
+	•	suggest closure or write-off rather than futile appeals.
+
+Tools:
+	•	get_denial_details
+	•	request_rcm_ai_task
+	•	get_rcm_ai_output
+
+⸻
+
+5.5 RCM Analytics & Command Center Agent
+
+You are the RCM Command Center Agent.
+
+Goals:
+	•	Help leadership understand financial performance and operational bottlenecks.
+
+Rules:
+	1.	Use analytic endpoints (exposed by rcm-analytics-service) to gather:
+	•	AR aging,
+	•	denial rates by payer & category,
+	•	TAT for pre-auth, claims, remittances,
+	•	package vs actual cost distributions.
+	2.	Summarise:
+	•	3–5 key insights, each with:
+	•	metric,
+	•	trend (improving/worsening),
+	•	likely root-cause hypotheses,
+	•	1–2 tactical actions.
+	3.	Separate:
+	•	facts (numbers, trends),
+	•	interpretation (what this may mean),
+	•	recommendations (what to try).
+	4.	Avoid over-precision; use rounded, understandable figures for narrative explanations.
+
+Tools:
+	•	RCM analytics read endpoints
+	•	request_rcm_ai_task (analytics summaries)
+
+⸻

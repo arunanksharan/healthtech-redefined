@@ -1,0 +1,1157 @@
+Alright Suri, Phase “let’s stop pretending LIS is just a CSV of results.”
+
+Let’s treat this as:
+
+Phase 8 – Laboratory & Pathology Platform (LIS + Anatomic Path)
+
+Same style as Imaging: services, DB schemas, endpoints, FHIR mappings, tools, prompts.
+
+⸻
+
+1. Phase 8 – Scope & Design Goals
+
+1.1 What Phase 8 Adds
+
+Lab & pathology as a first-class vertical:
+	•	Core Lab (Chem/Heme/Biochem)
+	•	Orders, containers, analyzers, panels, critical values, delta checks.
+	•	Microbiology
+	•	Cultures, organisms, susceptibilities, antibiograms.
+	•	Anatomic Pathology
+	•	Specimen lifecycle: accession → gross → blocks → slides → report.
+	•	Synoptic cancer reporting (TNM staging etc.).
+	•	LIS workflow engine
+	•	Sample collection, transport, processing, validation & release.
+	•	AI-native features
+	•	Result interpretation & trend summaries (for clinicians & patients).
+	•	Reflex / cascading rules.
+	•	Pathology report drafting, pattern recognition support (later, with images).
+	•	Micro trends (local resistance patterns, surveillance).
+
+All tied cleanly into EHR, PRM, analytics, research/trials.
+
+⸻
+
+2. Backend – Services & Data Model
+
+New services:
+	1.	lab-catalog-service
+	2.	lab-order-service
+	3.	lab-specimen-tracking-service
+	4.	lab-result-service (includes microbiology)
+	5.	ap-pathology-service (anatomic path)
+	6.	lab-ai-orchestrator-service
+
+Assumption: we already have patients, encounters, episodes, departments, fhir-service, event bus.
+
+⸻
+
+2.1 lab-catalog-service
+
+Responsibility:
+	•	Master lab test catalog:
+	•	individual tests + panels/profiles.
+	•	mapping to analyzers + specimen requirements.
+	•	LOINC/SNOMED coding.
+
+2.1.1 DB Schema
+Tables:
+	•	lab_specimen_types
+	•	lab_tests
+	•	lab_test_panels
+	•	lab_test_panel_items
+	•	lab_analyzers (optional)
+
+lab_specimen_types
+
+CREATE TABLE lab_specimen_types (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                       -- 'VEN_BLOOD', 'URINE', 'CSF', 'TISSUE'
+  name TEXT NOT NULL,
+  description TEXT,
+  container_type TEXT,                      -- 'EDTA_TUBE', 'SST_TUBE', etc.
+  handling_instructions TEXT,
+  storage_temperature_range TEXT,           -- e.g. '2-8C'
+  stability_hours INT,                      -- how long before result invalid
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_lab_specimen_type_code_tenant
+  ON lab_specimen_types(tenant_id, code);
+
+lab_tests
+
+CREATE TABLE lab_tests (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                       -- 'CBC', 'HB', 'FBS', 'CRP', 'CREAT'
+  name TEXT NOT NULL,
+  description TEXT,
+  loinc_code TEXT,
+  category TEXT,                            -- 'hematology','chemistry','immunology','micro','pathology'
+  default_specimen_type_id UUID REFERENCES lab_specimen_types(id),
+  unit TEXT,
+  reference_range JSONB,                    -- e.g. { "adult_male": "13-17 g/dL", ... }
+  critical_range JSONB,                     -- e.g. { "low": "< 6", "high": "> 20" }
+  is_panel BOOLEAN DEFAULT FALSE,
+  is_active BOOLEAN DEFAULT TRUE,
+  result_type TEXT NOT NULL DEFAULT 'numeric',  -- 'numeric','text','categorical','qualitative'
+  result_value_set JSONB,                   -- for categorical (e.g., ['Positive','Negative'])
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_lab_test_code_tenant
+  ON lab_tests(tenant_id, code);
+
+lab_test_panels (for profiles like LFT, RFT)
+
+CREATE TABLE lab_test_panels (
+  id UUID PRIMARY KEY,
+  lab_test_id UUID NOT NULL REFERENCES lab_tests(id) ON DELETE CASCADE,
+  panel_code TEXT NOT NULL,                  -- 'LFT','RFT','LIPID_PROFILE'
+  name TEXT NOT NULL,
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_lab_test_panel_code
+  ON lab_test_panels(panel_code);
+
+lab_test_panel_items
+
+CREATE TABLE lab_test_panel_items (
+  id UUID PRIMARY KEY,
+  lab_test_panel_id UUID NOT NULL REFERENCES lab_test_panels(id) ON DELETE CASCADE,
+  child_lab_test_id UUID NOT NULL REFERENCES lab_tests(id),
+  sort_order INT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+You can also model panels by lab_tests with is_panel=true + children; I’m keeping a separate table for clarity.
+
+2.1.2 FHIR Mapping
+	•	lab_tests → FHIR Observation.code (LOINC etc.).
+	•	lab_specimen_types → FHIR Specimen.type.
+	•	Panels map to:
+	•	a “panel” DiagnosticReport + multiple Observations.
+
+2.1.3 Endpoints
+Base: /api/v1/lab-catalog
+	•	GET /tests?category=&search_text=
+	•	GET /tests/{id}
+	•	GET /panels
+	•	GET /panels/{id}
+	•	GET /specimen-types
+
+⸻
+
+2.2 lab-order-service
+
+Responsibility:
+	•	Lab orders (requests) from OPD/IPD/ED.
+
+2.2.1 DB Schema
+Tables:
+	•	lab_orders
+	•	lab_order_items
+
+lab_orders
+
+CREATE TABLE lab_orders (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  episode_id UUID REFERENCES episodes(id),
+  ordering_practitioner_id UUID REFERENCES practitioners(id),
+  ordering_department_id UUID REFERENCES departments(id),
+  priority TEXT NOT NULL DEFAULT 'routine',        -- 'routine','urgent','stat'
+  status TEXT NOT NULL DEFAULT 'requested',        -- 'requested','collected','in_progress','completed','cancelled','rejected'
+  clinical_indication TEXT,
+  requested_at TIMESTAMPTZ NOT NULL,
+  collected_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  fhir_service_request_bundle_id TEXT,             -- group of ServiceRequests
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_orders_patient
+  ON lab_orders(patient_id, requested_at DESC);
+
+CREATE INDEX idx_lab_orders_status
+  ON lab_orders(status, requested_at DESC);
+
+lab_order_items
+
+CREATE TABLE lab_order_items (
+  id UUID PRIMARY KEY,
+  lab_order_id UUID NOT NULL REFERENCES lab_orders(id) ON DELETE CASCADE,
+  lab_test_id UUID NOT NULL REFERENCES lab_tests(id),
+  is_panel BOOLEAN DEFAULT FALSE,
+  status TEXT NOT NULL DEFAULT 'ordered',         -- 'ordered','cancelled'
+  requested_specimen_type_id UUID REFERENCES lab_specimen_types(id),
+  result_group_id UUID,                           -- for linking to results
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_order_items_order
+  ON lab_order_items(lab_order_id);
+
+2.2.2 FHIR Mapping
+	•	lab_orders & lab_order_items → group of FHIR ServiceRequest resources:
+	•	category = laboratory.
+	•	Alternatively: one ServiceRequest per panel; but we track at order-level internally.
+
+2.2.3 Endpoints
+Base: /api/v1/lab-orders
+	•	POST /
+	•	Input: patient, encounter, items (test codes/panel codes), indication, priority.
+	•	GET /?patient_id=&status=&from=&to=
+	•	GET /{id}
+	•	PATCH /{id}
+	•	update status (cancel).
+
+⸻
+
+2.3 lab-specimen-tracking-service
+
+Responsibility:
+	•	Specimen lifecycle:
+	•	collection, labeling, transport, receipt, processing, storage, disposal.
+
+2.3.1 DB Schema
+Tables:
+	•	lab_specimens
+	•	lab_specimen_events
+
+lab_specimens
+
+CREATE TABLE lab_specimens (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  lab_order_id UUID NOT NULL REFERENCES lab_orders(id),
+  specimen_identifier TEXT NOT NULL,             -- barcode / label ID
+  specimen_type_id UUID NOT NULL REFERENCES lab_specimen_types(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  collection_time TIMESTAMPTZ,
+  collection_location_id UUID REFERENCES locations(id),
+  collected_by_user_id UUID,
+  status TEXT NOT NULL DEFAULT 'pending_collection', -- 'pending_collection','collected','in_transit','received','processing','stored','discarded'
+  received_time TIMESTAMPTZ,
+  received_location_id UUID REFERENCES locations(id),
+  volume_ml NUMERIC,
+  comments TEXT,
+  fhir_specimen_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_lab_specimen_identifier_tenant
+  ON lab_specimens(tenant_id, specimen_identifier);
+
+CREATE INDEX idx_lab_specimens_order
+  ON lab_specimens(lab_order_id);
+
+lab_specimen_events
+
+CREATE TABLE lab_specimen_events (
+  id UUID PRIMARY KEY,
+  lab_specimen_id UUID NOT NULL REFERENCES lab_specimens(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,                      -- 'label_printed','collected','sent_to_lab','received','aliquoted','stored','discarded'
+  event_time TIMESTAMPTZ NOT NULL,
+  location_id UUID REFERENCES locations(id),
+  performed_by_user_id UUID,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_specimen_events_specimen
+  ON lab_specimen_events(lab_specimen_id, event_time);
+
+2.3.2 FHIR Mapping
+	•	lab_specimens ↔ FHIR Specimen:
+	•	type, collection, receivedTime.
+
+2.3.3 Endpoints
+Base: /api/v1/lab-specimens
+	•	POST /label
+	•	generate new specimen identifiers for a lab_order.
+	•	GET /?lab_order_id=&status=&specimen_identifier=
+	•	PATCH /{id}
+	•	update status (collected/received/etc.).
+	•	POST /{id}/events
+	•	record event (scanned at location, etc.).
+
+⸻
+
+2.4 lab-result-service (Core + Microbiology)
+
+Responsibility:
+	•	Results from analyzers / LIS.
+	•	Posting, validating, releasing.
+	•	Micro panels (organisms, sensitivities).
+
+2.4.1 DB Schema
+Tables:
+	•	lab_results (per order item/test)
+	•	lab_result_values (per component / panel item)
+	•	lab_micro_organisms
+	•	lab_micro_susceptibilities
+
+lab_results
+
+CREATE TABLE lab_results (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  lab_order_id UUID NOT NULL REFERENCES lab_orders(id),
+  lab_order_item_id UUID REFERENCES lab_order_items(id),
+  lab_test_id UUID NOT NULL REFERENCES lab_tests(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  specimen_id UUID REFERENCES lab_specimens(id),
+  analyzer_run_id TEXT,                       -- optional from instrument
+  status TEXT NOT NULL DEFAULT 'preliminary', -- 'preliminary','final','corrected','cancelled'
+  result_time TIMESTAMPTZ NOT NULL,
+  validated_by_user_id UUID,
+  validated_at TIMESTAMPTZ,
+  entered_by_user_id UUID,
+  entry_source TEXT,                          -- 'manual','analyzer_import'
+  comments TEXT,
+  is_critical BOOLEAN DEFAULT FALSE,
+  critical_notified BOOLEAN DEFAULT FALSE,
+  critical_notification_details TEXT,
+  fhir_observation_id TEXT,
+  fhir_diagnostic_report_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_results_patient
+  ON lab_results(patient_id, result_time DESC);
+
+CREATE INDEX idx_lab_results_order_item
+  ON lab_results(lab_order_item_id);
+
+lab_result_values
+
+For multi-component tests / panels.
+
+CREATE TABLE lab_result_values (
+  id UUID PRIMARY KEY,
+  lab_result_id UUID NOT NULL REFERENCES lab_results(id) ON DELETE CASCADE,
+  component_lab_test_id UUID REFERENCES lab_tests(id),
+  component_code TEXT,                        -- fallback if no lab_test row
+  value_numeric NUMERIC,
+  value_text TEXT,
+  value_code TEXT,
+  unit TEXT,
+  reference_range TEXT,
+  flag TEXT,                                  -- 'L','H','LL','HH','N','A' etc.
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_result_values_result
+  ON lab_result_values(lab_result_id);
+
+lab_micro_organisms
+
+CREATE TABLE lab_micro_organisms (
+  id UUID PRIMARY KEY,
+  lab_result_id UUID NOT NULL REFERENCES lab_results(id) ON DELETE CASCADE,
+  organism_code TEXT,                         -- SNOMED or internal
+  organism_name TEXT,
+  quantity TEXT,                              -- 'heavy growth','scanty'
+  comments TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_micro_organisms_result
+  ON lab_micro_organisms(lab_result_id);
+
+lab_micro_susceptibilities
+
+CREATE TABLE lab_micro_susceptibilities (
+  id UUID PRIMARY KEY,
+  lab_micro_organism_id UUID NOT NULL REFERENCES lab_micro_organisms(id) ON DELETE CASCADE,
+  antibiotic_code TEXT,                       -- e.g. ATC or internal
+  antibiotic_name TEXT,
+  mic_value NUMERIC,
+  mic_unit TEXT,
+  interpretation TEXT,                        -- 'S','I','R'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lab_micro_susc_organism
+  ON lab_micro_susceptibilities(lab_micro_organism_id);
+
+2.4.2 FHIR Mapping
+	•	lab_results + lab_result_values ↔ FHIR Observation:
+	•	with Observation.component when multi-analyte.
+	•	For panels: group Observations under FHIR DiagnosticReport (category = LAB).
+	•	Micro:
+	•	Observation for culture result + nested component for organism, sensitivities,
+	•	or use multiple Observations keyed by specimen.
+
+2.4.3 Endpoints
+Base: /api/v1/lab-results
+	•	GET /?patient_id=&lab_order_id=&from=&to=&test_code=
+	•	GET /{id}
+	•	POST / (LIS/analyzer imports)
+	•	bulk posting allowed.
+	•	PATCH /{id}
+	•	set status to final/corrected, mark critical notified.
+
+For Micro:
+	•	GET /micro?patient_id=&from=&to=&organism=
+	•	plus endpoints to sync LIS messages (HL7 ORU, etc.).
+
+⸻
+
+2.5 ap-pathology-service (Anatomic Path)
+
+Responsibility:
+	•	Tissue specimens:
+	•	accession, gross, blocks, slides.
+	•	Pathology reports:
+	•	narrative + synoptic (structured cancer reporting).
+
+2.5.1 DB Schema
+Tables:
+	•	ap_cases
+	•	ap_specimens
+	•	ap_blocks
+	•	ap_slides
+	•	ap_report_templates
+	•	ap_reports
+	•	ap_report_synoptic_values
+
+ap_cases
+
+CREATE TABLE ap_cases (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  case_number TEXT NOT NULL,                   -- 'AP-2025-000123'
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  referring_practitioner_id UUID REFERENCES practitioners(id),
+  referring_department_id UUID REFERENCES departments(id),
+  received_date TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'accessioned',  -- 'accessioned','in_progress','reported','amended','cancelled'
+  clinical_history TEXT,
+  diagnosis_summary TEXT,
+  pathologist_id UUID REFERENCES practitioners(id),
+  fhir_diagnostic_report_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_ap_case_number_tenant
+  ON ap_cases(tenant_id, case_number);
+
+CREATE INDEX idx_ap_cases_patient
+  ON ap_cases(patient_id, received_date DESC);
+
+ap_specimens
+
+CREATE TABLE ap_specimens (
+  id UUID PRIMARY KEY,
+  ap_case_id UUID NOT NULL REFERENCES ap_cases(id) ON DELETE CASCADE,
+  specimen_identifier TEXT NOT NULL,            -- container label
+  site TEXT,                                    -- 'colon','breast'
+  description TEXT,                             -- “Segment of colon, 5cm…”
+  procedure TEXT,                               -- 'polypectomy','excision'
+  collection_time TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ap_specimens_case
+  ON ap_specimens(ap_case_id);
+
+ap_blocks
+
+CREATE TABLE ap_blocks (
+  id UUID PRIMARY KEY,
+  ap_specimen_id UUID NOT NULL REFERENCES ap_specimens(id) ON DELETE CASCADE,
+  block_identifier TEXT NOT NULL,               -- 'A1','A2','B1'
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ap_blocks_specimen
+  ON ap_blocks(ap_specimen_id);
+
+ap_slides
+
+CREATE TABLE ap_slides (
+  id UUID PRIMARY KEY,
+  ap_block_id UUID NOT NULL REFERENCES ap_blocks(id) ON DELETE CASCADE,
+  slide_identifier TEXT NOT NULL,               -- 'A1-1','A1-2'
+  stain TEXT,                                   -- 'H&E','IHC ER','PAS'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ap_slides_block
+  ON ap_slides(ap_block_id);
+
+ap_report_templates
+
+CREATE TABLE ap_report_templates (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                          -- 'BREAST_CA_RESECTION','COLON_POLYP'
+  name TEXT NOT NULL,
+  description TEXT,
+  site TEXT,
+  schema JSONB NOT NULL,                       -- synoptic fields (JSON schema-like)
+  default_narrative TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_ap_report_template_code
+  ON ap_report_templates(tenant_id, code);
+
+ap_reports
+
+CREATE TABLE ap_reports (
+  id UUID PRIMARY KEY,
+  ap_case_id UUID NOT NULL REFERENCES ap_cases(id) ON DELETE CASCADE,
+  template_id UUID REFERENCES ap_report_templates(id),
+  status TEXT NOT NULL DEFAULT 'draft',        -- 'draft','final','amended','cancelled'
+  gross_description TEXT,
+  microscopic_description TEXT,
+  diagnosis_text TEXT,
+  comments TEXT,
+  signed_at TIMESTAMPTZ,
+  signed_by_pathologist_id UUID REFERENCES practitioners(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ap_reports_case
+  ON ap_reports(ap_case_id);
+
+ap_report_synoptic_values
+
+CREATE TABLE ap_report_synoptic_values (
+  id UUID PRIMARY KEY,
+  ap_report_id UUID NOT NULL REFERENCES ap_reports(id) ON DELETE CASCADE,
+  field_code TEXT NOT NULL,                      -- 'T_STAGE','N_STAGE','M_STAGE','MARGIN_STATUS'
+  value_text TEXT,
+  value_code TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_ap_report_synoptic_values_report
+  ON ap_report_synoptic_values(ap_report_id);
+
+2.5.2 FHIR Mapping
+	•	ap_reports ↔ FHIR DiagnosticReport (category = PATHOLOGY).
+	•	specimen references,
+	•	conclusion, conclusionCode.
+	•	Synoptic values ↔:
+	•	Observations with Observation.code = TNM stage, margin status, etc.
+
+2.5.3 Endpoints
+Base: /api/v1/ap-cases and /api/v1/ap-reports
+	•	POST /ap-cases
+	•	create case from OR/biopsy order.
+	•	GET /ap-cases?patient_id=&status=&from=&to=
+	•	GET /ap-cases/{caseId}
+	•	POST /ap-reports
+	•	create draft with template.
+	•	GET /ap-reports/{reportId}
+	•	PATCH /ap-reports/{reportId}
+	•	update narrative & synoptic values.
+	•	POST /ap-reports/{reportId}/sign
+
+⸻
+
+2.6 lab-ai-orchestrator-service
+
+Responsibility:
+	•	AI for:
+	•	numeric lab interpretation,
+	•	result trend summaries,
+	•	reflex testing suggestions,
+	•	micro antibiogram analytics,
+	•	pathology report skeleton suggestions.
+
+2.6.1 DB Schema
+Simple mirror of Imaging AI style:
+	•	lab_ai_models
+	•	lab_ai_tasks
+	•	lab_ai_outputs
+
+lab_ai_models
+
+CREATE TABLE lab_ai_models (
+  id UUID PRIMARY KEY,
+  tenant_id UUID,
+  code TEXT NOT NULL,                       -- 'LFT_INTERPRETER','CBC_TREND','MICRO_ABX_ANALYTICS'
+  name TEXT NOT NULL,
+  description TEXT,
+  domain TEXT NOT NULL,                     -- 'core_lab','micro','ap'
+  capabilities JSONB,
+  endpoint_config JSONB,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+lab_ai_tasks
+
+CREATE TABLE lab_ai_tasks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  domain TEXT NOT NULL,                     -- 'core_lab','micro','ap'
+  patient_id UUID REFERENCES patients(id),
+  lab_result_id UUID REFERENCES lab_results(id),
+  ap_report_id UUID REFERENCES ap_reports(id),
+  task_type TEXT NOT NULL,                  -- 'interpretation','trend_summary','reflex_suggestion','synoptic_suggestion'
+  status TEXT NOT NULL DEFAULT 'queued',
+  requested_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+lab_ai_outputs
+
+CREATE TABLE lab_ai_outputs (
+  id UUID PRIMARY KEY,
+  lab_ai_task_id UUID NOT NULL REFERENCES lab_ai_tasks(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,                -- 'patient_summary','clinician_comment','ap_synoptic'
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+
+⸻
+
+3. Frontend – LIS & Pathology Workflows
+
+New UI sections:
+	•	Lab ordering & result views (clinician).
+	•	Phlebotomy/specimen tracking views.
+	•	Core Lab & Micro dashboards (lab staff).
+	•	Anatomic Path cases & reporting (pathologists).
+
+3.1 Clinician Lab UI
+
+Routes (within patient chart):
+	•	/patient/[patientId]/labs
+	•	/patient/[patientId]/labs/order
+	•	/patient/[patientId]/labs/result/[labResultId]
+
+Key features
+	•	Timeline:
+	•	numeric graphs (Hb, creatinine, etc.).
+	•	event overlays (admission, surgery, new meds).
+	•	Panel view:
+	•	grouped by panel (LFT, RFT, etc.).
+	•	Interpretation:
+	•	AI summary (for clinician) + patient-facing summary (simpler).
+
+APIs:
+	•	GET /lab-orders?patient_id=...
+	•	GET /lab-results?patient_id=...
+
+⸻
+
+3.2 Phlebotomy & Specimen Tracking UI
+
+Routes:
+	•	/lab/phlebotomy/worklist
+	•	/lab/specimens/[specimenId]
+
+Phlebotomy worklist
+	•	Shows:
+	•	pending collection orders,
+	•	patient, location, tests, priority.
+	•	Actions:
+	•	print labels,
+	•	mark collected,
+	•	track in transit / received.
+
+APIs:
+	•	GET /lab-orders?status=requested&location=...
+	•	POST /lab-specimens/label
+	•	PATCH /lab-specimens/{id}
+
+⸻
+
+3.3 Lab (Core + Micro) Result Validation UI
+
+Routes:
+	•	/lab/validations
+	•	/lab/results/[labResultId]
+	•	/lab/micro/worklist
+
+Core Lab validation board
+	•	Filters:
+	•	analyzer, test, critical/unvalidated.
+	•	Displays:
+	•	patient, test, value, flags, delta from previous.
+
+Micro worklist
+	•	Culture/gram stain queue.
+	•	Organism & susceptibility entry.
+
+APIs:
+	•	GET /lab-results?status=preliminary
+	•	PATCH /lab-results/{id} (status → final, critical flags etc.)
+
+⸻
+
+3.4 Pathology UI
+
+Routes:
+	•	/pathology/cases
+	•	/pathology/cases/[caseId]
+	•	/pathology/reports/[reportId]
+
+Case list
+	•	Filter by:
+	•	pathologist, status, specimen site, priority.
+
+Case details
+	•	Show:
+	•	specimens, blocks, slides, OR notes.
+	•	Launch digital slide viewer (if WSI integrated).
+
+Report editor
+	•	Template-driven form with:
+	•	synoptic fields (TNM, margins, grade),
+	•	free-text sections,
+	•	AI suggestion panel for:
+	•	narrative “microscopic description” from synoptic fields,
+	•	check for staging consistency.
+
+APIs:
+	•	GET /ap-cases
+	•	GET /ap-reports/{id}
+	•	PATCH /ap-reports/{id}
+	•	POST /ap-reports/{id}/sign
+
+⸻
+
+4. LLM Tools – LIS & Pathology
+
+Let’s define key tools for agents.
+
+4.1 Lab Order Agent Tools
+
+Tool: list_lab_tests
+
+{
+  "name": "list_lab_tests",
+  "description": "List available lab tests and panels, optionally filtered by category or search text.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "category": { "type": "string" },
+      "search_text": { "type": "string" }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "tests": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "code": { "type": "string" },
+            "name": { "type": "string" },
+            "category": { "type": "string" },
+            "is_panel": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps → GET /lab-catalog/tests.
+
+⸻
+
+Tool: create_lab_order
+
+{
+  "name": "create_lab_order",
+  "description": "Create a lab order for a patient for one or more tests/panels.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "lab_test_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "clinical_indication": { "type": "string" },
+      "priority": {
+        "type": "string",
+        "enum": ["routine", "urgent", "stat"],
+        "default": "routine"
+      }
+    },
+    "required": ["patient_id", "lab_test_ids", "clinical_indication"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "lab_order_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps → POST /lab-orders.
+
+⸻
+
+4.2 Lab Interpretation & Summarisation Tools
+
+Tool: get_patient_lab_results
+
+{
+  "name": "get_patient_lab_results",
+  "description": "Fetch recent lab results for a patient, optionally filtered by test or time range.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "test_code": { "type": "string" },
+      "from_date": { "type": "string", "format": "date" },
+      "to_date": { "type": "string", "format": "date" },
+      "limit": { "type": "integer", "default": 50 }
+    },
+    "required": ["patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "lab_result_id": { "type": "string" },
+            "lab_test_code": { "type": "string" },
+            "lab_test_name": { "type": "string" },
+            "result_time": { "type": "string", "format": "date-time" },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "component_code": { "type": "string" },
+                  "value_numeric": { "type": "number" },
+                  "value_text": { "type": "string" },
+                  "unit": { "type": "string" },
+                  "reference_range": { "type": "string" },
+                  "flag": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+Tool: request_lab_ai_interpretation
+
+{
+  "name": "request_lab_ai_interpretation",
+  "description": "Request AI interpretation or trend summary for lab results.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "lab_result_ids": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "task_type": {
+        "type": "string",
+        "enum": ["interpretation", "trend_summary"]
+      }
+    },
+    "required": ["patient_id", "lab_result_ids", "task_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "lab_ai_task_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: get_lab_ai_output
+
+{
+  "name": "get_lab_ai_output",
+  "description": "Fetch AI interpretation output for lab tasks.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "lab_ai_task_id": { "type": "string" }
+    },
+    "required": ["lab_ai_task_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "outputs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "output_type": { "type": "string" },
+            "payload": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+4.3 Pathology Agent Tools
+
+Tool: list_ap_cases_for_pathologist
+
+{
+  "name": "list_ap_cases_for_pathologist",
+  "description": "List active anatomic pathology cases assigned to the current pathologist.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "status": { "type": "string" }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "cases": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "ap_case_id": { "type": "string" },
+            "case_number": { "type": "string" },
+            "patient_id": { "type": "string" },
+            "site": { "type": "string" },
+            "status": { "type": "string" },
+            "received_date": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: create_or_update_ap_report
+
+{
+  "name": "create_or_update_ap_report",
+  "description": "Create or update an anatomic pathology report with narrative and synoptic fields.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "ap_case_id": { "type": "string" },
+      "ap_report_id": { "type": "string" },
+      "gross_description": { "type": "string" },
+      "microscopic_description": { "type": "string" },
+      "diagnosis_text": { "type": "string" },
+      "synoptic_fields": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "field_code": { "type": "string" },
+            "value_text": { "type": "string" },
+            "value_code": { "type": "string" }
+          }
+        }
+      }
+    },
+    "required": ["ap_case_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "ap_report_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: sign_ap_report
+
+{
+  "name": "sign_ap_report",
+  "description": "Mark an anatomic pathology report as final.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "ap_report_id": { "type": "string" }
+    },
+    "required": ["ap_report_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "ap_report_id": { "type": "string" },
+      "status": { "type": "string" },
+      "signed_at": { "type": "string", "format": "date-time" }
+    }
+  }
+}
+
+
+⸻
+
+5. System Prompts – LIS & Pathology Agents
+
+5.1 Lab Ordering Co-Pilot (Clinician-Facing)
+
+You are the Lab Ordering Co-Pilot.
+
+Goals:
+	•	Help clinicians choose appropriate lab tests and panels.
+	•	Avoid redundant or unnecessary tests while ensuring safety.
+
+Rules:
+	1.	When asked “what labs should I order?”:
+	•	summarise the clinical question in 1–2 lines,
+	•	propose 1–2 minimal sets of tests (e.g., “baseline labs” vs “extended workup”),
+	•	highlight tests that are critical vs nice-to-have.
+	2.	Use list_lab_tests to map your conceptual suggestions to actual catalog items.
+	3.	Before using create_lab_order:
+	•	check for recent relevant results with get_patient_lab_results,
+	•	if the same test was done very recently, flag this and ask if a repeat is truly needed.
+	4.	When creating orders:
+	•	make the indication explicit (e.g., “Evaluate chest pain – rule out ACS and PE”),
+	•	use urgent or stat only when clinical description justifies it.
+	5.	Never order tests silently; always describe the panel you are about to order and ask for confirmation.
+
+Tools:
+	•	list_lab_tests
+	•	create_lab_order
+	•	get_patient_lab_results
+
+⸻
+
+5.2 Lab Interpretation Agent (Clinician-Facing)
+
+You are the Lab Interpretation Agent.
+
+Goals:
+	•	Summarise lab results and trends for clinicians.
+	•	Provide pattern-based insights without overstepping into full diagnosis.
+
+Rules:
+	1.	Use get_patient_lab_results to retrieve the actual values; do not hallucinate.
+	2.	When asked “interpret these labs”:
+	•	organise interpretation by system (e.g., renal, hepatic, hematologic),
+	•	clearly mark which values are abnormal and in what direction,
+	•	consider trends over time, not just single values.
+	3.	You may call request_lab_ai_interpretation and get_lab_ai_output when:
+	•	summarising a large set of results,
+	•	generating structured risk or pattern summaries.
+	4.	Always separate:
+	•	data: what values are and how they changed,
+	•	inference: what they likely suggest.
+	5.	Never give treatment orders; phrase your conclusions as:
+	•	“These results are consistent with…”, “Consider evaluating for…”
+
+Tools:
+	•	get_patient_lab_results
+	•	request_lab_ai_interpretation
+	•	get_lab_ai_output
+
+⸻
+
+5.3 Lab Result Explainer (Patient-Facing)
+
+You are the Lab Result Explainer Agent for patients.
+
+Goals:
+	•	Translate lab results into simple, understandable language.
+
+Rules:
+	1.	Always base explanations on actual lab values from get_patient_lab_results.
+	2.	Explain:
+	•	what each test generally measures,
+	•	whether the result is within, above, or below the typical range,
+	•	what that might mean, in non-scary language.
+	3.	Avoid:
+	•	precise probability claims (“you have a 75% chance of X”),
+	•	definitive diagnoses.
+	4.	Encourage follow-up with clinicians:
+	•	“Please discuss these results with your doctor, who knows your full clinical picture.”
+	5.	For critical or very abnormal results:
+	•	be calm but direct:
+	•	“This value is significantly outside the usual range and may need urgent review by your doctor.”
+
+Tools:
+	•	get_patient_lab_results
+	•	read-only descriptive metadata from lab catalog
+
+⸻
+
+5.4 Pathology Co-Pilot (Pathologist-Facing)
+
+You are the Pathology Co-Pilot Agent.
+
+Goals:
+	•	Help pathologists manage their AP caseload.
+	•	Assist in drafting structured and narrative pathology reports.
+
+Rules:
+	1.	Use list_ap_cases_for_pathologist to show the current case list, prioritised by:
+	•	urgency,
+	•	case age.
+	2.	For a given case:
+	•	summarise clinical history,
+	•	list specimen sites, blocks, slides and key stains.
+	3.	When drafting a report:
+	•	use the appropriate template (site/tumor-type),
+	•	ensure synoptic fields (TNM, margins, grade) are internally consistent.
+	4.	You may leverage AI suggestions (via lab_ai orchestration) for:
+	•	narrative “microscopic description” derived from synoptic data,
+	•	staging validation.
+	5.	Use create_or_update_ap_report to save drafts, but:
+	•	never sign automatically.
+	•	only call sign_ap_report after explicit confirmation from the pathologist.
+	6.	Always keep a clear disclaimer:
+	•	“This is a suggested draft for your review; you are responsible for the final wording and diagnosis.”
+
+Tools:
+	•	list_ap_cases_for_pathologist
+	•	create_or_update_ap_report
+	•	sign_ap_report
+	•	(internally) lab_ai tools for synoptic/narrative suggestions
+
+⸻

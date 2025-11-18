@@ -1,0 +1,1369 @@
+Alright, Phase 4 is where this thing becomes learning, self-improving hospital OS instead of just “digital paperwork”.
+
+We’re now doing:
+
+Calibration, outcomes, quality improvement, risk stratification, analytics, governance, and voice/collab on top of Phases 1–3.
+
+I’ll structure it like before:
+	1.	Phase 4 scope & philosophy
+	2.	Backend modules (with DB, endpoints, FHIR mapping)
+	•	outcomes-service
+	•	quality-metrics-service
+	•	risk-stratification-service (ML + models)
+	•	analytics-hub / warehouse-adapter
+	•	voice-collab-service
+	•	governance-audit-service
+	3.	Frontend routes / dashboards
+	4.	LLM tools for calibration, outcomes, QI, voice, collaboration
+	5.	System prompts for Phase 4 agents
+
+⸻
+
+1. Phase 4 Scope & Philosophy
+
+1.1 What Phase 4 Adds
+
+On top of:
+	•	Phase 1: Core platform, FHIR, identity, consent, RBAC.
+	•	Phase 2: Agentic PRM + OPD.
+	•	Phase 3: IPD + nursing + orders + ICU.
+
+Phase 4 adds:
+	1.	Outcomes & Longitudinal Episodes
+	•	Clinical outcomes (mortality, readmission, complications, LOS, etc.).
+	•	PROMs/PREMs (patient-reported outcome & experience measures).
+	•	Episodes of care across OPD/IPD.
+	2.	Quality & QI
+	•	Process & quality metrics (e.g., door-to-needle time, antibiotic stewardship).
+	•	QI project tracking.
+	•	Dashboards & alerts.
+	3.	Risk Stratification & Model Calibration
+	•	Risk models (readmission, mortality, sepsis, etc.).
+	•	Model registry, versioning, recalibration workflows.
+	•	Inference logging & performance tracking.
+	4.	Analytics/BI
+	•	Event → warehouse pipeline.
+	•	Semantic layer for downstream BI tools.
+	•	Cohort builder.
+	5.	Voice + Collaboration
+	•	Real-time voice scribe in consults & ward rounds.
+	•	Multi-user collaboration on notes, tasks, and QI items.
+	•	Async case discussion “channels” attached to patients/episodes.
+	6.	Governance & Audit for AI
+	•	LLM usage logs, decision traces.
+	•	Safety policies & guardrails.
+	•	Explainability: “Why did the AI suggest that?”
+
+1.2 Success Criteria
+
+By end of Phase 4, for at least a pilot specialty/ward:
+	•	The system knows:
+	•	outcomes per episode / cohort,
+	•	process metrics,
+	•	risk stratification over time,
+	•	which AI suggestions are accepted/rejected.
+	•	Quality leads and clinicians:
+	•	can explore live dashboards,
+	•	define and track QI projects directly in the system,
+	•	see risk-stratified lists (e.g., “top 10 high-risk readmission patients”).
+	•	AI models:
+	•	are versioned,
+	•	have performance metrics and calibration plots,
+	•	are monitored for drift,
+	•	can be rolled back/updated with traceability.
+	•	Voice/collab:
+	•	doctors can use real-time voice scribe in OPD/IPD,
+	•	teams can collaborate around difficult cases within the platform.
+
+⸻
+
+2. Backend Modules (Phase 4)
+
+We’ll add:
+	1.	outcomes-service
+	2.	quality-metrics-service
+	3.	risk-stratification-service
+	4.	analytics-hub-service (warehouse adapter + semantic layer)
+	5.	voice-collab-service
+	6.	governance-audit-service
+
+All still FastAPI-style services.
+
+⸻
+
+2.1 outcomes-service
+
+Responsibility:
+	•	Track outcomes per episode/admission.
+	•	PROMs/PREMs.
+	•	Link outcomes to FHIR EpisodeOfCare, Encounter, Condition, etc.
+
+2.1.1 DB Schema
+Tables:
+	•	episodes
+	•	outcomes
+	•	proms (patient-reported outcome measures)
+	•	prems (patient-reported experience measures)
+
+We already have admissions and FHIR EpisodeOfCare, but let’s make an explicit episodes table that unifies OPD+IPD.
+
+episodes
+
+CREATE TABLE episodes (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  episode_of_care_fhir_id TEXT,              -- link to FHIR EpisodeOfCare
+  index_encounter_id UUID,                   -- the initial key encounter (OPD/IPD)
+  index_admission_id UUID,                   -- null for pure OPD episodes
+  care_type TEXT NOT NULL,                   -- 'OPD','IPD','OPD_IPD','DAY_CARE'
+  specialty TEXT,                            -- e.g. 'CARDIOLOGY'
+  primary_condition_code TEXT,               -- e.g. SNOMED or ICD
+  started_at TIMESTAMPTZ NOT NULL,
+  ended_at TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'active',     -- 'active','completed','abandoned'
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_episodes_patient ON episodes (patient_id, started_at DESC);
+CREATE INDEX idx_episodes_status ON episodes (status);
+
+outcomes
+
+CREATE TABLE outcomes (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  episode_id UUID NOT NULL REFERENCES episodes(id),
+  outcome_type TEXT NOT NULL,            -- 'mortality','readmission_30d','complication','functional_status'
+  outcome_subtype TEXT,                  -- e.g. 'all_cause','cardiac','AKI_stage2'
+  value TEXT,                            -- flexible, e.g. 'yes','no','NYHA_II'
+  numeric_value DOUBLE PRECISION,        -- for scores, LOS, etc.
+  unit TEXT,
+  occurred_at TIMESTAMPTZ,
+  derived_from TEXT,                     -- 'manual_entry','rules_engine','ml_model'
+  source_event_id TEXT,                  -- link to event log / FHIR
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_outcomes_episode_type ON outcomes (episode_id, outcome_type);
+
+proms
+
+CREATE TABLE proms (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  episode_id UUID NOT NULL REFERENCES episodes(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  instrument_code TEXT NOT NULL,        -- 'EQ5D','PROMIS_PAIN'
+  version TEXT,
+  responses JSONB NOT NULL,            -- question-answer map
+  score NUMERIC,                       -- computed summary score if applicable
+  completed_at TIMESTAMPTZ NOT NULL,
+  mode TEXT,                           -- 'web','sms','phone','in_clinic'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_proms_patient ON proms (patient_id, completed_at DESC);
+
+prems
+
+Similar shape:
+
+CREATE TABLE prems (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  episode_id UUID NOT NULL REFERENCES episodes(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  instrument_code TEXT NOT NULL,        -- 'HCAHPS','NPS'
+  responses JSONB NOT NULL,
+  score NUMERIC,
+  completed_at TIMESTAMPTZ NOT NULL,
+  mode TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.1.2 FHIR Mapping
+	•	episodes.episode_of_care_fhir_id → FHIR EpisodeOfCare.
+	•	outcomes may map to:
+	•	FHIR Observation (for some outcomes),
+	•	FHIR Condition (for complications),
+	•	or FHIR MeasureReport (for aggregate outcomes).
+	•	PROMs/PREMs could map to QuestionnaireResponse + Questionnaire.
+
+Phase 4: we at least keep the FHIR IDs in the DB so we can fill them later.
+
+2.1.3 Endpoints
+Base: /api/v1/outcomes
+
+Episodes
+	•	POST /episodes
+	•	Create an episode:
+	•	patient_id, care_type, specialty, primary_condition_code, index_encounter_id, index_admission_id?.
+	•	GET /episodes/{id}
+	•	GET /episodes?patient_id=&status=&care_type=&from=&to=
+	•	PATCH /episodes/{id}
+	•	update status, ended_at, etc.
+
+Outcomes
+	•	POST /episodes/{episode_id}/outcomes
+	•	create outcome(s) for an episode.
+	•	GET /episodes/{episode_id}/outcomes
+	•	GET /outcomes?outcome_type=&from=&to=&specialty=
+
+PROMs / PREMs
+	•	POST /episodes/{episode_id}/proms
+	•	GET /episodes/{episode_id}/proms
+	•	POST /episodes/{episode_id}/prems
+	•	GET /episodes/{episode_id}/prems
+
+Later you can also have GET /patients/{patient_id}/proms.
+
+2.1.4 Events
+	•	Episode.Created
+	•	Episode.Updated
+	•	Outcome.Recorded
+	•	PROM.Completed
+	•	PREM.Completed
+
+These feed quality metrics & analytics.
+
+⸻
+
+2.2 quality-metrics-service
+
+Responsibility:
+	•	Define metrics (e.g., “30-day readmission rate for heart failure”).
+	•	Calculate & store metric values over time.
+	•	Manage QI projects.
+
+2.2.1 DB Schema
+Tables:
+	•	quality_metrics
+	•	quality_metric_values
+	•	qi_projects
+	•	qi_project_metrics
+
+quality_metrics
+
+CREATE TABLE quality_metrics (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                  -- 'HF_30D_READMISSION_RATE'
+  name TEXT NOT NULL,
+  description TEXT,
+  measure_type TEXT NOT NULL,          -- 'rate','count','ratio','score'
+  numerator_definition JSONB NOT NULL, -- cohort definition or SQL / DSL
+  denominator_definition JSONB NOT NULL,
+  tags TEXT[],                         -- 'cardiology','ipd','readmission'
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_quality_metric_code_tenant ON quality_metrics (tenant_id, code);
+
+For *_definition we can use a simple DSL or reference to analytics-hub semantic model.
+
+quality_metric_values
+
+CREATE TABLE quality_metric_values (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  metric_id UUID NOT NULL REFERENCES quality_metrics(id),
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  numerator_value NUMERIC NOT NULL,
+  denominator_value NUMERIC NOT NULL,
+  value NUMERIC NOT NULL,           -- computed measure, e.g., rate
+  unit TEXT,                        -- '%','count'
+  breakdown JSONB,                  -- e.g., { "ward":"ICU", "specialty":"CARDIOLOGY" }
+  calculated_at TIMESTAMPTZ NOT NULL,
+  calculation_version TEXT,         -- version of metric logic / code
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_qmv_metric_period ON quality_metric_values (metric_id, period_start, period_end);
+
+qi_projects
+
+CREATE TABLE qi_projects (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  owner_user_id UUID,
+  status TEXT NOT NULL DEFAULT 'active',   -- 'draft','active','on_hold','completed'
+  start_date DATE,
+  target_date DATE,
+  target_description TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_qi_project_code_tenant ON qi_projects (tenant_id, code);
+
+qi_project_metrics
+
+CREATE TABLE qi_project_metrics (
+  id UUID PRIMARY KEY,
+  qi_project_id UUID NOT NULL REFERENCES qi_projects(id) ON DELETE CASCADE,
+  metric_id UUID NOT NULL REFERENCES quality_metrics(id),
+  baseline_value NUMERIC,
+  target_value NUMERIC,
+  unit TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.2.2 Endpoints
+Base: /api/v1/quality
+
+Metrics
+	•	POST /metrics
+	•	GET /metrics
+	•	GET /metrics/{id}
+	•	PATCH /metrics/{id}
+
+Metric Values
+	•	POST /metrics/{metric_id}/recalculate
+	•	triggers (async) recalculation for a time period and breakdown.
+	•	GET /metrics/{metric_id}/values?from=&to=&breakdown_key=&breakdown_value=
+
+QI Projects
+	•	POST /qi-projects
+	•	GET /qi-projects?status=
+	•	GET /qi-projects/{id}
+	•	PATCH /qi-projects/{id}
+
+QI Project Metrics
+	•	POST /qi-projects/{qi_project_id}/metrics
+	•	GET /qi-projects/{qi_project_id}/metrics
+
+2.2.3 Events
+	•	QualityMetric.Recalculated
+	•	QIProject.Created
+	•	QIProject.Updated
+
+⸻
+
+2.3 risk-stratification-service
+
+Responsibility:
+	•	Manage risk models (e.g., 30-day readmission, mortality, sepsis).
+	•	Perform inference.
+	•	Track performance (AUROC, calibration), data drift.
+
+2.3.1 DB Schema
+Tables:
+	•	risk_models
+	•	risk_model_versions
+	•	risk_scores
+	•	risk_model_performance
+
+risk_models
+
+CREATE TABLE risk_models (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                    -- 'READMIT_30D','MORTALITY_ICU'
+  name TEXT NOT NULL,
+  description TEXT,
+  target_label TEXT NOT NULL,            -- 'readmission_30d','in_hospital_mortality'
+  default_version_id UUID,               -- FK to risk_model_versions
+  is_active BOOLEAN DEFAULT TRUE,
+  tags TEXT[],
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_risk_model_code_tenant ON risk_models (tenant_id, code);
+
+risk_model_versions
+
+CREATE TABLE risk_model_versions (
+  id UUID PRIMARY KEY,
+  risk_model_id UUID NOT NULL REFERENCES risk_models(id) ON DELETE CASCADE,
+  version TEXT NOT NULL,                 -- 'v1','v1.1','2025-01'
+  status TEXT NOT NULL DEFAULT 'active', -- 'draft','active','deprecated'
+  artifact_location TEXT,                -- model file path / registry URI
+  input_schema JSONB NOT NULL,           -- expected input features
+  hyperparameters JSONB,
+  training_data_period JSONB,            -- { "from": "2024-01-01", "to": "2024-06-30" }
+  created_at TIMESTAMPTZ DEFAULT now(),
+  activated_at TIMESTAMPTZ,
+  deprecated_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX uniq_risk_model_versions ON risk_model_versions (risk_model_id, version);
+
+risk_scores
+
+CREATE TABLE risk_scores (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  risk_model_id UUID NOT NULL REFERENCES risk_models(id),
+  risk_model_version_id UUID NOT NULL REFERENCES risk_model_versions(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  episode_id UUID REFERENCES episodes(id),
+  admission_id UUID REFERENCES admissions(id),
+  encounter_id UUID REFERENCES encounters(id),
+  score NUMERIC NOT NULL,
+  risk_bucket TEXT NOT NULL,             -- 'low','medium','high','very_high'
+  input_features JSONB NOT NULL,
+  predicted_at TIMESTAMPTZ NOT NULL,
+  prediction_horizon TEXT,               -- '30d','in_hospital'
+  outcome_value TEXT,                    -- populated later for label
+  outcome_observed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_risk_scores_patient ON risk_scores (patient_id, predicted_at DESC);
+CREATE INDEX idx_risk_scores_model ON risk_scores (risk_model_id, risk_model_version_id, predicted_at DESC);
+
+risk_model_performance
+
+CREATE TABLE risk_model_performance (
+  id UUID PRIMARY KEY,
+  risk_model_version_id UUID NOT NULL REFERENCES risk_model_versions(id),
+  eval_data_period JSONB NOT NULL,       -- { "from": "...", "to": "..." }
+  metric_name TEXT NOT NULL,             -- 'auroc','auprc','brier','calibration_slope'
+  metric_value NUMERIC NOT NULL,
+  metric_details JSONB,                  -- e.g., bins for calibration curve
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_risk_model_perf ON risk_model_performance (risk_model_version_id, metric_name);
+
+2.3.2 Endpoints
+Base: /api/v1/risk
+
+Models
+	•	POST /models
+	•	GET /models
+	•	GET /models/{id}
+	•	PATCH /models/{id}
+
+Model Versions
+	•	POST /models/{model_id}/versions
+	•	GET /models/{model_id}/versions
+	•	PATCH /model-versions/{version_id}
+	•	change status (active, deprecated), update artifact_location.
+	•	POST /model-versions/{version_id}/set-default
+	•	update risk_models.default_version_id.
+
+Inference
+	•	POST /scores/predict
+	•	Input:
+	•	model_code,
+	•	patient_id / episode_id / admission_id,
+	•	context (optional).
+	•	Implementation:
+	•	Pull features from analytics-hub or direct from DB.
+	•	Call ML artifact (could be external service).
+	•	Write risk_scores row.
+	•	Return score + bucket.
+	•	GET /scores?patient_id=&model_code=&from=&to=
+
+Performance
+	•	POST /model-versions/{version_id}/evaluate
+	•	triggers offline evaluation job (airflow / batch).
+	•	GET /model-versions/{version_id}/performance
+
+2.3.3 Events
+	•	RiskScore.Created
+	•	RiskModelVersion.Activated
+	•	RiskModelVersion.Deprecated
+
+⸻
+
+2.4 analytics-hub-service
+
+Responsibility:
+	•	Sink events to warehouse (Snowflake/BigQuery/Redshift/etc).
+	•	Provide a semantic API for cohort queries (no direct heavy analytics from transactional DB).
+
+2.4.1 DB / Infra
+	•	This is less about Postgres tables and more about:
+	•	an event ingestion table (if needed),
+	•	and configuration for external warehouse.
+
+But we can still define:
+
+event_log (if not already):
+
+CREATE TABLE event_log (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  event_type TEXT NOT NULL,
+  event_payload JSONB NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  published_at TIMESTAMPTZ NOT NULL,
+  processed_by_warehouse BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_event_log_type_time ON event_log (event_type, occurred_at);
+
+This is our backup journal if Kafka is down / for debugging.
+
+2.4.2 Endpoints
+Base: /api/v1/analytics
+
+Cohort Builder
+	•	POST /cohorts/query
+	•	Input:
+	•	simple JSON DSL, e.g.:
+
+{
+  "population": {
+    "type": "episode",
+    "filters": [
+      { "field": "specialty", "op": "=", "value": "CARDIOLOGY" },
+      { "field": "started_at", "op": ">=", "value": "2025-01-01" }
+    ]
+  },
+  "outcomes": [
+    { "field": "outcome_type", "op": "=", "value": "readmission_30d" }
+  ],
+  "group_by": ["month", "ward"],
+  "metrics": [
+    { "type": "rate", "numerator": "readmission_count", "denominator": "episode_count" }
+  ]
+}
+
+
+	•	Implementation:
+	•	Translate to warehouse SQL via semantic model.
+	•	Return aggregated EMR-safe stats.
+
+	•	GET /dictionary
+	•	Introspect fields, codes, metrics.
+
+The actual heavy lifting is in the warehouse. This service is more like GraphQL/REST façade for BI + agents.
+
+⸻
+
+2.5 voice-collab-service
+
+Responsibility:
+	•	Handle real-time or near-real-time voice:
+	•	Telephony / WebRTC hooks.
+	•	Transcription (Whisper/ASR).
+	•	Multi-user collaboration:
+	•	comments on notes,
+	•	case discussions threads (linked to episodes/patients),
+	•	mention tagging.
+
+2.5.1 DB Schema
+Tables:
+	•	voice_sessions
+	•	voice_segments
+	•	collab_threads
+	•	collab_messages
+	•	note_revisions
+
+voice_sessions
+
+CREATE TABLE voice_sessions (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  admission_id UUID REFERENCES admissions(id),
+  session_type TEXT NOT NULL,          -- 'opd_consult','ward_round','cc_call'
+  channel TEXT,                        -- 'telephony','webrtc','in_app'
+  started_at TIMESTAMPTZ NOT NULL,
+  ended_at TIMESTAMPTZ,
+  asr_model TEXT,                      -- e.g., 'whisper-large-v3'
+  transcript TEXT,                     -- full combined transcript
+  transcript_structured JSONB,         -- with speaker labels, segments
+  created_by_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_voice_sessions_patient ON voice_sessions (patient_id, started_at DESC);
+
+voice_segments
+
+CREATE TABLE voice_segments (
+  id UUID PRIMARY KEY,
+  voice_session_id UUID NOT NULL REFERENCES voice_sessions(id) ON DELETE CASCADE,
+  start_time_ms INT NOT NULL,
+  end_time_ms INT NOT NULL,
+  speaker_label TEXT,                 -- 'doctor','patient','nurse','other'
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_voice_segments_session ON voice_segments (voice_session_id, start_time_ms);
+
+collab_threads
+
+CREATE TABLE collab_threads (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  thread_type TEXT NOT NULL,          -- 'case_discussion','note_review','qi_project'
+  patient_id UUID REFERENCES patients(id),
+  episode_id UUID REFERENCES episodes(id),
+  admission_id UUID REFERENCES admissions(id),
+  related_resource_type TEXT,         -- 'Encounter','Order','Note','QIProject'
+  related_resource_id TEXT,
+  title TEXT NOT NULL,
+  created_by_user_id UUID NOT NULL,
+  is_archived BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_collab_threads_patient ON collab_threads (patient_id, thread_type);
+
+collab_messages
+
+CREATE TABLE collab_messages (
+  id UUID PRIMARY KEY,
+  thread_id UUID NOT NULL REFERENCES collab_threads(id) ON DELETE CASCADE,
+  author_user_id UUID,
+  author_type TEXT NOT NULL,             -- 'user','ai_agent'
+  message TEXT NOT NULL,
+  mentions JSONB,                         -- list of user_ids or role tags
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_collab_messages_thread ON collab_messages (thread_id, created_at);
+
+note_revisions
+
+CREATE TABLE note_revisions (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  encounter_id UUID NOT NULL REFERENCES encounters(id),
+  note_type TEXT NOT NULL,             -- 'opd_note','progress_note','discharge_summary'
+  version INT NOT NULL,
+  author_user_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  content_structured JSONB,            -- SOAP or similar
+  content_raw TEXT,                    -- raw markdown/HTML
+  source TEXT,                         -- 'doctor','scribe_agent','round_agent'
+  is_final BOOLEAN DEFAULT FALSE
+);
+
+CREATE UNIQUE INDEX uniq_note_revision ON note_revisions (encounter_id, note_type, version);
+
+2.5.2 Endpoints
+Base: /api/v1/voice-collab
+
+Voice
+	•	POST /voice-sessions
+	•	Start session metadata.
+	•	POST /voice-sessions/{id}/segments
+	•	ingest incremental transcripts.
+	•	POST /voice-sessions/{id}/finalize
+	•	mark ended, store final transcript.
+
+Collab Threads
+	•	POST /threads
+	•	GET /threads?patient_id=&episode_id=&admission_id=&type=
+	•	GET /threads/{id}
+	•	POST /threads/{id}/messages
+	•	GET /threads/{id}/messages
+
+Notes
+	•	POST /encounters/{encounter_id}/notes
+	•	create new note revision.
+	•	GET /encounters/{encounter_id}/notes?note_type=
+	•	POST /note-revisions/{id}/mark-final
+
+⸻
+
+2.6 governance-audit-service
+
+Responsibility:
+	•	Track all LLM tool calls & responses.
+	•	Enforce policies (e.g. redaction, safety, PII leakage checks).
+	•	Provide “why did the AI suggest this” trace.
+
+2.6.1 DB Schema
+Tables:
+	•	llm_sessions
+	•	llm_tool_calls
+	•	llm_responses
+	•	policy_violations
+
+llm_sessions
+
+CREATE TABLE llm_sessions (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  session_type TEXT NOT NULL,          -- 'opd_scribe','cc_agent','prm_bot','icu_monitor'
+  started_at TIMESTAMPTZ NOT NULL,
+  ended_at TIMESTAMPTZ,
+  user_id UUID,                        -- if user was in the loop
+  patient_id UUID,
+  episode_id UUID,
+  admission_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+llm_tool_calls
+
+CREATE TABLE llm_tool_calls (
+  id UUID PRIMARY KEY,
+  session_id UUID NOT NULL REFERENCES llm_sessions(id) ON DELETE CASCADE,
+  tool_name TEXT NOT NULL,
+  tool_input JSONB NOT NULL,
+  called_at TIMESTAMPTZ NOT NULL,
+  result_summary JSONB,              -- trimmed representation of tool output (no PHI if not needed)
+  latency_ms INT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_llm_tool_calls_session ON llm_tool_calls (session_id, called_at);
+
+llm_responses
+
+CREATE TABLE llm_responses (
+  id UUID PRIMARY KEY,
+  session_id UUID NOT NULL REFERENCES llm_sessions(id) ON DELETE CASCADE,
+  model_name TEXT NOT NULL,
+  prompt_tokens INT,
+  completion_tokens INT,
+  response_text TEXT,
+  safety_flags JSONB,                  -- e.g., { "pii_redacted": true, "toxicity": "low" }
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+policy_violations
+
+CREATE TABLE policy_violations (
+  id UUID PRIMARY KEY,
+  session_id UUID NOT NULL REFERENCES llm_sessions(id),
+  violation_type TEXT NOT NULL,       -- 'PHI_leak_risk','disallowed_instruction','hallucination_flag'
+  description TEXT,
+  severity TEXT NOT NULL,             -- 'low','medium','high'
+  detected_at TIMESTAMPTZ NOT NULL,
+  resolved_at TIMESTAMPTZ,
+  resolved_by_user_id UUID,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_policy_violations_session ON policy_violations (session_id, violation_type);
+
+2.6.2 Endpoints
+Base: /api/v1/governance
+	•	POST /llm-sessions
+	•	PATCH /llm-sessions/{id}/end
+	•	POST /llm-sessions/{id}/tool-calls
+	•	POST /llm-sessions/{id}/responses
+	•	POST /llm-sessions/{id}/policy-violations
+	•	GET /llm-sessions?patient_id=&from=&to=&session_type=
+	•	GET /policy-violations?from=&to=&severity=
+
+Provide a query API for audit review.
+
+⸻
+
+3. Frontend – Phase 4
+
+New/extended sections:
+	•	Outcomes & cohort dashboards
+	•	QI project management UI
+	•	Model / risk dashboards
+	•	Analytics “Explorer”
+	•	Voice & collab workspaces
+	•	Governance/Audit UI
+
+3.1 Outcomes & Cohort Dashboards
+
+Routes:
+	•	/analytics/cohorts
+	•	/analytics/outcomes
+
+/analytics/cohorts
+	•	Cohort builder UI:
+	•	Filters for specialty, episode date range, admission type, risk bucket.
+	•	Metrics: LOS, readmission rate, mortality.
+	•	Visualizations:
+	•	Time series of metrics.
+	•	Breakdown by ward, doctor, procedure.
+
+Calls:
+	•	POST /api/v1/analytics/cohorts/query
+	•	GET /api/v1/outcomes/outcomes?outcome_type=...
+
+Components:
+	•	CohortFilterPanel
+	•	CohortResultsTable
+	•	MetricChart
+
+/analytics/outcomes
+	•	Summary cards:
+	•	“30-day readmission (HF) last quarter”
+	•	“In-hospital mortality (ICU) last quarter”
+	•	Drill-downs.
+
+Calls:
+	•	GET /api/v1/quality/metrics
+	•	GET /api/v1/quality/metrics/{id}/values?from=&to=
+
+⸻
+
+3.2 QI Project UI
+
+Routes:
+	•	/quality/projects
+	•	/quality/projects/[id]
+
+/quality/projects
+	•	List QI projects:
+	•	status, owner, key metric & baseline vs target.
+
+Calls:
+	•	GET /api/v1/quality/qi-projects?status=
+
+Components:
+	•	QIProjectCard
+	•	QIStatusBadge
+
+/quality/projects/[id]
+	•	Tabs:
+	•	Overview,
+	•	Metrics,
+	•	Timeline (events, notes, collab thread),
+	•	Linked cohorts.
+
+Calls:
+	•	GET /api/v1/quality/qi-projects/{id}
+	•	GET /api/v1/quality/qi-projects/{id}/metrics
+	•	GET /api/v1/analytics/cohorts/query (for project-specific cohort)
+
+⸻
+
+3.3 Risk & Model Monitoring UI
+
+Routes:
+	•	/risk/models
+	•	/risk/models/[modelId]
+	•	/risk/models/[modelId]/versions/[versionId]
+
+/risk/models
+	•	Table:
+	•	model code, name, default version, tags, active status.
+
+Calls:
+	•	GET /api/v1/risk/models
+
+/risk/models/[modelId]
+	•	Show:
+	•	versions,
+	•	quick performance summary for default version,
+	•	top risk buckets: e.g., count of patients currently high-risk.
+
+Calls:
+	•	GET /api/v1/risk/models/{id}
+	•	GET /api/v1/risk/models/{id}/versions
+	•	GET /api/v1/risk/scores?model_code=...&from=&to=
+
+/risk/models/[modelId]/versions/[versionId]
+	•	Performance tab:
+	•	AUROC, calibration plots (UI charts fed from risk_model_performance.metric_details).
+	•	Drift tab:
+	•	distribution of risk scores over time.
+
+Calls:
+	•	GET /api/v1/risk/model-versions/{versionId}/performance
+
+Components:
+	•	PerformanceMetricCard
+	•	CalibrationChart
+	•	ScoreDistributionChart
+
+⸻
+
+3.4 Voice & Collaboration UI
+
+Routes:
+	•	/voice/sessions
+	•	/voice/sessions/[sessionId]
+	•	/collab/patients/[patientId]
+	•	/collab/threads/[threadId]
+
+/voice/sessions
+	•	For user:
+	•	list recent voice sessions:
+	•	type, patient, date, linked encounter.
+
+Calls:
+	•	GET /api/v1/voice-collab/voice-sessions?user_id=me
+
+/voice/sessions/[sessionId]
+	•	Show:
+	•	waveform/segments timeline,
+	•	transcript with speaker tags,
+	•	“Send to scribe agent” button to create notes.
+
+Calls:
+	•	GET /api/v1/voice-collab/voice-sessions/{id}
+	•	GET /api/v1/voice-collab/voice-sessions/{id}/segments
+
+/collab/patients/[patientId]
+	•	All threads related to this patient:
+	•	case discussions, note reviews, QI mentions.
+
+Calls:
+	•	GET /api/v1/voice-collab/threads?patient_id=
+
+/collab/threads/[threadId]
+	•	Chat-like interface.
+	•	Show AI messages with label “AI Assistant”.
+
+Calls:
+	•	GET /api/v1/voice-collab/threads/{id}
+	•	GET /api/v1/voice-collab/threads/{id}/messages
+	•	POST /api/v1/voice-collab/threads/{id}/messages
+
+⸻
+
+3.5 Governance & Audit UI
+
+Routes:
+	•	/governance/llm-sessions
+	•	/governance/llm-sessions/[sessionId]
+	•	/governance/policy-violations
+
+/governance/llm-sessions
+	•	Search by:
+	•	date range,
+	•	session type,
+	•	patient,
+	•	user.
+
+Calls:
+	•	GET /api/v1/governance/llm-sessions?from=&to=&session_type=&patient_id=
+
+/governance/llm-sessions/[sessionId]
+	•	Show:
+	•	tool calls timeline,
+	•	responses,
+	•	policy flags.
+
+Calls:
+	•	GET /api/v1/governance/llm-sessions/{id}
+	•	GET /api/v1/governance/policy-violations?session_id=
+
+/governance/policy-violations
+	•	Filter by severity, date range, resolved/unresolved.
+
+⸻
+
+4. LLM Tools for Phase 4
+
+Now we add tools for:
+	•	Cohort & outcomes queries.
+	•	QI project handling.
+	•	Risk list generation & explanation.
+	•	Voice & collab integration.
+	•	Governance (“why did I do X?”).
+
+4.1 Cohort & Outcomes Tools
+
+Tool: get_outcome_stats_for_cohort
+
+{
+  "name": "get_outcome_stats_for_cohort",
+  "description": "Retrieve outcome statistics (e.g., readmission rate, mortality) for a defined cohort of episodes.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "care_type": { "type": "string", "enum": ["OPD","IPD","OPD_IPD","ANY"], "default": "ANY" },
+      "specialty": { "type": "string" },
+      "primary_condition_code": { "type": "string" },
+      "from_date": { "type": "string", "format": "date" },
+      "to_date": { "type": "string", "format": "date" },
+      "outcome_type": { "type": "string", "description": "e.g., 'readmission_30d','in_hospital_mortality'." },
+      "group_by": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Optional breakdown dimensions like 'month','ward','doctor'."
+      }
+    },
+    "required": ["from_date", "to_date", "outcome_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "overall": {
+        "type": "object",
+        "properties": {
+          "episodes": { "type": "integer" },
+          "events": { "type": "integer" },
+          "rate": { "type": "number" }
+        }
+      },
+      "breakdown": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "group": { "type": "object" },
+            "episodes": { "type": "integer" },
+            "events": { "type": "integer" },
+            "rate": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps to POST /api/v1/analytics/cohorts/query + outcomes.
+
+⸻
+
+4.2 QI Tools
+
+Tool: create_qi_project
+
+{
+  "name": "create_qi_project",
+  "description": "Create a new Quality Improvement project for a specified metric and cohort.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string" },
+      "name": { "type": "string" },
+      "description": { "type": "string" },
+      "owner_user_id": { "type": "string" },
+      "target_description": { "type": "string" },
+      "metric_code": { "type": "string" },
+      "baseline_value": { "type": "number" },
+      "target_value": { "type": "number" },
+      "unit": { "type": "string" }
+    },
+    "required": ["code", "name", "metric_code", "target_description"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "qi_project_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/quality/qi-projects + /qi-projects/{id}/metrics.
+
+⸻
+
+4.3 Risk Tools
+
+Tool: get_high_risk_patients
+
+{
+  "name": "get_high_risk_patients",
+  "description": "Retrieve a list of high-risk patients for a given risk model and time period.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "model_code": { "type": "string" },
+      "from_date": { "type": "string", "format": "date" },
+      "to_date": { "type": "string", "format": "date" },
+      "min_risk_bucket": { "type": "string", "enum": ["medium","high","very_high"], "default": "high" },
+      "limit": { "type": "integer", "default": 50 }
+    },
+    "required": ["model_code", "from_date", "to_date"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "patients": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "patient_id": { "type": "string" },
+            "episode_id": { "type": "string" },
+            "admission_id": { "type": "string" },
+            "score": { "type": "number" },
+            "risk_bucket": { "type": "string" },
+            "predicted_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Maps to GET /api/v1/risk/scores?....
+
+⸻
+
+Tool: explain_risk_score_in_clinical_terms
+This is a pure LLM transformation tool over existing score + features; no DB call needed, but we define contract:
+
+{
+  "name": "explain_risk_score_in_clinical_terms",
+  "description": "Generate a clinician-facing explanation of a risk score using the score value, bucket, and key contributing features.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "model_code": { "type": "string" },
+      "score": { "type": "number" },
+      "risk_bucket": { "type": "string" },
+      "input_features": { "type": "object" }
+    },
+    "required": ["model_code", "score", "risk_bucket", "input_features"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "summary": { "type": "string" },
+      "key_contributors": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string" },
+            "direction": { "type": "string", "enum": ["increased_risk","decreased_risk","neutral"] },
+            "comment": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Implemented entirely on the LLM side, but tracked by governance-audit.
+
+⸻
+
+4.4 Voice & Collab Tools
+
+Tool: attach_voice_session_to_encounter
+
+{
+  "name": "attach_voice_session_to_encounter",
+  "description": "Link a completed voice session (with transcript) to an encounter for use by scribe agents.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "voice_session_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "patient_id": { "type": "string" }
+    },
+    "required": ["voice_session_id", "encounter_id", "patient_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Maps to PATCH /api/v1/voice-collab/voice-sessions/{id}.
+
+⸻
+
+Tool: create_collab_thread_for_case
+
+{
+  "name": "create_collab_thread_for_case",
+  "description": "Create a case discussion thread linked to a patient and episode/admission.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "episode_id": { "type": "string" },
+      "admission_id": { "type": "string" },
+      "title": { "type": "string" },
+      "initial_message": { "type": "string" }
+    },
+    "required": ["patient_id", "title", "initial_message"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "thread_id": { "type": "string" }
+    }
+  }
+}
+
+Maps to POST /api/v1/voice-collab/threads and POST /threads/{id}/messages.
+
+⸻
+
+4.5 Governance Tools
+
+Tool: log_llm_decision_trace
+
+{
+  "name": "log_llm_decision_trace",
+  "description": "Record a structured trace of an LLM-assisted decision, including tools used and rationale.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "session_id": { "type": "string" },
+      "decision_type": { "type": "string", "description": "e.g., 'note_draft','order_suggestion','risk_alert'." },
+      "summary": { "type": "string" },
+      "tools_used": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "tool_name": { "type": "string" },
+            "call_id": { "type": "string" }
+          }
+        }
+      },
+      "final_action_taken": { "type": "string", "description": "What the human ultimately did.", "nullable": true }
+    },
+    "required": ["session_id", "decision_type", "summary"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "status": { "type": "string" }
+    }
+  }
+}
+
+This is more for the orchestrator agent, but we define it explicitly.
+
+⸻
+
+5. System Prompts for Phase 4 Agents
+
+5.1 Outcomes & Population Health Agent
+
+You are the Outcomes & Population Health Agent.
+
+Goal:
+	•	Help clinicians and quality leaders understand outcomes across cohorts of patients and identify opportunities for improvement.
+
+Rules:
+	1.	When asked about outcome rates (e.g., “What is our 30-day readmission rate for heart failure?”):
+	•	Use get_outcome_stats_for_cohort with appropriate filters (care type, specialty, condition code, date range).
+	•	Always state the time period and cohort definition explicitly in your explanation.
+	2.	When comparing groups (e.g., by ward or doctor):
+	•	rely on the breakdown results, do not compute from raw data yourself.
+	3.	You must be clear about:
+	•	denominators,
+	•	numerator events,
+	•	confidence in small samples (warn when counts are small).
+	4.	When asked “what should we improve?”:
+	•	identify high-rate cohorts,
+	•	suggest potential QI projects but do not claim causal relationships.
+	5.	If a user wants to formalize improvement work, suggest creating a QI project using create_qi_project.
+
+Tools:
+	•	get_outcome_stats_for_cohort
+	•	create_qi_project
+
+⸻
+
+5.2 Risk Stratification Explainer Agent
+
+You are the Risk Stratification Explainer Agent.
+
+Goal:
+	•	Help clinicians understand which patients are at higher risk and why, using existing risk scores.
+
+Rules:
+	1.	When asked for “high-risk patients for X”:
+	•	use get_high_risk_patients with the correct model_code and date range.
+	•	emphasise that risk scores are aids, not definitive diagnoses.
+	2.	When asked “why is this patient high risk?”:
+	•	use the input features and explain_risk_score_in_clinical_terms to generate an explanation.
+	•	keep explanations concise, highlight the top 3–5 contributors.
+	3.	Never recommend interventions purely on the basis of risk score. You may suggest generic actions (e.g., “consider closer follow-up”) but leave specific clinical decisions to clinicians.
+	4.	Be explicit that the model can be wrong and that clinicians must cross-check against the clinical picture.
+
+Tools:
+	•	get_high_risk_patients
+	•	explain_risk_score_in_clinical_terms
+
+⸻
+
+5.3 QI Coach Agent
+
+You are the Quality Improvement Coach Agent.
+
+Goal:
+	•	Help quality leads structure QI projects, define clear metrics, and track progress.
+
+Rules:
+	1.	When a user describes a quality problem (e.g., “Our sepsis patients seem to be staying too long in ICU”):
+	•	help them clarify the problem statement,
+	•	identify a candidate quality metric (e.g., ICU LOS for sepsis episodes),
+	•	suggest an achievable target.
+	2.	Use get_outcome_stats_for_cohort or metric APIs to estimate baseline.
+	3.	Use create_qi_project to formalise the project, ensuring:
+	•	code and name are descriptive,
+	•	target description is specific and measurable.
+	4.	Keep language practical and non-blaming. Focus on system changes, not individual fault.
+
+Tools:
+	•	get_outcome_stats_for_cohort
+	•	create_qi_project
+
+⸻
+
+5.4 Voice Scribe + Collab Agent (Advanced)
+
+You are the Voice Scribe & Collaboration Agent.
+
+Goal:
+	•	Turn voice session transcripts into useful notes and facilitate case discussions across the care team.
+
+Rules:
+	1.	For a new voice session:
+	•	Ensure it is linked to the correct patient and encounter using attach_voice_session_to_encounter.
+	2.	For note creation:
+	•	Use draft_clinical_note_from_transcript (from Phase 2) with the transcript from the voice session.
+	•	Create a new note revision via backend APIs (handled outside this tool spec).
+	3.	For complex or ambiguous cases:
+	•	propose creating a collaboration thread via create_collab_thread_for_case with a short, neutral summary of the case.
+	4.	In collaboration threads:
+	•	your role is to summarise, highlight open questions, and keep everyone aligned,
+	•	do not override clinician decisions.
+	5.	Always respect confidentiality; never share identifiable patient information outside the authorised thread context.
+
+Tools:
+	•	attach_voice_session_to_encounter
+	•	create_collab_thread_for_case
+	•	draft_clinical_note_from_transcript (existing)
+
+⸻
+
+5.5 Governance Auditor Agent
+
+You are the Governance Auditor Agent.
+
+Goal:
+	•	Provide transparent explanations of LLM-assisted behaviour and highlight any safety concerns or policy violations.
+
+Rules:
+	1.	When asked “Why did the AI do X?”:
+	•	fetch the corresponding llm_session,
+	•	review llm_tool_calls and llm_responses,
+	•	provide a step-by-step narrative of:
+	•	tools invoked,
+	•	key inputs/outputs,
+	•	any policy flags.
+	2.	Use log_llm_decision_trace to ensure a structured trace exists for important decisions.
+	3.	When summarising potential issues:
+	•	be honest and specific,
+	•	flag where information was ambiguous or incomplete.
+	4.	You must not disclose more PHI than necessary for the explanation; redact or generalise details where possible.
+
+Tools:
+	•	log_llm_decision_trace
+	•	read-only governance APIs (GET /llm-sessions/..., etc., via wrappers)
+
+⸻

@@ -1,0 +1,1173 @@
+Let’s wire up the bit where people actually get cut open.
+
+Phase 10 – OR / Procedure / Perioperative Management
+
+Same pattern as before:
+	1.	Scope & design goals
+	2.	Backend services
+	•	services list
+	•	DB schemas
+	•	endpoints
+	•	FHIR mappings
+	3.	Frontend routes & workflows
+	4.	LLM tools for OR agents
+	5.	System prompts for those agents
+
+⸻
+
+1. Phase 10 – Scope & Design Goals
+
+1.1 What This Phase Adds
+
+On top of existing EHR/Imaging/Labs/Pharmacy:
+	•	Surgical case lifecycle
+Request → pre-op assessment → scheduling → checklist → intra-op charting → PACU → post-op orders → discharge.
+	•	OR scheduling & utilisation
+Block time, elective vs emergency, turnover times, cancellations.
+	•	Pre-op assessment & clearance
+Structured forms, risk scores (ASA, RCRI), optimisation tasks.
+	•	Intra-op documentation
+Anesthesia record, surgical events, implants, specimens, meds, fluids.
+	•	Immediate post-op & PACU
+Recovery scores, handoff notes, complications.
+	•	AI-native bits
+	•	Case triage (which theatre, how long, what equipment).
+	•	Pre-op optimisation assistant.
+	•	Handoff note generator.
+	•	OR utilisation analytics.
+
+1.2 Design Principles
+	•	Procedure-centric spine: surgical case is a first-class object, linking all perioperative data.
+	•	FHIR aligned: ServiceRequest, Procedure, Encounter, CarePlan, Observation, Device, MedicationAdministration.
+	•	Tight integration with imaging, labs, pharmacy, pathology, ICU/IPD.
+	•	AI in support roles: not deciding who gets operated or how; just structuring, drafting, flagging risk.
+
+⸻
+
+2. Backend – Services & Data Model
+
+New services:
+	1.	surgery-request-service
+	2.	or-scheduling-service
+	3.	preop-assessment-service
+	4.	surgical-case-service (intra-op spine)
+	5.	anesthesia-record-service
+	6.	pacu-recovery-service
+	7.	periop-ai-orchestrator-service
+
+Assume existing core: patients, encounters, episodes, practitioners, departments, locations, imaging, lab, pharmacy, ap-pathology.
+
+⸻
+
+2.1 surgery-request-service
+
+Responsible for:
+	•	Surgical / procedure requests from clinics/wards/ED.
+	•	Priority, indication, pre-op requirements.
+
+2.1.1 DB Schema
+Tables:
+	•	surgery_procedure_catalog
+	•	surgery_requests
+
+surgery_procedure_catalog
+
+CREATE TABLE surgery_procedure_catalog (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'APPENDECTOMY_LAP','CABG_3V','C_SECTION'
+  name TEXT NOT NULL,
+  specialty TEXT NOT NULL,                   -- 'General Surgery','Cardiac Surgery'
+  body_site TEXT,                            -- 'abdomen','heart','uterus'
+  description TEXT,
+  typical_duration_minutes INT,              -- expected OR time
+  fhir_code TEXT,                            -- SNOMED/ICD-10-PCS/OPCS
+  default_priority TEXT DEFAULT 'elective',  -- 'elective','urgent','emergency'
+  default_anaesthesia_type TEXT,             -- 'general','regional','local'
+  preop_required_labs TEXT[],                -- e.g. ['CBC','RFT','LFT']
+  preop_required_imaging TEXT[],             -- e.g. ['CXR','ECG']
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_surgery_procedure_catalog_code_tenant
+  ON surgery_procedure_catalog(tenant_id, code);
+
+surgery_requests
+
+CREATE TABLE surgery_requests (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),   -- usually current admission/visit
+  episode_id UUID REFERENCES episodes(id),
+  requesting_practitioner_id UUID REFERENCES practitioners(id),
+  requesting_department_id UUID REFERENCES departments(id),
+  procedure_catalog_id UUID NOT NULL REFERENCES surgery_procedure_catalog(id),
+  additional_procedure_text TEXT,
+  indication TEXT NOT NULL,
+  urgency TEXT NOT NULL DEFAULT 'elective',      -- 'elective','urgent','emergency'
+  status TEXT NOT NULL DEFAULT 'requested',      -- 'requested','accepted','rejected','scheduled','cancelled','completed'
+  requested_date TIMESTAMPTZ NOT NULL,
+  comments TEXT,
+  fhir_service_request_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_surgery_requests_patient
+  ON surgery_requests(patient_id, requested_date DESC);
+
+CREATE INDEX idx_surgery_requests_status
+  ON surgery_requests(status, urgency, requested_date);
+
+2.1.2 FHIR Mapping
+	•	surgery_requests ↔ FHIR ServiceRequest:
+	•	category = procedure,
+	•	code = procedure catalog entry,
+	•	priority from urgency.
+
+2.1.3 Endpoints
+Base: /api/v1/surgery-requests
+	•	POST /
+	•	GET /?patient_id=&status=&urgency=&specialty=&from=&to=
+	•	GET /{id}
+	•	PATCH /{id} (update status, comments).
+
+⸻
+
+2.2 or-scheduling-service
+
+Responsible for:
+	•	OR rooms, block time, case scheduling, turnover, cancellations.
+
+2.2.1 DB Schema
+Tables:
+	•	or_rooms
+	•	or_blocks
+	•	or_case_schedule
+
+or_rooms
+
+CREATE TABLE or_rooms (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  code TEXT NOT NULL,                        -- 'OR1','OR2','CATH1'
+  name TEXT NOT NULL,
+  location_id UUID REFERENCES locations(id),
+  specialties_supported TEXT[],              -- ['General Surgery','Ortho']
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_or_rooms_code_tenant
+  ON or_rooms(tenant_id, code);
+
+or_blocks
+
+Represents scheduled block time for a service/surgeon.
+
+CREATE TABLE or_blocks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  or_room_id UUID NOT NULL REFERENCES or_rooms(id),
+  service_or_department_id UUID REFERENCES departments(id),
+  surgeon_id UUID REFERENCES practitioners(id),
+  day_of_week INT NOT NULL,                  -- 1-7
+  start_time_local TIME NOT NULL,
+  end_time_local TIME NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_or_blocks_room_day
+  ON or_blocks(or_room_id, day_of_week);
+
+or_case_schedule
+
+CREATE TABLE or_case_schedule (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  surgery_request_id UUID NOT NULL REFERENCES surgery_requests(id),
+  or_room_id UUID NOT NULL REFERENCES or_rooms(id),
+  scheduled_date DATE NOT NULL,
+  scheduled_start_time_local TIME NOT NULL,
+  scheduled_end_time_local TIME,
+  status TEXT NOT NULL DEFAULT 'scheduled',   -- 'scheduled','in_progress','completed','cancelled','no_show'
+  block_id UUID REFERENCES or_blocks(id),
+  priority TEXT NOT NULL,                    -- 'elective','urgent','emergency'
+  case_number TEXT,                          -- 'CASE-2025-000123'
+  reason_for_cancellation TEXT,
+  actual_start_time TIMESTAMPTZ,
+  actual_end_time TIMESTAMPTZ,
+  turnover_start_time TIMESTAMPTZ,
+  turnover_end_time TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uniq_or_case_schedule_case_number_tenant
+  ON or_case_schedule(tenant_id, case_number);
+
+CREATE INDEX idx_or_case_schedule_or_date
+  ON or_case_schedule(or_room_id, scheduled_date, scheduled_start_time_local);
+
+2.2.2 FHIR Mapping
+	•	Schedule is primarily internal, but can be represented via Schedule + Slot resources for API consumers.
+	•	Links to ServiceRequest and Encounter.
+
+2.2.3 Endpoints
+Base: /api/v1/or-schedule
+	•	GET /cases?date=&or_room_id=&surgeon_id=&status=
+	•	POST /cases (create schedule entry from request)
+	•	PATCH /cases/{id} (reschedule, cancel, mark in-progress/completed).
+
+⸻
+
+2.3 preop-assessment-service
+
+Responsible for:
+	•	Pre-anesthesia evaluation.
+	•	Perioperative risk scoring, optimisation tasks.
+
+2.3.1 DB Schema
+Tables:
+	•	preop_assessments
+	•	preop_risk_scores
+	•	preop_optimization_tasks
+
+preop_assessments
+
+CREATE TABLE preop_assessments (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  surgery_request_id UUID NOT NULL REFERENCES surgery_requests(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  assessor_id UUID REFERENCES practitioners(id),          -- usually anesthetist
+  assessment_datetime TIMESTAMPTZ,
+  asa_class TEXT,                                        -- 'I','II','III','IV','V','VI'
+  airway_assessment TEXT,                                -- e.g. Mallampati, neck mobility
+  comorbidities TEXT,                                    -- free text / summarised
+  functional_status TEXT,                                -- e.g. METs
+  planned_anaesthesia_type TEXT,                         -- 'general','regional','spinal','local'
+  npo_status TEXT,
+  investigations_reviewed JSONB,                         -- labs, imaging summary
+  recommendation TEXT,                                   -- 'fit for surgery', 'optimise'
+  status TEXT NOT NULL DEFAULT 'in_progress',            -- 'in_progress','cleared','deferred'
+  fhir_encounter_id TEXT,                                -- preop eval encounter if separate
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_preop_assessments_surgery_request
+  ON preop_assessments(surgery_request_id);
+
+preop_risk_scores
+
+CREATE TABLE preop_risk_scores (
+  id UUID PRIMARY KEY,
+  preop_assessment_id UUID NOT NULL REFERENCES preop_assessments(id) ON DELETE CASCADE,
+  score_type TEXT NOT NULL,                              -- 'RCRI','NSQIP','Custom'
+  score_value NUMERIC,
+  risk_category TEXT,                                    -- 'low','intermediate','high'
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+preop_optimization_tasks
+
+CREATE TABLE preop_optimization_tasks (
+  id UUID PRIMARY KEY,
+  preop_assessment_id UUID NOT NULL REFERENCES preop_assessments(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,                             -- 'Optimise BP','Stop warfarin 5 days prior'
+  assigned_to_role TEXT,                                 -- 'cardiologist','primary_team'
+  due_date DATE,
+  status TEXT NOT NULL DEFAULT 'pending',                -- 'pending','in_progress','completed','cancelled'
+  completed_at TIMESTAMPTZ,
+  comments TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.3.2 FHIR Mapping
+	•	Pre-op assessment as an Encounter (pre-admission clinic) with Condition and Observation resources for ASA class, functional status, scores.
+
+2.3.3 Endpoints
+Base: /api/v1/preop-assessments
+	•	POST /
+	•	GET /?surgery_request_id=&patient_id=
+	•	GET /{id}
+	•	PATCH /{id} (update ASA, recommendation, status).
+	•	POST /{id}/optimization-tasks
+	•	PATCH /optimization-tasks/{taskId}
+
+⸻
+
+2.4 surgical-case-service (Intra-op Spine)
+
+Responsible for:
+	•	Each surgical case as the central record.
+	•	Links to OR schedule, pre-op, anesthesia record, notes, implants, specimens.
+
+2.4.1 DB Schema
+Tables:
+	•	surgical_cases
+	•	surgical_case_team_members
+	•	surgical_case_implants
+	•	surgical_case_specimens
+
+surgical_cases
+
+CREATE TABLE surgical_cases (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  or_case_schedule_id UUID NOT NULL REFERENCES or_case_schedule(id),
+  surgery_request_id UUID NOT NULL REFERENCES surgery_requests(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  primary_surgeon_id UUID REFERENCES practitioners(id),
+  assistant_surgeon_ids UUID[],                          -- array of IDs
+  anesthetist_id UUID REFERENCES practitioners(id),
+  anesthesia_type TEXT,                                  -- 'general','regional','spinal','local'
+  procedure_performed_code TEXT,                         -- may differ from planned
+  procedure_performed_text TEXT,
+  wound_class TEXT,                                      -- 'clean','clean-contaminated',...
+  asa_class_intraop TEXT,
+  incision_time TIMESTAMPTZ,
+  closure_time TIMESTAMPTZ,
+  estimated_blood_loss_ml NUMERIC,
+  intraop_complications TEXT,
+  disposition TEXT,                                      -- 'PACU','ICU','ward'
+  status TEXT NOT NULL DEFAULT 'in_progress',            -- 'in_progress','completed','abandoned'
+  fhir_procedure_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_surgical_cases_patient
+  ON surgical_cases(patient_id, created_at DESC);
+
+CREATE INDEX idx_surgical_cases_schedule
+  ON surgical_cases(or_case_schedule_id);
+
+surgical_case_team_members
+
+CREATE TABLE surgical_case_team_members (
+  id UUID PRIMARY KEY,
+  surgical_case_id UUID NOT NULL REFERENCES surgical_cases(id) ON DELETE CASCADE,
+  practitioner_id UUID REFERENCES practitioners(id),
+  role TEXT NOT NULL,                                    -- 'scrub_nurse','circulating_nurse','perfursionist'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+surgical_case_implants
+
+CREATE TABLE surgical_case_implants (
+  id UUID PRIMARY KEY,
+  surgical_case_id UUID NOT NULL REFERENCES surgical_cases(id) ON DELETE CASCADE,
+  implant_code TEXT,                                     -- internal or UDI
+  description TEXT,
+  manufacturer TEXT,
+  lot_number TEXT,
+  expiry_date DATE,
+  quantity INT,
+  body_site TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+surgical_case_specimens
+
+(links to AP service)
+
+CREATE TABLE surgical_case_specimens (
+  id UUID PRIMARY KEY,
+  surgical_case_id UUID NOT NULL REFERENCES surgical_cases(id) ON DELETE CASCADE,
+  ap_case_id UUID REFERENCES ap_cases(id),
+  specimen_label TEXT,                                   -- 'Specimen A','B'
+  description TEXT,
+  site TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+2.4.2 FHIR Mapping
+	•	surgical_cases ↔ FHIR Procedure:
+	•	status, code, performedPeriod, bodySite, performer, used, complication.
+
+Implants → Device + DeviceUseStatement / Procedure.usedReference.
+Specimens → FHIR Specimen and DiagnosticReport in AP.
+
+2.4.3 Endpoints
+Base: /api/v1/surgical-cases
+	•	POST /
+	•	GET /?patient_id=&schedule_id=
+	•	GET /{id}
+	•	PATCH /{id} (update times, procedure performed, EBL, status).
+	•	POST /{id}/team-members
+	•	POST /{id}/implants
+	•	POST /{id}/specimens
+
+⸻
+
+2.5 anesthesia-record-service
+
+Responsible for:
+	•	Intra-op anesthesia chart.
+	•	Vitals, drugs, fluids, airway management.
+
+2.5.1 DB Schema
+Tables:
+	•	anesthesia_records
+	•	anesthesia_events
+	•	anesthesia_vitals
+
+anesthesia_records
+
+CREATE TABLE anesthesia_records (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  surgical_case_id UUID NOT NULL REFERENCES surgical_cases(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  anesthetist_id UUID REFERENCES practitioners(id),
+  anesthesia_start_time TIMESTAMPTZ,
+  anesthesia_end_time TIMESTAMPTZ,
+  airway_type TEXT,                                     -- 'ETT','LMA','mask'
+  airway_difficulty TEXT,
+  induction_agents TEXT,                                -- free text / summary
+  maintenance_agents TEXT,
+  reversal_agents TEXT,
+  intraop_notes TEXT,
+  status TEXT NOT NULL DEFAULT 'in_progress',           -- 'in_progress','completed'
+  fhir_encounter_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_anesthesia_records_surgical_case
+  ON anesthesia_records(surgical_case_id);
+
+anesthesia_events
+
+CREATE TABLE anesthesia_events (
+  id UUID PRIMARY KEY,
+  anesthesia_record_id UUID NOT NULL REFERENCES anesthesia_records(id) ON DELETE CASCADE,
+  event_time TIMESTAMPTZ NOT NULL,
+  event_type TEXT NOT NULL,                             -- 'drug','fluid','airway','procedure','complication'
+  description TEXT,
+  medication_product_id UUID REFERENCES medication_products(id),
+  dose_numeric NUMERIC,
+  dose_unit TEXT,
+  fluid_volume_ml NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_anesthesia_events_record
+  ON anesthesia_events(anesthesia_record_id, event_time);
+
+anesthesia_vitals
+
+CREATE TABLE anesthesia_vitals (
+  id UUID PRIMARY KEY,
+  anesthesia_record_id UUID NOT NULL REFERENCES anesthesia_records(id) ON DELETE CASCADE,
+  timestamp TIMESTAMPTZ NOT NULL,
+  heart_rate NUMERIC,
+  systolic_bp NUMERIC,
+  diastolic_bp NUMERIC,
+  mean_arterial_pressure NUMERIC,
+  spo2 NUMERIC,
+  resp_rate NUMERIC,
+  etco2 NUMERIC,
+  temperature NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_anesthesia_vitals_record
+  ON anesthesia_vitals(anesthesia_record_id, timestamp);
+
+2.5.2 FHIR Mapping
+	•	Anesthesia record as an Encounter or Procedure-extension.
+	•	anesthesia_events & anesthesia_vitals → Observation + MedicationAdministration sets.
+
+2.5.3 Endpoints
+Base: /api/v1/anesthesia-records
+	•	POST /
+	•	GET /?surgical_case_id=
+	•	GET /{id}
+	•	PATCH /{id}
+	•	POST /{id}/events
+	•	POST /{id}/vitals
+
+⸻
+
+2.6 pacu-recovery-service
+
+Responsible for:
+	•	Immediate post-op monitoring in PACU.
+	•	Recovery scores, pain scores, complications, disposition.
+
+2.6.1 DB Schema
+Tables:
+	•	pacu_stays
+	•	pacu_vitals
+	•	pacu_scores
+
+pacu_stays
+
+CREATE TABLE pacu_stays (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  surgical_case_id UUID NOT NULL REFERENCES surgical_cases(id),
+  patient_id UUID NOT NULL REFERENCES patients(id),
+  encounter_id UUID REFERENCES encounters(id),
+  admission_time TIMESTAMPTZ NOT NULL,
+  discharge_time TIMESTAMPTZ,
+  initial_status TEXT,                                 -- 'stable','requires_observation','critical'
+  disposition TEXT,                                    -- 'ward','ICU','home'
+  complications TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_pacu_stays_case
+  ON pacu_stays(surgical_case_id);
+
+pacu_vitals
+
+CREATE TABLE pacu_vitals (
+  id UUID PRIMARY KEY,
+  pacu_stay_id UUID NOT NULL REFERENCES pacu_stays(id) ON DELETE CASCADE,
+  timestamp TIMESTAMPTZ NOT NULL,
+  heart_rate NUMERIC,
+  systolic_bp NUMERIC,
+  diastolic_bp NUMERIC,
+  spo2 NUMERIC,
+  resp_rate NUMERIC,
+  pain_score NUMERIC,                                  -- 0-10
+  sedation_score TEXT,                                 -- e.g. RASS
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_pacu_vitals_stay
+  ON pacu_vitals(pacu_stay_id, timestamp);
+
+pacu_scores
+
+CREATE TABLE pacu_scores (
+  id UUID PRIMARY KEY,
+  pacu_stay_id UUID NOT NULL REFERENCES pacu_stays(id) ON DELETE CASCADE,
+  timestamp TIMESTAMPTZ NOT NULL,
+  score_type TEXT NOT NULL,                            -- 'Aldrete','Modified_Aldrete'
+  score_value NUMERIC,
+  components JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_pacu_scores_stay
+  ON pacu_scores(pacu_stay_id, timestamp);
+
+2.6.2 FHIR Mapping
+	•	pacu_vitals & pacu_scores → Observation.
+	•	pacu_stays as part of the post-op Encounter.
+
+2.6.3 Endpoints
+Base: /api/v1/pacu
+	•	POST /stays
+	•	GET /stays?patient_id=&case_id=&active=
+	•	PATCH /stays/{id}
+	•	POST /stays/{id}/vitals
+	•	POST /stays/{id}/scores
+
+⸻
+
+2.7 periop-ai-orchestrator-service
+
+Responsible for:
+	•	Case duration estimation.
+	•	OR list optimisation.
+	•	Risk summaries.
+	•	Handover note generation.
+
+2.7.1 DB Schema
+Tables:
+	•	periop_ai_tasks
+	•	periop_ai_outputs
+
+periop_ai_tasks
+
+CREATE TABLE periop_ai_tasks (
+  id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  patient_id UUID REFERENCES patients(id),
+  surgery_request_id UUID REFERENCES surgery_requests(id),
+  surgical_case_id UUID REFERENCES surgical_cases(id),
+  task_type TEXT NOT NULL,                   -- 'case_duration_estimate','preop_risk_summary','handoff_note','or_list_optimisation'
+  status TEXT NOT NULL DEFAULT 'queued',     -- 'queued','running','completed','failed'
+  requested_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+periop_ai_outputs
+
+CREATE TABLE periop_ai_outputs (
+  id UUID PRIMARY KEY,
+  periop_ai_task_id UUID NOT NULL REFERENCES periop_ai_tasks(id) ON DELETE CASCADE,
+  output_type TEXT NOT NULL,                 -- 'duration_estimate','risk_summary','handoff_text','optimised_list'
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+
+⸻
+
+3. Frontend – OR & Perioperative Workflows
+
+Key areas:
+	1.	Surgeon & ward UI: request, track, review.
+	2.	OR manager UI: day-of-surgery board.
+	3.	Anesthesia UI: pre-op & intra-op.
+	4.	PACU UI: recovery board.
+
+3.1 Surgeon / Ward – Surgery Request & Tracking
+
+Routes:
+	•	/patient/[patientId]/procedures
+	•	/patient/[patientId]/procedures/request
+	•	/surgery/requests
+
+Request form
+	•	Pick procedure from catalog (with duration & requirements shown).
+	•	Fill indication, urgency, preferred date.
+	•	AI suggests:
+	•	typical duration,
+	•	required labs/imaging (with their status).
+
+APIs:
+	•	GET /surgery-procedure-catalog
+	•	POST /surgery-requests
+	•	GET /surgery-requests?patient_id=...
+
+⸻
+
+3.2 OR Manager – OR List & Scheduling
+
+Routes:
+	•	/or/schedule (day view / room view)
+	•	/or/case/[caseScheduleId]
+
+Features:
+	•	Drag-and-drop case ordering per OR.
+	•	Visual indicators:
+	•	estimated vs actual duration.
+	•	risk/complex cases.
+	•	AI suggestion:
+	•	reorder list to minimise overtime / maximise block utilisation.
+
+APIs:
+	•	GET /or-schedule/cases?date=
+	•	PATCH /or-schedule/cases/{id} (reorder/reschedule).
+	•	POST /periop-ai/tasks (or_list_optimisation).
+
+⸻
+
+3.3 Anesthesia – Pre-op & Intra-op UI
+
+Routes:
+	•	/anesthesia/preop/[surgeryRequestId]
+	•	/anesthesia/record/[surgicalCaseId]
+
+Pre-op
+	•	Pulls labs, imaging, problems, meds.
+	•	Structured form for ASA, airway, risk scores.
+	•	AI:
+	•	summarises key risks,
+	•	suggests optimisation tasks.
+
+APIs:
+	•	GET /preop-assessments?request_id=
+	•	POST /preop-assessments
+
+Intra-op
+	•	Timeline UI:
+	•	vitals trend chart,
+	•	marked events (induction, intubation, incision, reversal).
+	•	Buttons:
+	•	“Record bolus” (drug & dose).
+	•	“Add event” (e.g., hypotension episode).
+
+APIs:
+	•	GET /anesthesia-records?surgical_case_id=
+	•	POST /anesthesia-records/{id}/events
+	•	POST /anesthesia-records/{id}/vitals
+
+⸻
+
+3.4 PACU – Recovery
+
+Routes:
+	•	/pacu/board (list of all patients in PACU)
+	•	/pacu/stay/[pacuStayId]
+
+Features:
+	•	Board view:
+	•	patient, surgery, time since arrival, Aldrete scores.
+	•	Detail view:
+	•	vitals chart, pain management, complications log.
+	•	AI:
+	•	Draft ward/ICU handoff note from intra-op + PACU data.
+
+APIs:
+	•	GET /pacu/stays?active=true
+	•	POST /pacu/stays
+	•	POST /pacu/stays/{id}/scores
+
+⸻
+
+4. LLM Tools – OR & Perioperative Agents
+
+4.1 Surgery Request Helper Tools
+
+Tool: list_surgery_procedures
+
+{
+  "name": "list_surgery_procedures",
+  "description": "List available surgical procedures from the catalog, optionally filtered by specialty or search text.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "specialty": { "type": "string" },
+      "search_text": { "type": "string" }
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "procedures": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "procedure_catalog_id": { "type": "string" },
+            "code": { "type": "string" },
+            "name": { "type": "string" },
+            "specialty": { "type": "string" },
+            "typical_duration_minutes": { "type": "integer" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: create_surgery_request
+
+{
+  "name": "create_surgery_request",
+  "description": "Create a surgery request for a patient for a specific procedure.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "patient_id": { "type": "string" },
+      "encounter_id": { "type": "string" },
+      "procedure_catalog_id": { "type": "string" },
+      "indication": { "type": "string" },
+      "urgency": {
+        "type": "string",
+        "enum": ["elective", "urgent", "emergency"],
+        "default": "elective"
+      },
+      "preferred_date": { "type": "string", "format": "date" }
+    },
+    "required": ["patient_id", "procedure_catalog_id", "indication"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "surgery_request_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+
+⸻
+
+4.2 OR Schedule & Case Tools
+
+Tool: get_or_schedule_for_date
+
+{
+  "name": "get_or_schedule_for_date",
+  "description": "Fetch the OR case schedule for a given date.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "date": { "type": "string", "format": "date" }
+    },
+    "required": ["date"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "cases": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "or_case_schedule_id": { "type": "string" },
+            "or_room_code": { "type": "string" },
+            "scheduled_date": { "type": "string", "format": "date" },
+            "scheduled_start_time": { "type": "string" },
+            "scheduled_end_time": { "type": "string" },
+            "status": { "type": "string" },
+            "patient_id": { "type": "string" },
+            "procedure_name": { "type": "string" },
+            "surgeon_name": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+
+Tool: request_periop_ai_task
+
+{
+  "name": "request_periop_ai_task",
+  "description": "Request AI analysis for perioperative tasks such as case duration estimate, risk summary, or handoff note.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "task_type": {
+        "type": "string",
+        "enum": [
+          "case_duration_estimate",
+          "preop_risk_summary",
+          "handoff_note",
+          "or_list_optimisation"
+        ]
+      },
+      "patient_id": { "type": "string" },
+      "surgery_request_id": { "type": "string" },
+      "surgical_case_id": { "type": "string" }
+    },
+    "required": ["task_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "periop_ai_task_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: get_periop_ai_output
+
+{
+  "name": "get_periop_ai_output",
+  "description": "Fetch AI output for a perioperative AI task.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "periop_ai_task_id": { "type": "string" }
+    },
+    "required": ["periop_ai_task_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "outputs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "output_type": { "type": "string" },
+            "payload": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+⸻
+
+4.3 Pre-op & Anesthesia Tools
+
+Tool: create_or_update_preop_assessment
+
+{
+  "name": "create_or_update_preop_assessment",
+  "description": "Create or update a preoperative assessment for a surgery request.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "surgery_request_id": { "type": "string" },
+      "preop_assessment_id": { "type": "string" },
+      "asa_class": { "type": "string" },
+      "airway_assessment": { "type": "string" },
+      "comorbidities": { "type": "string" },
+      "functional_status": { "type": "string" },
+      "planned_anaesthesia_type": { "type": "string" },
+      "recommendation": { "type": "string" },
+      "status": { "type": "string" }
+    },
+    "required": ["surgery_request_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "preop_assessment_id": { "type": "string" },
+      "status": { "type": "string" }
+    }
+  }
+}
+
+Tool: record_anesthesia_event
+
+{
+  "name": "record_anesthesia_event",
+  "description": "Record an intraoperative anesthesia event (drug, fluid, airway event).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "anesthesia_record_id": { "type": "string" },
+      "event_time": { "type": "string", "format": "date-time" },
+      "event_type": {
+        "type": "string",
+        "enum": ["drug", "fluid", "airway", "procedure", "complication"]
+      },
+      "description": { "type": "string" },
+      "medication_product_id": { "type": "string" },
+      "dose_numeric": { "type": "number" },
+      "dose_unit": { "type": "string" },
+      "fluid_volume_ml": { "type": "number" }
+    },
+    "required": ["anesthesia_record_id", "event_time", "event_type"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "anesthesia_event_id": { "type": "string" }
+    }
+  }
+}
+
+
+⸻
+
+4.4 PACU & Handoff Tools
+
+Tool: create_pacu_stay
+
+{
+  "name": "create_pacu_stay",
+  "description": "Create a PACU stay record for a surgical case.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "surgical_case_id": { "type": "string" },
+      "patient_id": { "type": "string" },
+      "admission_time": { "type": "string", "format": "date-time" },
+      "initial_status": { "type": "string" }
+    },
+    "required": ["surgical_case_id", "patient_id", "admission_time"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "pacu_stay_id": { "type": "string" }
+    }
+  }
+}
+
+Tool: add_pacu_score
+
+{
+  "name": "add_pacu_score",
+  "description": "Add a recovery score (e.g. Aldrete) entry for a PACU stay.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "pacu_stay_id": { "type": "string" },
+      "timestamp": { "type": "string", "format": "date-time" },
+      "score_type": { "type": "string" },
+      "score_value": { "type": "number" },
+      "components": { "type": "object" }
+    },
+    "required": ["pacu_stay_id", "timestamp", "score_type", "score_value"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "pacu_score_id": { "type": "string" }
+    }
+  }
+}
+
+
+⸻
+
+5. System Prompts – OR / Perioperative Agents
+
+5.1 Surgery Planning & Request Co-Pilot (Surgeon/Ward-Facing)
+
+You are the Surgery Planning & Request Co-Pilot.
+
+Goals:
+	•	Help clinicians frame clear, appropriate surgical requests.
+	•	Make sure pre-op requirements and expectations are visible from day 0.
+
+Rules:
+	1.	Clarify the clinical problem and goals of surgery in 2–3 sentences.
+	2.	Use list_surgery_procedures to retrieve candidate procedures matching the clinician’s description.
+	3.	For each candidate:
+	•	show name, specialty, typical duration, anaesthesia type.
+	4.	Suggest a primary option and any reasonable alternatives; state why.
+	5.	Before calling create_surgery_request:
+	•	check basic context (patient comorbidities, recent imaging, labs) via EHR read-only APIs,
+	•	surface missing key investigations (e.g. ECG, basic labs), but do not block.
+	6.	When the clinician confirms:
+	•	call create_surgery_request,
+	•	summarise the created request, including urgency and any recommended pre-op steps.
+
+Tools:
+	•	list_surgery_procedures
+	•	create_surgery_request
+	•	read-only EHR tools (problems, meds, labs, imaging).
+
+⸻
+
+5.2 Pre-op Risk & Optimisation Agent (Anaesthetist-Facing)
+
+You are the Pre-op Risk & Optimisation Agent assisting anaesthetists.
+
+Goals:
+	•	Synthesize patient risk profile for surgery.
+	•	Suggest pre-op investigations and optimisation tasks.
+
+Rules:
+	1.	Retrieve:
+	•	major diagnoses,
+	•	relevant labs (Hb, creatinine, coagulation),
+	•	imaging (CXR, echo where relevant),
+	•	medications (especially anticoagulants, antiplatelets, beta-blockers).
+	2.	Summarise in structured sections:
+	•	cardiovascular, respiratory, metabolic, other comorbidities.
+	3.	Estimate risk qualitatively (low/intermediate/high) using known scores when possible (RCRI-like logic), but:
+	•	label them clearly as approximations,
+	•	avoid exact numeric mortality estimates.
+	4.	Suggest optimisation tasks for:
+	•	uncontrolled comorbidities,
+	•	anaemia, volume status, meds adjustment (anticoagulation holds, etc.).
+	5.	Use create_or_update_preop_assessment to fill structured ASA, airway, and recommendation, but:
+	•	never override an anaesthetist’s explicit entry,
+	•	update only when they request it.
+
+Tools:
+	•	create_or_update_preop_assessment
+	•	request_periop_ai_task (preop_risk_summary)
+	•	get_periop_ai_output
+
+⸻
+
+5.3 Intra-op Documentation Assistant (Anesthesia & OR Team)
+
+You are the Intra-op Documentation Assistant.
+
+Goals:
+	•	Make anesthesia and surgical documentation easier, without creating noise.
+
+Rules:
+	1.	When the user asks to “record” a drug/bolus:
+	•	use record_anesthesia_event with:
+	•	event_type = “drug”,
+	•	medication_product_id (if available),
+	•	dose + units,
+	•	accurate event_time.
+	2.	For fluids, airway events, complications:
+	•	use the same tool with appropriate event_type and description.
+	3.	Do not invent events; only act on explicit user commands or connected device signals.
+	4.	For summary / note generation:
+	•	rely on recorded data (events, vitals, case spine),
+	•	structure a narrative that is:
+	•	chronological,
+	•	highlights key events and deviations.
+	5.	Do not mark anesthesia or surgical cases as “completed”; that is a human decision.
+
+Tools:
+	•	record_anesthesia_event
+	•	request_periop_ai_task (handoff_note)
+	•	get_periop_ai_output
+
+⸻
+
+5.4 PACU Handoff & Recovery Agent
+
+You are the PACU Handoff & Recovery Agent.
+
+Goals:
+	•	Help Structure postoperative handoff notes and monitor recovery progress.
+
+Rules:
+	1.	For a given surgical case:
+	•	pull summary from:
+	•	surgical_case (procedure performed, complications, EBL),
+	•	anesthesia_record (agents, airway, intra-op events),
+	•	pacu_stay (initial status, latest vitals, scores, pain).
+	2.	Draft handoff notes organised as:
+	•	procedure summary,
+	•	anaesthesia summary,
+	•	intra-op issues,
+	•	PACU course so far,
+	•	“watch for” items (pain, bleeding, respiratory status, etc.).
+	3.	Use add_pacu_score when asked to log recovery scores.
+	4.	When generating notes:
+	•	be concise and clinically focused,
+	•	avoid recommendations beyond level of available information.
+	5.	Emphasise unresolved issues and pending tasks (e.g., labs, imaging, consults).
+
+Tools:
+	•	create_pacu_stay
+	•	add_pacu_score
+	•	request_periop_ai_task (handoff_note)
+	•	get_periop_ai_output
+
+⸻
+
+5.5 OR List Optimisation Agent (OR Manager-Facing)
+
+You are the OR List Optimisation Agent.
+
+Goals:
+	•	Help OR managers plan the daily schedule to minimise overtime and chaos.
+
+Rules:
+	1.	Use get_or_schedule_for_date to retrieve the case list for a given day.
+	2.	For each case, combine:
+	•	catalog typical duration,
+	•	historical duration patterns (if available),
+	•	risk level (pre-op summary).
+	3.	Estimate:
+	•	expected case duration,
+	•	turnover time per room,
+	•	probability of running late.
+	4.	Propose:
+	•	reordering of elective cases,
+	•	reallocation between rooms where feasible.
+	5.	Always present:
+	•	current list vs proposed list,
+	•	explanation of why changes are suggested (short cases first, clustering similar setups, etc.).
+	6.	Do not commit changes by yourself; OR managers decide and apply via the UI.
+
+Tools:
+	•	get_or_schedule_for_date
+	•	request_periop_ai_task (or_list_optimisation)
+	•	get_periop_ai_output
+
+⸻
