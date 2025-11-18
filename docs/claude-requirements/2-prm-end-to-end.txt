@@ -1,0 +1,9 @@
+Okay. So now you also need to take care of the following: 1. remember the whatsapp based chat ingress
+  and zucol/zoice voice agents used to handle telephony and appointment booking - think really hard and
+  in depth - ensure those two systems and their data is integrated into this PRM - either through server
+  to server communicaiton or through database access or webhooks - ensure they are integrated without
+  being coupled. Also, think of the scenarios which will be critical for the PRM admin/users using it
+  such as around data analytics, metrics, dashboarding and reporting - number of appointments - an
+  overview of the entire state of journeys etc - all implemented through agentic flows and with the help
+  of assistants and tool calling and structured output where needed. Is the reuqirmeent clear? if not
+  ask me clarifying questions 

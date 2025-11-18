@@ -1,0 +1,45 @@
+<Context>
+You are an expert at LLM based AI agentic CRMs. You are tasked with building a Patient Relationship Management system.
+</Context>
+
+<Requirments>
+There are multiple parts to the system:
+
+1. Core patient & other entity details and data which are FHIR compliant and uses core FHIR entities
+
+
+2. Whatsapp based appointment booking flow & other PRM constructs as is inside: "/Users/paruljuniwal/kuzushi_labs/healthcare/prm"
+
+3. Voice agent platform as developed inside the folder: "/Users/paruljuniwal/kuzushi_labs/zucol/zoice" for backend | "/Users/paruljuniwal/kuzushi_labs/zucol/zoice-web" for frontend
+
+4. A PRM dashboard/frontend with an AI assistant with text and audio chat on the dashboard which basically takes in a set of unstructured textual instructions and performs form filling and other steps.
+
+eg: "For patient with phone number 9844111173, book an appointment with Dr. Rajiv Sharma of crdiology for 10AM tomorrow" -> uses LLM to convert to structured response and make the CRM/PRM updates in database alonside opportunity creation and doing regular PRM stuff.
+
+This UI/dashbaord has not been built out yet. You need to create a detailed plan to build this as well.
+
+5. For the first and most important task - utilise the folders and the context I have given you to do the following:
+
+- reconcile the backend for PRM in the folder "/Users/paruljuniwal/kuzushi_labs/healthcare/prm" with the larger more comprehensive PRM vision with EHR integration in "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/backend/services/prm-service"
+
+By reconcile, I mean - go through systematically though their constructus -> api routes, schemas, controller, database interaction layer, database models etc and ensure everything in the prm folder is included and part of healthtech-redefined project. 
+
+We will then deprecate prm folder.
+
+- Ensure everything is world class. Going forward we will treat "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/backend" as the north star
+
+- Copy the code from prm folder if you need to into the healthtech-redefined folder - eg - around whatsapp and other capabilties. Do not leave behind anything
+
+6. Also, the healthtech-redefined/backend/services/prm-service is a monolith file/fodler. refactor and break it down into smaller logical setup alongwith bringing code from the prm folder into it.
+
+7. Do not make any changes in the zucol/zoice voice agents. Just think of it this way -> the voice agent based telephony platform is an ingress into the system. It outputs -> call recording, call transcription and extracts data from the transcription. For the PRM, it should be able to receive these peices of information through a webhook and then take actions within itself. The voice agent platfrom is an ingress and does not need to be modified or changes at all. Just definee clean interfaces through webhook.
+
+8. There no frontend in place yet.
+You need to plan the roadmap for building a webapp based frontend for this CRM/PRM.
+This needs to have an AI assistant companion with text and voice capabilities similar to chitchat (do not write any code for this) - just put it in the roadmap and we will reuse the construcuts developed in chitchat. Just mark it as a chitchat integration.
+
+</Requirments>
+
+
+
+

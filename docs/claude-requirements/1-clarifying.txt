@@ -1,0 +1,227 @@
+Clarifying Questions
+
+  1. WhatsApp Chat Ingress System
+
+  About the System:
+  - Is this an existing/separate system that's already built, or should I design it from scratch?
+  - What's the current architecture? (Does it use WhatsApp Business API directly, or is there a
+  middleware?)
+  - Does it have an existing API/webhooks I can integrate with?
+
+  <Answer>: It is an existing system - you can see more of it in "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/backend/services/prm-service". remember - we reconciled and implemented the prm project and its twilio based whatsapp flow into this.
+
+  Data Flow:
+  - When a patient sends a WhatsApp message, should it:
+    - Appear in the PRM Dashboard Communications tab?
+    - Trigger notifications for providers?
+    - Be stored in the PRM database or just synced?
+    <Answer> - for now -> it should simply be the user -> whatsapp -> twilio -> n8n based whatsapp chatbot -> PRM database. We can build an entire flow of show conversation threads patient wise to show it in the PRM dashboard and integrate with the AI assistant to be able to respond to it if needed. Think very carefully and plan out the development of this feature. it does not have to be a two way conversation thread right now.
+
+  - When a provider sends a message from PRM, should it:
+    - Go through this WhatsApp ingress system?
+    - Or directly to WhatsApp Business API?
+    - Support two-way conversation threading?
+    <Answer>: this should go back via the twilio setup but this is not needed right now
+    
+
+  Integration Points:
+  - Should patient messages automatically create/update patient records?
+  - Should appointment-related messages auto-create appointments?
+  - Should the AI Assistant be able to read WhatsApp conversation history?
+  <Answer>: Yes to all - but this is already a separate n8n based agentic flow which is doing this - user -> whatsapp -> twilio -> n8n based whatsapp chatbot -> PRM database | PRM dashboard is only reading and updating this info from the UI from a CRM perspective
+
+  2. Zucol/Zoice Voice Agents
+
+  About the System:
+  - Are Zucol/Zoice existing voice AI platforms you're using?
+  - What do they currently handle?
+    - Inbound calls from patients?
+    - Appointment booking via voice?
+    - Patient queries/FAQs?
+    - Appointment reminders via outbound calls?
+    <Answer>: They are a fully built platform. We had added a webhook based mechanism to receive data for every call from them. DO NOT REBUILD IT OR CHANGE ANYTHING. You can know more about this product at : "/Users/paruljuniwal/kuzushi_labs/zucol/zoice"
+
+  Data Generated:
+  - What data should sync to PRM?
+    - Call logs (who called, when, duration)?
+    - Call transcripts?
+    - Call recordings (audio)?
+    - Booked appointments?
+    - Patient intent/sentiment?
+    <Answer>: Everything. Think of a comprehensive structure. keep it consistnent with the backend and dtabase.
+
+  Integration Points:
+  - When voice agent books an appointment, should it:
+    - Automatically create in PRM database?
+    - Send webhook to PRM?
+    - Wait for manual confirmation?
+
+    <Answer>: Automatically update -> this is done via toolcall through the zucol/zoice agent -> we need to expose apis for this to be called an updated
+
+  - Should PRM admins be able to:
+    - View call history per patient?
+    - Listen to call recordings?
+    - See call transcripts?
+    - Trigger outbound calls from PRM?
+
+    <Answer>: Yes to all of it. They should be integrated with "/Users/paruljuniwal/kuzushi_labs/zucol/zoice"
+
+  3. Integration Architecture
+
+  Preferred Method:
+  Which integration approach do you prefer?
+
+  Option A: Webhooks (Loose Coupling - Recommended) <Answer>: This is recommended.
+  - WhatsApp ingress sends webhooks to PRM on new messages
+  - Voice agent sends webhooks on call completion/appointment booking
+  - PRM sends webhooks to these systems when actions occur
+  - ✅ Pros: Decoupled, scalable, fault-tolerant
+  - ⚠️ Cons: Eventual consistency, need webhook security
+
+  Option B: Shared Database
+  - All systems write to same PostgreSQL database
+  - PRM reads from shared tables
+  - ⚠️ Cons: Tight coupling, harder to maintain
+
+  Option C: API Gateway/Service Mesh
+  - PRM calls APIs on WhatsApp/Voice systems
+  - Those systems call PRM APIs
+  - ✅ Pros: Real-time, synchronous
+  - ⚠️ Cons: More complex, tighter coupling
+
+  My Recommendation: Webhooks + API calls (hybrid) - Accepted
+  - Use webhooks for async events (new message, call completed)
+  - Use API calls for real-time needs (send message, make call)
+
+  4. Analytics & Reporting Requirements
+
+  Metrics Needed:
+  Please confirm/expand on these:
+
+  Appointment Analytics:
+  - Total appointments (by day/week/month/quarter)
+  - Appointments by status (scheduled/completed/cancelled/no-show)
+  - Appointments by type (checkup/consultation/procedure)
+  - Appointments by provider
+  - Appointment booking sources (PRM/WhatsApp/Voice/Web)
+  - Average wait time
+  - No-show rates
+  - Peak appointment times
+  <Answer> : All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+  Journey Analytics:
+  - Total active journeys
+  - Journeys by type (post-surgery/chronic/wellness)
+  - Journey completion rates
+  - Average journey duration
+  - Overdue steps
+  - Journey progress distribution
+  - Patient engagement by journey
+  <Answer> : All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+
+
+  Communication Analytics:
+  - Messages sent (by channel: WhatsApp/SMS/Email/Voice)
+  - Response rates
+  - Average response time
+  - Communication volume trends
+  - Patient engagement scores
+  <Answer> : All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+
+  Voice/Call Analytics:
+  - Total calls handled
+  - Average call duration
+  - Call outcomes (appointment booked/query answered/transferred)
+  - Voice AI success rate
+  - Call recordings accessed
+  <Answer> : All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+
+  Patient Analytics:
+  - Total patients
+  - New patients (by time period)
+  - Active vs inactive
+  - Patient demographics
+  - Patient engagement levels
+  - High-risk patients
+  <Answer> : All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+
+  Are there other specific metrics you need?
+
+  5. Dashboard & Reporting
+
+  Real-time Dashboards:
+  Should the PRM have interactive dashboards showing:
+  - Today's appointments overview
+  - Active journeys status
+  - Recent communications
+  - Call/message volume graphs
+  - Provider workload
+  - System health metrics
+  <Answer> : YEs! You can implement a pub sub or some other realtime mechanism for this.
+  
+  All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+
+  Scheduled Reports:
+  Should admins be able to:
+  - Generate weekly/monthly reports?
+  - Export reports (PDF/CSV/Excel)?
+  - Schedule automated report emails?
+  - Custom date range reports?
+  <Answer> : All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+
+  AI-Powered Analytics:
+  Should the AI Assistant be able to:
+  - Answer questions like "How many appointments do I have next week?"
+  - Generate insights like "Your no-show rate increased 15% this month"
+  - Provide recommendations like "Consider scheduling more slots on Tuesdays"
+  - Create custom reports via natural language?
+  <Answer> : All and make it more comprehensive. Also ensure the AI assistant in the PRM dashboard hs tools avaialble to be able to query these items when user requests it through text or voice
+
+
+  ---
+  📋 My Current Understanding
+
+  Integration Architecture I'm Planning:
+
+  ┌─────────────────────────────────────────────────────────┐
+  │                     PRM Dashboard                       │
+  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+  │  │ Web UI       │  │ AI Assistant │  │ Analytics    │ │
+  │  └──────────────┘  └──────────────┘  └──────────────┘ │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │           PRM Backend API                        │  │
+  │  │  - Patient Management                            │  │
+  │  │  - Appointment Management                        │  │
+  │  │  - Journey Management                            │  │
+  │  │  - Communication Hub (centralized)               │  │
+  │  │  - Analytics Engine                              │  │
+  │  └──────────────────────────────────────────────────┘  │
+  └─────────────────────────────────────────────────────────┘
+           │                    │                   │
+      Webhooks              Webhooks           Webhooks
+      + API Calls          + API Calls        + API Calls
+           │                    │                   │
+           ↓                    ↓                   ↓
+  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐
+  │  WhatsApp Chat  │  │ Zucol/Zoice     │  │  PostgreSQL  │
+  │  Ingress System │  │ Voice Agents    │  │  Database    │
+  │                 │  │                 │  │              │
+  │ - Receives msgs │  │ - Handles calls │  │ - All data   │
+  │ - Sends msgs    │  │ - Books appts   │  │ - Analytics  │
+  │ - Webhooks      │  │ - Transcripts   │  │ - Reports    │
+  └─────────────────┘  └─────────────────┘  └──────────────┘
+
+  Data Flow Example:
+  1. Patient calls → Zucol/Zoice handles → Books appointment → Webhook to PRM → Appointment created in
+   DB → Confirmation sent via WhatsApp Chat Ingress
+  2. Admin sends message in PRM → API call to WhatsApp Chat Ingress → Message delivered → Delivery
+  status webhook back to PRM
+  3. Patient sends WhatsApp → Chat Ingress receives → Webhook to PRM → Message logged → AI suggests
+  response
+
