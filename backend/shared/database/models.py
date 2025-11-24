@@ -647,6 +647,108 @@ class EventLog(Base):
     )
 
 
+class StoredEvent(Base):
+    """
+    Event store for event sourcing pattern
+    Stores domain events for aggregate reconstruction and event replay
+    """
+
+    __tablename__ = "stored_events"
+
+    event_id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+
+    # Aggregate Information
+    aggregate_type = Column(String(100), nullable=False)  # Patient, Appointment, Order, etc.
+    aggregate_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    version = Column(Integer, nullable=False)  # Version of aggregate when event occurred
+
+    # Event Details
+    event_type = Column(String(100), nullable=False)  # Patient.Created, etc.
+    event_data = Column(JSONB, nullable=False)  # Event payload
+
+    # Metadata
+    occurred_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    metadata = Column(JSONB, default=dict)
+
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index("idx_stored_events_aggregate", "aggregate_id", "version"),
+        Index("idx_stored_events_type", "event_type", "occurred_at"),
+        Index("idx_stored_events_tenant", "tenant_id", "occurred_at"),
+        # Unique constraint to prevent duplicate versions
+        Index("idx_stored_events_unique_version", "aggregate_id", "version", unique=True),
+    )
+
+
+class AggregateSnapshot(Base):
+    """
+    Snapshots of aggregate state for performance optimization
+    Allows rebuilding aggregates without replaying all events
+    """
+
+    __tablename__ = "aggregate_snapshots"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+
+    # Aggregate Information
+    aggregate_type = Column(String(100), nullable=False)
+    aggregate_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    version = Column(Integer, nullable=False)  # Version at which snapshot was taken
+
+    # Snapshot Data
+    state = Column(JSONB, nullable=False)  # Complete aggregate state
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_aggregate_snapshots_aggregate", "aggregate_id", "version"),
+        Index("idx_aggregate_snapshots_type", "aggregate_type", "created_at"),
+    )
+
+
+class FailedEvent(Base):
+    """
+    Dead Letter Queue for events that failed to process
+    Stores failed events for debugging and retry
+    """
+
+    __tablename__ = "failed_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+
+    # Original Event Information
+    event_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    event_type = Column(String(100), nullable=False)
+    event_payload = Column(JSONB, nullable=False)
+
+    # Failure Information
+    error_type = Column(String(255), nullable=False)
+    error_message = Column(Text)
+    retry_count = Column(Integer, nullable=False, default=0)
+    failed_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+
+    # Retry Status
+    retried = Column(Boolean, nullable=False, default=False)
+    retried_at = Column(DateTime(timezone=True))
+    resolved = Column(Boolean, nullable=False, default=False)
+    resolved_at = Column(DateTime(timezone=True))
+
+    # Metadata
+    metadata = Column(JSONB, default=dict)
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_failed_events_type", "event_type", "failed_at"),
+        Index("idx_failed_events_status", "resolved", "failed_at"),
+        Index("idx_failed_events_tenant", "tenant_id", "failed_at"),
+    )
+
+
 # ============================================================================
 # PHASE 2: SCHEDULING & APPOINTMENTS
 # ============================================================================

@@ -1,0 +1,11 @@
+You have identified all the gaps as in : "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/docs/gaps" folder.
+
+You need to come up with an extensive excrutiatingly detialed epic -> user stories -> task roadmap to ensure all the gaps are covered properly and addressed.
+
+You must ultrathink, use parallel subagents or sub-agents if you need to.
+Write all the output of the roadmap and implementation instructions in the folder : "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/docs/implement"
+
+Think in terms of world class engineering standards, practices and processes.
+Focus first on building out the entire setup.
+Push the security hardening etc to later phases.
+First let us build out everything first

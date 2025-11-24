@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.shared.database.session import get_db
+from shared.auth.webhooks import verify_webhook_secret, verify_api_key
 from .schemas import (
     VoiceAgentWebhookRequest,
     VoiceCallWebhookResponse,
@@ -51,21 +52,20 @@ def receive_voice_call_webhook(
 
     **Webhook Configuration in Zucol/Zoice:**
     ```
-    URL: https://api.healthtech.com/api/v1/voice/webhook
+    URL: https://api.healthtech.com/api/v1/prm/voice/webhook
     Method: POST
     Headers:
       X-Tenant-Id: <your-tenant-id>
       X-Webhook-Secret: <your-secret>
+    Environment Variable: ZOICE_WEBHOOK_SECRET=your-secret-key-here
     ```
     """
-    # TODO: Verify webhook secret
-    # import os
-    # expected_secret = os.getenv("ZOICE_WEBHOOK_SECRET")
-    # if x_webhook_secret != expected_secret:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Invalid webhook secret"
-    #     )
+    # Verify webhook secret
+    verify_webhook_secret(
+        x_webhook_secret,
+        "ZOICE_WEBHOOK_SECRET",
+        "Zucol/Zoice"
+    )
 
     service = get_voice_webhook_service(db)
     return service.process_call_webhook(webhook, x_tenant_id)
@@ -109,10 +109,12 @@ def lookup_patient(
       }
     }
     ```
+
+    **Security:**
+    Set ZOICE_API_KEY environment variable with the API key.
     """
-    # TODO: Verify API key
-    # if not verify_api_key(x_api_key):
-    #     raise HTTPException(status_code=401, detail="Invalid API key")
+    # Verify API key
+    verify_api_key(x_api_key, "ZOICE_API_KEY", "Zucol/Zoice Tool")
 
     service = get_voice_webhook_service(db)
     return service.lookup_patient(request)
@@ -159,6 +161,9 @@ def get_available_slots(
     }
     ```
     """
+    # Verify API key
+    verify_api_key(x_api_key, "ZOICE_API_KEY", "Zucol/Zoice Tool")
+
     service = get_voice_webhook_service(db)
     return service.get_available_slots(request)
 
@@ -207,6 +212,9 @@ def book_appointment(
     }
     ```
     """
+    # Verify API key
+    verify_api_key(x_api_key, "ZOICE_API_KEY", "Zucol/Zoice Tool")
+
     service = get_voice_webhook_service(db)
     return service.book_appointment(request)
 

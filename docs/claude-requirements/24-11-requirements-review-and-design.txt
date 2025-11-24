@@ -1,0 +1,5 @@
+You are tasked with:
+1. Perform ultrathink and do a deep dive into the implementation so far based on claude.md context.
+2. Identify the gaps and provide a detailed analysis in the folder: "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/docs/gaps"
+
+3. Based on these gaps, identified, we will then design a roadmap for the next phase of the project.

@@ -1,0 +1,77 @@
+# Prometheus Configuration for Event-Driven Architecture Monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'healthtech'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Kafka JMX Metrics
+  - job_name: 'kafka-broker-1'
+    static_configs:
+      - targets: ['kafka-1:9999']
+        labels:
+          broker_id: '1'
+
+  - job_name: 'kafka-broker-2'
+    static_configs:
+      - targets: ['kafka-2:9999']
+        labels:
+          broker_id: '2'
+
+  - job_name: 'kafka-broker-3'
+    static_configs:
+      - targets: ['kafka-3:9999']
+        labels:
+          broker_id: '3'
+
+  # Application services
+  - job_name: 'prm-service'
+    static_configs:
+      - targets: ['prm-service:8007']
+    metrics_path: '/metrics'
+
+  - job_name: 'fhir-service'
+    static_configs:
+      - targets: ['fhir-service:8002']
+    metrics_path: '/metrics'
+
+  - job_name: 'identity-service'
+    static_configs:
+      - targets: ['identity-service:8001']
+    metrics_path: '/metrics'
+
+  # Elasticsearch
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    metrics_path: '/_prometheus/metrics'
+
+  # PostgreSQL Exporter (if added)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Redis Exporter (if added)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']

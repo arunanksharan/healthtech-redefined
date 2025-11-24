@@ -48,6 +48,8 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_SERVERS: zookeeper:2888:3888
     ports:
       - "2181:2181"
     volumes:
@@ -56,30 +58,143 @@ services:
     networks:
       - healthtech-network
 
-  kafka:
+  kafka-1:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: healthtech-kafka
+    container_name: healthtech-kafka-1
     depends_on:
       - zookeeper
     ports:
       - "9092:9092"
-      - "9093:9093"
+      - "19092:19092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9093,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9093,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_HOURS: 720
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_COMPRESSION_TYPE: gzip
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka-1
     volumes:
-      - kafka_data:/var/lib/kafka/data
+      - kafka_1_data:/var/lib/kafka/data
     healthcheck:
       test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - healthtech-network
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: healthtech-kafka-2
+    depends_on:
+      - zookeeper
+    ports:
+      - "9094:9094"
+      - "19093:19093"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9093,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 720
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_COMPRESSION_TYPE: gzip
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka-2
+    volumes:
+      - kafka_2_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9094"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: healthtech-kafka-3
+    depends_on:
+      - zookeeper
+    ports:
+      - "9095:9095"
+      - "19094:19094"
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9093,PLAINTEXT_HOST://localhost:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 720
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_COMPRESSION_TYPE: gzip
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka-3
+    volumes:
+      - kafka_3_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9095"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: healthtech-schema-registry
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks:
+      - healthtech-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: healthtech-kafka-ui
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: healthtech-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9999
     networks:
       - healthtech-network
 
@@ -94,7 +209,7 @@ services:
     container_name: healthtech-identity-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       REDIS_URL: redis://redis:6379
       ENV: development
@@ -104,7 +219,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -121,7 +236,7 @@ services:
     container_name: healthtech-fhir-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       REDIS_URL: redis://redis:6379
       ENV: development
@@ -131,7 +246,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -146,7 +261,7 @@ services:
     container_name: healthtech-consent-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       REDIS_URL: redis://redis:6379
       ENV: development
@@ -156,7 +271,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -171,7 +286,7 @@ services:
     container_name: healthtech-auth-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       REDIS_URL: redis://redis:6379
       JWT_SECRET_KEY: your-secret-key-change-in-production-please
@@ -204,7 +319,7 @@ services:
     container_name: healthtech-scheduling-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -213,7 +328,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -228,7 +343,7 @@ services:
     container_name: healthtech-encounter-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -237,7 +352,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -252,7 +367,7 @@ services:
     container_name: healthtech-prm-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -261,7 +376,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -300,7 +415,7 @@ services:
     container_name: healthtech-bed-management-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -309,7 +424,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -324,7 +439,7 @@ services:
     container_name: healthtech-admission-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -333,7 +448,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -348,7 +463,7 @@ services:
     container_name: healthtech-nursing-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -357,7 +472,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -372,7 +487,7 @@ services:
     container_name: healthtech-orders-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -381,7 +496,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -396,7 +511,7 @@ services:
     container_name: healthtech-icu-service
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/healthtech
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
       KAFKA_ENABLED: "true"
       ENV: development
       LOG_LEVEL: DEBUG
@@ -405,7 +520,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka:
+      kafka-1:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -450,6 +565,48 @@ services:
       - healthtech-network
 
   # ============================================================================
+  # EVENT ANALYTICS & SEARCH
+  # ============================================================================
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: healthtech-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - http.cors.enabled=true
+      - http.cors.allow-origin="*"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: healthtech-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_NAME: healthtech-kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - kibana_data:/usr/share/kibana/data
+    networks:
+      - healthtech-network
+
+  # ============================================================================
   # DATABASE ADMIN TOOLS
   # ============================================================================
 
@@ -478,7 +635,11 @@ volumes:
     driver: local
   redis_data:
     driver: local
-  kafka_data:
+  kafka_1_data:
+    driver: local
+  kafka_2_data:
+    driver: local
+  kafka_3_data:
     driver: local
   zookeeper_data:
     driver: local
@@ -487,6 +648,10 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  kibana_data:
     driver: local
   pgadmin_data:
     driver: local
