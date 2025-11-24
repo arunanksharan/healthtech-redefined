@@ -59,14 +59,14 @@ async def get_capability_statement():
     capability = {
         "resourceType": "CapabilityStatement",
         "status": "active",
-        "date": "2024-11-24",
+        "date": "2024-11-25",
         "kind": "instance",
         "software": {
             "name": "PRM FHIR Server",
             "version": "1.0.0"
         },
         "implementation": {
-            "description": "PRM FHIR R4 Server",
+            "description": "PRM FHIR R4 Server - 15+ Core Resources",
             "url": "/fhir"
         },
         "fhirVersion": "4.0.1",
@@ -103,8 +103,11 @@ async def get_capability_statement():
                             {"code": "create"},
                             {"code": "update"},
                             {"code": "delete"},
-                            {"code": "search-type"}
-                        ]
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
                     },
                     {
                         "type": "Organization",
@@ -113,8 +116,11 @@ async def get_capability_statement():
                             {"code": "create"},
                             {"code": "update"},
                             {"code": "delete"},
-                            {"code": "search-type"}
-                        ]
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
                     },
                     {
                         "type": "Encounter",
@@ -122,8 +128,12 @@ async def get_capability_statement():
                             {"code": "read"},
                             {"code": "create"},
                             {"code": "update"},
-                            {"code": "search-type"}
-                        ]
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
                     },
                     {
                         "type": "Observation",
@@ -131,8 +141,12 @@ async def get_capability_statement():
                             {"code": "read"},
                             {"code": "create"},
                             {"code": "update"},
-                            {"code": "search-type"}
-                        ]
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
                     },
                     {
                         "type": "Condition",
@@ -140,8 +154,123 @@ async def get_capability_statement():
                             {"code": "read"},
                             {"code": "create"},
                             {"code": "update"},
-                            {"code": "search-type"}
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
+                    },
+                    {
+                        "type": "Location",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
+                    },
+                    {
+                        "type": "Procedure",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
+                    },
+                    {
+                        "type": "MedicationRequest",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
+                    },
+                    {
+                        "type": "AllergyIntolerance",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
+                    },
+                    {
+                        "type": "CodeSystem",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
+                    },
+                    {
+                        "type": "ValueSet",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True,
+                        "operation": [
+                            {"name": "expand", "definition": "http://hl7.org/fhir/OperationDefinition/ValueSet-expand"},
+                            {"name": "validate-code", "definition": "http://hl7.org/fhir/OperationDefinition/ValueSet-validate-code"}
                         ]
+                    },
+                    {
+                        "type": "ConceptMap",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True,
+                        "operation": [
+                            {"name": "translate", "definition": "http://hl7.org/fhir/OperationDefinition/ConceptMap-translate"}
+                        ]
+                    },
+                    {
+                        "type": "Subscription",
+                        "interaction": [
+                            {"code": "read"},
+                            {"code": "create"},
+                            {"code": "update"},
+                            {"code": "delete"},
+                            {"code": "search-type"},
+                            {"code": "history-instance"}
+                        ],
+                        "versioning": "versioned",
+                        "readHistory": True
                     }
                 ]
             }

@@ -4,7 +4,7 @@ An interaction during which services are provided to the patient
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import Field
 from enum import Enum
 
@@ -155,7 +155,7 @@ class Encounter(FHIRResource):
     An interaction between a patient and healthcare provider(s) for the purpose of providing healthcare service(s) or assessing the health status of a patient.
     """
 
-    resourceType: str = Field("Encounter", const=True)
+    resourceType: Literal["Encounter"] = "Encounter"
 
     # Identifiers
     identifier: Optional[List[Identifier]] = Field(
@@ -334,12 +334,5 @@ class Encounter(FHIRResource):
 
 # Import Quantity after defining Encounter to avoid circular import
 from .base import Quantity
-Encounter.update_forward_refs(Quantity=Quantity)
 
 # Update forward references
-EncounterStatusHistory.update_forward_refs()
-EncounterParticipant.update_forward_refs()
-EncounterDiagnosis.update_forward_refs()
-EncounterHospitalization.update_forward_refs()
-EncounterLocation.update_forward_refs()
-EncounterClassHistory.update_forward_refs()

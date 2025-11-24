@@ -4,8 +4,8 @@ Demographics and other administrative information about an individual receiving 
 """
 
 from datetime import date, datetime
-from typing import List, Optional, Union
-from pydantic import Field, validator
+from typing import List, Optional, Union, Literal
+from pydantic import Field
 from enum import Enum
 
 from .base import (
@@ -71,7 +71,7 @@ class Patient(FHIRResource):
     Demographics and other administrative information about an individual or animal receiving care or other health-related services.
     """
 
-    resourceType: str = Field("Patient", const=True)
+    resourceType: Literal["Patient"] = "Patient"
 
     # Identifiers
     identifier: Optional[List[Identifier]] = Field(
@@ -177,21 +177,6 @@ class Patient(FHIRResource):
         description="Link to another patient resource that concerns the same actual person"
     )
 
-    @validator('birthDate')
-    def validate_birth_date(cls, v):
-        """Validate birth date is not in the future"""
-        if v and v > date.today():
-            raise ValueError('Birth date cannot be in the future')
-        return v
-
-    @validator('deceasedDateTime')
-    def validate_deceased_date(cls, v, values):
-        """Validate deceased date is after birth date"""
-        if v and 'birthDate' in values and values['birthDate']:
-            if v.date() < values['birthDate']:
-                raise ValueError('Deceased date cannot be before birth date')
-        return v
-
     class Config:
         schema_extra = {
             "example": {
@@ -235,8 +220,3 @@ class Patient(FHIRResource):
         }
 
 
-# Update forward references
-PatientContact.update_forward_refs()
-PatientCommunication.update_forward_refs()
-PatientLink.update_forward_refs()
-Patient.update_forward_refs()

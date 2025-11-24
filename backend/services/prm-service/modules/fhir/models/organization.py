@@ -3,7 +3,7 @@ FHIR R4 Organization Resource
 Formally or informally recognized grouping of people or organizations
 """
 
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import Field
 
 from .base import (
@@ -43,7 +43,7 @@ class Organization(FHIRResource):
     A formally or informally recognized grouping of people or organizations formed for the purpose of achieving some form of collective action.
     """
 
-    resourceType: str = Field("Organization", const=True)
+    resourceType: Literal["Organization"] = "Organization"
 
     # Identifiers
     identifier: Optional[List[Identifier]] = Field(
@@ -149,5 +149,3 @@ class Organization(FHIRResource):
 
 
 # Update forward references
-OrganizationContact.update_forward_refs()
-Organization.update_forward_refs()

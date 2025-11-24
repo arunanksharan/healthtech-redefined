@@ -4,7 +4,7 @@ Healthcare professionals and their roles
 """
 
 from datetime import date
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import Field
 
 from .base import (
@@ -47,7 +47,7 @@ class Practitioner(FHIRResource):
     A person who is directly or indirectly involved in the provisioning of healthcare.
     """
 
-    resourceType: str = Field("Practitioner", const=True)
+    resourceType: Literal["Practitioner"] = "Practitioner"
 
     # Identifiers
     identifier: Optional[List[Identifier]] = Field(
@@ -189,7 +189,7 @@ class PractitionerRole(FHIRResource):
     A specific set of Roles/Locations/specialties/services that a practitioner may perform at an organization.
     """
 
-    resourceType: str = Field("PractitionerRole", const=True)
+    resourceType: Literal["PractitionerRole"] = "PractitionerRole"
 
     # Identifiers
     identifier: Optional[List[Identifier]] = Field(
@@ -309,8 +309,3 @@ class PractitionerRole(FHIRResource):
 
 
 # Update forward references
-PractitionerQualification.update_forward_refs()
-Practitioner.update_forward_refs()
-PractitionerRoleAvailableTime.update_forward_refs()
-PractitionerRoleNotAvailable.update_forward_refs()
-PractitionerRole.update_forward_refs()

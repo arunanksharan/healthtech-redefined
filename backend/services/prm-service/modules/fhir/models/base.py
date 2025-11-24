@@ -336,5 +336,3 @@ class FHIRResource(BaseModel):
 
 
 # Update forward references
-Identifier.update_forward_refs()
-Reference.update_forward_refs()

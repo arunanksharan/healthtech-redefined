@@ -4,7 +4,7 @@ A clinical condition, problem, diagnosis, or other event, situation, issue, or c
 """
 
 from datetime import datetime, date
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import Field
 from enum import Enum
 
@@ -73,7 +73,7 @@ class Condition(FHIRResource):
     A clinical condition, problem, diagnosis, or other event, situation, issue, or clinical concept that has risen to a level of concern.
     """
 
-    resourceType: str = Field("Condition", const=True)
+    resourceType: Literal["Condition"] = "Condition"
 
     # Identifiers
     identifier: Optional[List[Identifier]] = Field(
@@ -263,6 +263,3 @@ class Condition(FHIRResource):
 
 
 # Update forward references
-ConditionStage.update_forward_refs()
-ConditionEvidence.update_forward_refs()
-Condition.update_forward_refs()

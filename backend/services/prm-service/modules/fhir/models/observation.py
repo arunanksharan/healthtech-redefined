@@ -4,7 +4,7 @@ Measurements and simple assertions made about a patient
 """
 
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Literal
 from pydantic import Field
 from enum import Enum
 
@@ -102,7 +102,7 @@ class Observation(FHIRResource):
     Measurements and simple assertions made about a patient, device or other subject.
     """
 
-    resourceType: str = Field("Observation", const=True)
+    resourceType: Literal["Observation"] = "Observation"
 
     # Identifiers
     identifier: Optional[List[Identifier]] = Field(
@@ -320,6 +320,3 @@ class Observation(FHIRResource):
 
 
 # Update forward references
-ObservationReferenceRange.update_forward_refs()
-ObservationComponent.update_forward_refs()
-Observation.update_forward_refs()
