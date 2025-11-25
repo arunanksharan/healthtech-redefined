@@ -79,6 +79,21 @@ class TokenTypeSchema(str, Enum):
     REFRESH = "refresh"
 
 
+class SDKLanguage(str, Enum):
+    """Supported SDK languages"""
+    TYPESCRIPT = "typescript"
+    PYTHON = "python"
+    JAVA = "java"
+    CSHARP = "csharp"
+
+
+class ReviewDecision(str, Enum):
+    """App review decision"""
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    NEEDS_CHANGES = "needs_changes"
+
+
 # ============================================================================
 # Developer Organization Schemas
 # ============================================================================
@@ -886,3 +901,265 @@ class AuditLogListResponse(BaseModel):
     """List of audit logs"""
     items: List[AuditLogResponse]
     total: int
+
+
+# ============================================================================
+# Additional Token Request Schemas
+# ============================================================================
+
+class TokenExchangeRequest(BaseModel):
+    """Token exchange request for authorization code flow"""
+    grant_type: str
+    code: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    code_verifier: Optional[str] = None
+
+
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request"""
+    grant_type: str
+    refresh_token: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    scope: Optional[str] = None
+
+
+class ClientCredentialsRequest(BaseModel):
+    """Client credentials grant request"""
+    grant_type: str
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    scope: Optional[str] = None
+
+
+# ============================================================================
+# Consent Schemas (Additional)
+# ============================================================================
+
+class ConsentCreate(BaseModel):
+    """Create consent (alias for ConsentGrant with additional fields)"""
+    scopes: List[str]
+    patient_id: Optional[UUID] = None
+
+
+# ============================================================================
+# App Installation Schemas (Additional)
+# ============================================================================
+
+class AppInstallationCreate(BaseModel):
+    """Create app installation"""
+    scopes: List[str] = Field(default=[])
+    configuration: Optional[Dict[str, Any]] = None
+
+
+class AppInstallationResponse(BaseModel):
+    """App installation response"""
+    id: UUID
+    marketplace_app_id: UUID
+    tenant_id: UUID
+    status: str
+    granted_scopes: List[str]
+    configured_scopes: List[str]
+    installed_by: Optional[UUID]
+    installed_version: Optional[str]
+    configuration: Dict[str, Any]
+    last_used_at: Optional[datetime]
+    api_calls_count: int
+    installed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AppInstallationUpdate(BaseModel):
+    """Update app installation"""
+    scopes: Optional[List[str]] = None
+    configuration: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+
+
+# ============================================================================
+# App Search Schemas
+# ============================================================================
+
+class AppSearchFilters(BaseModel):
+    """App search filters"""
+    query: Optional[str] = None
+    category: Optional[AppCategorySchema] = None
+    is_free: Optional[bool] = None
+    min_rating: Optional[float] = None
+    is_featured: Optional[bool] = None
+    smart_on_fhir_only: Optional[bool] = None
+    sort_by: str = "popularity"
+
+
+# ============================================================================
+# App Submission Schemas
+# ============================================================================
+
+class AppSubmissionCreate(BaseModel):
+    """Create app submission for marketplace"""
+    application_id: UUID
+    display_name: str = Field(..., max_length=200)
+    short_description: str = Field(..., max_length=300)
+    long_description: Optional[str] = None
+    tagline: Optional[str] = Field(None, max_length=100)
+    category: AppCategorySchema = AppCategorySchema.OTHER
+    subcategory: Optional[str] = None
+    tags: List[str] = Field(default=[])
+    icon_url: Optional[str] = None
+    banner_url: Optional[str] = None
+    screenshots: List[Dict[str, str]] = Field(default=[])
+    video_url: Optional[str] = None
+    documentation_url: Optional[str] = None
+    support_email: Optional[EmailStr] = None
+    is_free: bool = True
+    pricing_model: Optional[str] = None
+    price_monthly: Optional[Decimal] = None
+    price_annual: Optional[Decimal] = None
+    required_scopes: List[str] = Field(default=[])
+    optional_scopes: List[str] = Field(default=[])
+
+
+class AppSubmissionResponse(BaseModel):
+    """App submission response"""
+    id: UUID
+    application_id: UUID
+    organization_id: UUID
+    display_name: str
+    short_description: str
+    status: str
+    category: str
+    is_free: bool
+    submitted_at: Optional[datetime]
+    reviewed_at: Optional[datetime]
+    reviewer_notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SubmissionReviewCreate(BaseModel):
+    """Review submission decision"""
+    decision: ReviewDecision
+    review_notes: Optional[str] = None
+
+
+# ============================================================================
+# Version Rollout Schemas
+# ============================================================================
+
+class VersionRollout(BaseModel):
+    """Version rollout configuration"""
+    initial_percentage: int = Field(100, ge=0, le=100)
+
+
+# ============================================================================
+# Publisher Dashboard Schemas
+# ============================================================================
+
+class PublisherDashboard(BaseModel):
+    """Publisher dashboard data"""
+    organization_id: UUID
+    total_apps: int
+    published_apps: int
+    pending_reviews: int
+    total_installs: int
+    total_reviews: int
+    average_rating: float
+    monthly_api_calls: int
+    apps: List[Dict[str, Any]]
+    recent_reviews: List[Dict[str, Any]]
+    install_trend: List[Dict[str, Any]]
+
+
+# ============================================================================
+# SDK Documentation Schemas
+# ============================================================================
+
+class CodeSample(BaseModel):
+    """Code sample for SDK documentation"""
+    title: str
+    description: str
+    language: SDKLanguage
+    code: str
+    dependencies: List[str] = Field(default=[])
+
+
+class SDKDocumentation(BaseModel):
+    """SDK documentation response"""
+    language: SDKLanguage
+    package_name: str
+    installation: str
+    quick_start: str
+    api_reference_url: str
+    github_url: str
+    examples: List[CodeSample] = Field(default=[])
+
+
+# ============================================================================
+# API Usage Schemas (Additional)
+# ============================================================================
+
+class APIUsageLogCreate(BaseModel):
+    """Create API usage log entry"""
+    endpoint: str
+    method: str
+    status_code: int
+    response_time_ms: int
+    request_size_bytes: Optional[int] = None
+    response_size_bytes: Optional[int] = None
+    error_message: Optional[str] = None
+    tenant_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None
+    patient_id: Optional[UUID] = None
+
+
+class APIUsageLogResponse(BaseModel):
+    """API usage log entry response"""
+    id: UUID
+    application_id: UUID
+    endpoint: str
+    method: str
+    status_code: int
+    response_time_ms: int
+    request_size_bytes: Optional[int]
+    response_size_bytes: Optional[int]
+    error_message: Optional[str]
+    tenant_id: Optional[UUID]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UsageAnalytics(BaseModel):
+    """Usage analytics response"""
+    total_requests: int
+    successful_requests: int
+    failed_requests: int
+    avg_response_time_ms: float
+    p50_response_time_ms: float
+    p95_response_time_ms: float
+    p99_response_time_ms: float
+    requests_by_endpoint: Dict[str, int]
+    requests_by_status: Dict[int, int]
+    requests_by_hour: List[Dict[str, Any]]
+    error_rate: float
+    top_errors: List[Dict[str, Any]]
+
+
+# ============================================================================
+# Paginated Response Schema
+# ============================================================================
+
+class PaginatedResponse(BaseModel):
+    """Generic paginated response"""
+    items: List[Any]
+    total: int
+    page: int
+    page_size: int
+    pages: int

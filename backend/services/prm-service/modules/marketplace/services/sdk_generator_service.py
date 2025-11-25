@@ -291,7 +291,8 @@ async function handleCallback(code: string, state: string) {{
     ) -> CodeSample:
         params_str = ""
         if parameters:
-            params_str = f"\n    params: {{{', '.join(f'{k}: "{v}"' for k, v in parameters.items())}}},"
+            param_items = ', '.join(f'{k}: "{v}"' for k, v in parameters.items())
+            params_str = f"\n    params: {{{param_items}}},"
 
         body_str = ""
         if request_body:
