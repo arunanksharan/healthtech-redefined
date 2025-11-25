@@ -35,6 +35,9 @@ from .code_system import CodeSystem
 from .value_set import ValueSet
 from .concept_map import ConceptMap
 from .subscription import Subscription
+from .service_request import ServiceRequest, SERVICE_REQUEST_SEARCH_PARAMS
+from .diagnostic_report import DiagnosticReport, DIAGNOSTIC_REPORT_SEARCH_PARAMS
+from .document_reference import DocumentReference, DOCUMENT_REFERENCE_SEARCH_PARAMS
 
 __all__ = [
     "FHIRResource",
@@ -67,4 +70,10 @@ __all__ = [
     "ValueSet",
     "ConceptMap",
     "Subscription",
+    "ServiceRequest",
+    "SERVICE_REQUEST_SEARCH_PARAMS",
+    "DiagnosticReport",
+    "DIAGNOSTIC_REPORT_SEARCH_PARAMS",
+    "DocumentReference",
+    "DOCUMENT_REFERENCE_SEARCH_PARAMS",
 ]
