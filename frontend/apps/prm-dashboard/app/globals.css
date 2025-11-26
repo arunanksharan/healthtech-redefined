@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    /* Base shadcn/ui variables */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -24,6 +25,48 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+
+    /* Semantic Colors */
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 100%;
+
+    /* Healthcare-Specific Colors */
+    --urgent: 0 72% 51%;
+    --scheduled: 258 90% 66%;
+    --completed: 160 84% 39%;
+    --cancelled: 220 9% 46%;
+    --pending: 38 92% 50%;
+
+    /* Sentiment Colors (for Zoice/WhatsApp) */
+    --sentiment-positive: 160 84% 39%;
+    --sentiment-neutral: 220 9% 46%;
+    --sentiment-negative: 0 84% 60%;
+    --sentiment-frustrated: 25 95% 53%;
+
+    /* Channel Colors */
+    --channel-voice: 258 90% 66%;
+    --channel-whatsapp: 142 70% 49%;
+    --channel-email: 221 83% 53%;
+    --channel-sms: 187 92% 43%;
+    --channel-app: 239 84% 67%;
+
+    /* Clinical Colors */
+    --vital-normal: 160 84% 39%;
+    --vital-warning: 38 92% 50%;
+    --vital-critical: 0 84% 60%;
+    --allergy-severe: 0 72% 51%;
+    --allergy-moderate: 38 92% 50%;
+    --allergy-mild: 45 93% 47%;
+
+    /* Layout dimensions */
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 64px;
+    --topbar-height: 64px;
+    --context-panel-width: 320px;
   }
 
   .dark {
@@ -46,6 +89,42 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    /* Semantic Colors - Dark */
+    --success: 160 72% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* Healthcare-Specific - Dark */
+    --urgent: 0 72% 55%;
+    --scheduled: 258 85% 70%;
+    --completed: 160 72% 45%;
+    --cancelled: 220 10% 55%;
+    --pending: 38 92% 55%;
+
+    /* Sentiment Colors - Dark */
+    --sentiment-positive: 160 72% 45%;
+    --sentiment-neutral: 220 10% 55%;
+    --sentiment-negative: 0 72% 55%;
+    --sentiment-frustrated: 25 90% 55%;
+
+    /* Channel Colors - Dark */
+    --channel-voice: 258 85% 70%;
+    --channel-whatsapp: 142 65% 55%;
+    --channel-email: 217 91% 60%;
+    --channel-sms: 187 85% 50%;
+    --channel-app: 239 80% 70%;
+
+    /* Clinical Colors - Dark */
+    --vital-normal: 160 72% 45%;
+    --vital-warning: 38 92% 55%;
+    --vital-critical: 0 72% 55%;
+    --allergy-severe: 0 72% 55%;
+    --allergy-moderate: 38 92% 55%;
+    --allergy-mild: 45 90% 50%;
   }
 }
 

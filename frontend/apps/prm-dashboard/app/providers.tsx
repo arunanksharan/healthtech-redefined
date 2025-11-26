@@ -2,6 +2,8 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { ToastProvider, ToastViewport } from "@/components/ui/toast";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Create a client with React 19 optimizations
@@ -21,7 +23,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <ThemeProvider defaultTheme="system" enableSystem>
+        <ToastProvider>
+          {children}
+          <ToastViewport />
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
