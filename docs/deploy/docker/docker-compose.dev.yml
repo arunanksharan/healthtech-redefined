@@ -1,0 +1,180 @@
+# HealthTech Development Docker Compose
+# Usage: docker compose -f docs/deploy/docker/docker-compose.dev.yml up -d
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # DATABASES
+  # ==========================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: healthtech-postgres-dev
+    environment:
+      POSTGRES_USER: healthtech
+      POSTGRES_PASSWORD: healthtech
+      POSTGRES_DB: healthtech
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthtech"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: healthtech-redis-dev
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  # ==========================================================================
+  # MESSAGE QUEUE (Kafka)
+  # ==========================================================================
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: healthtech-zookeeper-dev
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    healthcheck:
+      test: echo srvr | nc localhost 2181 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: healthtech-kafka-dev
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: kafka-topics --bootstrap-server localhost:9092 --list || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - healthtech-network
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: healthtech-schema-registry-dev
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+    networks:
+      - healthtech-network
+
+  # ==========================================================================
+  # MONITORING (Development)
+  # ==========================================================================
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: healthtech-kafka-ui-dev
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: healthtech-dev
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+    ports:
+      - "8090:8080"
+    networks:
+      - healthtech-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: healthtech-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@healthtech.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - healthtech-network
+
+  # ==========================================================================
+  # OPTIONAL: Backend Services (uncomment to run in Docker)
+  # ==========================================================================
+
+  # prm-service:
+  #   build:
+  #     context: ../../../backend
+  #     dockerfile: services/prm-service/Dockerfile
+  #   container_name: healthtech-prm-service-dev
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   environment:
+  #     DATABASE_URL: postgresql://healthtech:healthtech@postgres:5432/healthtech
+  #     REDIS_URL: redis://redis:6379/0
+  #     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  #     ENVIRONMENT: development
+  #     DEBUG: "true"
+  #   ports:
+  #     - "8007:8000"
+  #   volumes:
+  #     - ../../../backend:/app
+  #   networks:
+  #     - healthtech-network
+
+networks:
+  healthtech-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+  pgadmin_data:
