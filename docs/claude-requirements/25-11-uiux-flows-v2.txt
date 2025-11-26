@@ -1,0 +1,14 @@
+You have created the ux epics in the folder : "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/docs/implement/epics-ux". Great job. You
+  did this by following the requirmeents specified in :
+  "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/docs/claude-requirements/25-11-uiux-flows.txt"
+
+  Now you are tasked with the following : 
+
+  1. ultrathink and ensure that the ui/ux flows you have created are all based on existing backend pis and structure. There is no requirement which requires significant backend development.
+
+  2. For the UI/UX flows, identify the apis and modules which wil be used. This will help you build this out better when you are ctually implementing this. Breakdown this mapping and output in smaller peices when you are writing this to not exceed the token limit.
+
+  3. For the UI, amke sure to describe the UI properly to make it easier for you build this out later.
+  examples: 
+a. There is a sidebar with buttons for Organisation, Doctors, Patients, Departments, Slots (all FHIR entities) and their listview, detail view and ability to perform CRUD operations on them
+b. There is an AI assistant widget on the bottom right side. It has an input field, a widnow which shows previous chats, a microphone button to toggle between text and voice input and a send button to send the input to the AI assistant. The AI assistant can take in text and audio and convert users input into structured output and fill in the relevant forms (eg: add 1PM to 2PM slot for Doctor Rohit Sharma from Cardiology | add a 2PM appointment for patient -> 9844111173 with dr. virat kohli from orthopaedics at Surya Whitefield). It shows the extracted output on left side of the chat.

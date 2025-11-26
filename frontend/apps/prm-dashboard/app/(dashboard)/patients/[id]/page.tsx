@@ -1,32 +1,115 @@
-'use client';
+"use client";
 
-import { use } from 'react';
-import Link from 'next/link';
+import * as React from "react";
+import { use } from "react";
+import Link from "next/link";
 import {
   ArrowLeft,
-  Phone,
-  Mail,
-  MapPin,
+  Settings,
+  Printer,
+  MoreHorizontal,
   Calendar,
-  User,
-  Activity,
-  MessageSquare,
+  Pill,
+  FlaskConical,
   FileText,
-  Clock,
-} from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { patientsAPI } from '@/lib/api/patients';
+  MessageSquare,
+  Phone,
+  FileOutput,
+  ClipboardList,
+  BarChart3,
+  Search,
+  Sparkles,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { patientsAPI } from "@/lib/api/patients";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { formatDate, formatSmartDate } from '@/lib/utils/date';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePatientProfileStore } from "@/lib/store/patient-profile-store";
+import {
+  PatientHeader,
+  HealthScoreWidget,
+  AISummaryCard,
+  PatientTimeline,
+  CareGapsSection,
+  CommunicationHistory,
+  AskPatientData,
+  AskPatientDataButton,
+} from "@/components/patient-profile";
+
+// ============================================================================
+// Quick Actions Bar
+// ============================================================================
+
+interface QuickActionsBarProps {
+  patientId: string;
+  onAskData: () => void;
+}
+
+function QuickActionsBar({ patientId, onAskData }: QuickActionsBarProps) {
+  const actions = [
+    { icon: Calendar, label: "Book Appt", action: "book_appointment" },
+    { icon: Pill, label: "Prescribe", action: "prescribe" },
+    { icon: FlaskConical, label: "Order Lab", action: "order_lab" },
+    { icon: FileText, label: "Add Note", action: "add_note" },
+    { icon: MessageSquare, label: "Message", action: "message" },
+    { icon: Phone, label: "Call", action: "call" },
+    { icon: FileOutput, label: "Referral", action: "referral" },
+    { icon: ClipboardList, label: "Care Plan", action: "care_plan" },
+    { icon: BarChart3, label: "Reports", action: "reports" },
+  ];
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 z-40">
+      <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 flex-wrap">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={onAskData}
+        >
+          <Search className="h-4 w-4" />
+          Ask Patient Data
+        </Button>
+        {actions.map((action) => (
+          <Button
+            key={action.action}
+            variant="ghost"
+            size="sm"
+            className="gap-2"
+          >
+            <action.icon className="h-4 w-4" />
+            {action.label}
+          </Button>
+        ))}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>Export Summary</DropdownMenuItem>
+            <DropdownMenuItem>Print Records</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>Transfer Care</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Main Page Component
+// ============================================================================
 
 export default function Patient360Page({
   params,
@@ -34,33 +117,66 @@ export default function Patient360Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const [askDataOpen, setAskDataOpen] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState("overview");
 
-  // Fetch patient 360 view
-  const { data: view, isLoading, error } = useQuery({
-    queryKey: ['patient-360', id],
+  // Patient profile store
+  const {
+    patient,
+    alerts,
+    healthScore,
+    vitals,
+    aiSummary,
+    timelineEvents,
+    careGaps,
+    communications,
+    communicationFilter,
+    queryHistory,
+    isLoadingPatient,
+    isGeneratingSummary,
+    isQueryLoading,
+    loadPatient,
+    regenerateSummary,
+    setCommunicationFilter,
+    submitQuery,
+    updateCareGapStatus,
+  } = usePatientProfileStore();
+
+  // Load patient data on mount
+  React.useEffect(() => {
+    loadPatient(id);
+  }, [id, loadPatient]);
+
+  // Also fetch from API for server data (optional - can be used alongside mock data)
+  const { data: apiData, isLoading: apiLoading } = useQuery({
+    queryKey: ["patient-360", id],
     queryFn: async () => {
       const [data, error] = await patientsAPI.get360View(id);
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: false, // Disable for now, using mock data from store
   });
 
-  if (isLoading) {
+  // Loading state
+  if (isLoadingPatient) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading patient profile...</p>
+        </div>
       </div>
     );
   }
 
-  if (error || !view) {
+  // Error state
+  if (!patient) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">
-          Error loading patient: {(error as Error)?.message}
-        </p>
-        <Link href="/dashboard/patients">
-          <Button className="mt-4">
+        <p className="text-destructive mb-4">Patient not found</p>
+        <Link href="/patients">
+          <Button>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Patients
           </Button>
@@ -69,322 +185,191 @@ export default function Patient360Page({
     );
   }
 
-  const { patient, appointments, journeys, communications, tickets } = view;
-
   return (
-    <div className="space-y-6">
-      {/* Back Button */}
-      <Link href="/dashboard/patients">
-        <Button variant="ghost">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Patients
-        </Button>
-      </Link>
+    <div className="pb-24">
+      {/* Top navigation */}
+      <div className="flex items-center justify-between mb-6">
+        <Link href="/patients">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Patients
+          </Button>
+        </Link>
 
-      {/* Patient Header */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-6">
-              <Avatar className="w-24 h-24">
-                <AvatarImage src={patient.avatar_url} />
-                <AvatarFallback className="text-2xl">
-                  {patient.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon">
+            <Printer className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
-              <div className="space-y-3">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    {patient.name}
-                  </h1>
-                  <p className="text-gray-500 mt-1">
-                    MRN: <code className="text-xs bg-gray-100 px-2 py-1 rounded">{patient.mrn}</code>
-                  </p>
-                </div>
+      {/* Patient Header with Alerts */}
+      <PatientHeader
+        patient={patient}
+        alerts={alerts}
+        onEdit={() => console.log("Edit patient")}
+        onAction={(action) => console.log("Action:", action)}
+        className="mb-6"
+      />
 
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  {patient.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      {patient.phone}
-                    </div>
-                  )}
-                  {patient.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      {patient.email}
-                    </div>
-                  )}
-                  {patient.date_of_birth && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      {formatDate(patient.date_of_birth, 'MMM d, yyyy')}
-                    </div>
-                  )}
-                </div>
+      {/* View Mode Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="overview">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Story View
+          </TabsTrigger>
+          <TabsTrigger value="clinical">Clinical</TabsTrigger>
+          <TabsTrigger value="engagement">Engagement</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
 
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={
-                      patient.status === 'active'
-                        ? 'success'
-                        : patient.status === 'inactive'
-                        ? 'secondary'
-                        : 'warning'
-                    }
-                  >
-                    {patient.status || 'Unknown'}
-                  </Badge>
-                  {patient.gender && (
-                    <Badge variant="outline">{patient.gender}</Badge>
-                  )}
-                </div>
-              </div>
+        {/* Overview / Story View Tab */}
+        <TabsContent value="overview" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* AI Summary */}
+              <AISummaryCard
+                summary={aiSummary}
+                isLoading={isGeneratingSummary}
+                onRegenerate={regenerateSummary}
+              />
+
+              {/* Timeline */}
+              <PatientTimeline
+                events={timelineEvents}
+                groupBy="day"
+                isLoading={false}
+                onEventClick={(event) => console.log("Event clicked:", event)}
+                onLoadMore={() => console.log("Load more")}
+                hasMore={true}
+              />
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline">Edit Profile</Button>
-              <Button>Book Appointment</Button>
+            {/* Right Column - Sidebar */}
+            <div className="space-y-6">
+              {/* Health Score */}
+              {healthScore && (
+                <HealthScoreWidget
+                  score={healthScore.score}
+                  trend={healthScore.trend}
+                  label={healthScore.label}
+                  components={healthScore.components}
+                  lastUpdated={healthScore.lastUpdated}
+                />
+              )}
+
+              {/* Care Gaps */}
+              <CareGapsSection
+                careGaps={careGaps}
+                onAction={(gapId, action) => {
+                  console.log("Care gap action:", gapId, action);
+                }}
+                onViewAll={() => setActiveTab("clinical")}
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardDescription>Appointments</CardDescription>
-              <Calendar className="w-4 h-4 text-blue-600" />
-            </div>
-            <CardTitle className="text-3xl">
-              {appointments?.length || 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardDescription>Active Journeys</CardDescription>
-              <Activity className="w-4 h-4 text-green-600" />
-            </div>
-            <CardTitle className="text-3xl">
-              {journeys?.length || 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardDescription>Communications</CardDescription>
-              <MessageSquare className="w-4 h-4 text-purple-600" />
-            </div>
-            <CardTitle className="text-3xl">
-              {communications?.length || 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardDescription>Open Tickets</CardDescription>
-              <FileText className="w-4 h-4 text-yellow-600" />
-            </div>
-            <CardTitle className="text-3xl">
-              {tickets?.length || 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+        {/* Clinical View Tab */}
+        <TabsContent value="clinical" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Care Gaps - Full view */}
+            <CareGapsSection
+              careGaps={careGaps}
+              onAction={(gapId, action) => {
+                console.log("Care gap action:", gapId, action);
+              }}
+            />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Appointments */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Appointments</CardTitle>
-            <CardDescription>Latest appointment history</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {appointments && appointments.length > 0 ? (
-              <div className="space-y-4">
-                {appointments.slice(0, 5).map((appointment) => (
-                  <div
-                    key={appointment.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Calendar className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">
-                          {appointment.appointment_type || 'Consultation'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {formatSmartDate(appointment.scheduled_at)}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={
-                      appointment.status === 'completed' ? 'success' :
-                      appointment.status === 'cancelled' ? 'destructive' :
-                      'default'
-                    }>
-                      {appointment.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-8">
-                No appointments found
-              </p>
+            {/* Timeline - Clinical events only */}
+            <PatientTimeline
+              events={timelineEvents.filter(
+                (e) => e.type === "encounter" || e.type === "lab" || e.type === "prescription"
+              )}
+              groupBy="episode"
+              isLoading={false}
+              onEventClick={(event) => console.log("Event clicked:", event)}
+              onLoadMore={() => console.log("Load more")}
+              hasMore={true}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Engagement View Tab */}
+        <TabsContent value="engagement" className="space-y-6 mt-6">
+          <CommunicationHistory
+            communications={communications}
+            filter={communicationFilter}
+            onFilterChange={setCommunicationFilter}
+            onPlayRecording={(id) => console.log("Play recording:", id)}
+            onViewTranscript={(id) => console.log("View transcript:", id)}
+            onViewConversation={(id) => console.log("View conversation:", id)}
+            hasMore={true}
+          />
+        </TabsContent>
+
+        {/* Analytics View Tab */}
+        <TabsContent value="analytics" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Health Score - Expanded */}
+            {healthScore && (
+              <HealthScoreWidget
+                score={healthScore.score}
+                trend={healthScore.trend}
+                label={healthScore.label}
+                components={healthScore.components}
+                lastUpdated={healthScore.lastUpdated}
+              />
             )}
-          </CardContent>
-        </Card>
 
-        {/* Active Journeys */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Journeys</CardTitle>
-            <CardDescription>Ongoing care journeys</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {journeys && journeys.length > 0 ? (
-              <div className="space-y-4">
-                {journeys.slice(0, 5).map((journey) => (
-                  <div
-                    key={journey.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">
-                          {journey.journey_type || 'Care Journey'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Started {formatSmartDate(journey.created_at)}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={
-                      journey.status === 'completed' ? 'success' :
-                      journey.status === 'cancelled' ? 'destructive' :
-                      'default'
-                    }>
-                      {journey.status}
-                    </Badge>
-                  </div>
-                ))}
+            {/* Vitals trends placeholder */}
+            <div className="p-6 border rounded-lg bg-card">
+              <h3 className="font-medium mb-4">Vitals Trends</h3>
+              <div className="h-48 flex items-center justify-center text-muted-foreground">
+                <p className="text-sm">Charts will be displayed here</p>
               </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-8">
-                No active journeys
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            </div>
 
-        {/* Recent Communications */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Communications</CardTitle>
-            <CardDescription>Latest messages and notifications</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {communications && communications.length > 0 ? (
-              <div className="space-y-4">
-                {communications.slice(0, 5).map((comm) => (
-                  <div
-                    key={comm.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                        <MessageSquare className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">
-                          {comm.type || 'Message'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {formatSmartDate(comm.sent_at)}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={
-                      comm.status === 'delivered' ? 'success' :
-                      comm.status === 'failed' ? 'destructive' :
-                      'default'
-                    }>
-                      {comm.status}
-                    </Badge>
-                  </div>
-                ))}
+            {/* Risk scores placeholder */}
+            <div className="p-6 border rounded-lg bg-card">
+              <h3 className="font-medium mb-4">Risk Predictions</h3>
+              <div className="h-48 flex items-center justify-center text-muted-foreground">
+                <p className="text-sm">Risk scores will be displayed here</p>
               </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-8">
-                No communications found
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            </div>
 
-        {/* Open Tickets */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Open Tickets</CardTitle>
-            <CardDescription>Support tickets and issues</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {tickets && tickets.length > 0 ? (
-              <div className="space-y-4">
-                {tickets.slice(0, 5).map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-yellow-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">
-                          {ticket.title || 'Support Ticket'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Created {formatSmartDate(ticket.created_at)}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={
-                      ticket.status === 'resolved' ? 'success' :
-                      ticket.status === 'closed' ? 'secondary' :
-                      ticket.priority === 'high' ? 'destructive' :
-                      'warning'
-                    }>
-                      {ticket.status}
-                    </Badge>
-                  </div>
-                ))}
+            {/* Population comparison placeholder */}
+            <div className="p-6 border rounded-lg bg-card">
+              <h3 className="font-medium mb-4">Population Comparison</h3>
+              <div className="h-48 flex items-center justify-center text-muted-foreground">
+                <p className="text-sm">Comparison charts will be displayed here</p>
               </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-8">
-                No open tickets
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Quick Actions Bar */}
+      <QuickActionsBar
+        patientId={id}
+        onAskData={() => setAskDataOpen(true)}
+      />
+
+      {/* Ask Patient Data Dialog */}
+      <AskPatientData
+        isOpen={askDataOpen}
+        onClose={() => setAskDataOpen(false)}
+        patientId={id}
+        patientName={patient.name}
+        onQuery={submitQuery}
+        queryHistory={queryHistory}
+        isLoading={isQueryLoading}
+      />
     </div>
   );
 }

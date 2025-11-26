@@ -1,0 +1,12 @@
+for  AI Assistant Chat Widget -> ultrathink and do the following:
+
+  1. You do not need to create a widget from scratch.
+  2. You should instead use - AI SDK by vercel -> "https://ai-sdk.dev/docs/ai-sdk-ui" alongwith shadcn to build this out.
+  3. Ensure the tech stack used is as mentioned in the original setup.
+  4. Ensure the entire UI/UX is in sync and consistent with the backend apis and development done so far 
+
+  ultrathink and implement the ui/ux described in the folder : "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/docs/implement/epics-ux".
+  1. Go at it one by one and slowly, methodically, systematically, rigorously. Do not try to implement all the files at once. plan it one after another and ensure nothing is missed.
+  You can refer to docs and other project folders as needed.
+
+  Write the code in the frontend folder. Update it, remove redundant stuff as appropriate and build this out systematically and properly.3

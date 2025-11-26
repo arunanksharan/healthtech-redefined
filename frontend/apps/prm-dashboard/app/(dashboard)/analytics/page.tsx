@@ -1,508 +1,463 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import * as React from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  TrendingUp,
-  TrendingDown,
   Calendar,
-  MessageSquare,
-  Phone,
   Users,
+  DollarSign,
+  Clock,
   Activity,
   Download,
   RefreshCw,
-  Filter,
   ChevronDown,
-} from 'lucide-react';
+  Sparkles,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Star,
+} from "lucide-react";
+import { format, subDays } from "date-fns";
+import toast from "react-hot-toast";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
-  LineChart,
-  Line,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// Analytics Components
+import {
+  SimpleStatCard,
+  ProgressStatCard,
+  TrendStatCard,
+  ComparisonStatCard,
+  ActionStatCard,
+  StatCardsGrid,
+  TimeSeriesChart,
   BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { analyticsAPI, TimePeriod, DashboardOverview } from '@/lib/api/analytics';
-import { format } from 'date-fns';
-import toast from 'react-hot-toast';
+  DonutChart,
+  AIInsightsPanel,
+  ProactiveAlertsPanel,
+  SentimentHeatmap,
+  SentimentSummary,
+  DashboardHeader,
+  DashboardSelector,
+  BentoGridLayout,
+  AnalyticsQueryInput,
+  AnalyticsAssistantDialog,
+  CompactQueryWidget,
+} from "@/components/analytics";
 
-// ==================== Constants ====================
+import { useAnalyticsStore } from "@/lib/store/analytics-store";
+import type { AIInsight, ProactiveAlert, SentimentData } from "@/lib/store/analytics-store";
 
-const COLORS = {
-  primary: '#3B82F6',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  purple: '#8B5CF6',
-  pink: '#EC4899',
-  gray: '#6B7280',
-};
+// ============================================================================
+// Types & Constants
+// ============================================================================
 
-const CHART_COLORS = [
-  COLORS.primary,
-  COLORS.success,
-  COLORS.warning,
-  COLORS.purple,
-  COLORS.pink,
-  COLORS.danger,
-];
+type TimePeriod = "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_month" | "this_quarter";
 
 const TIME_PERIODS: { value: TimePeriod; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: 'last_7_days', label: 'Last 7 Days' },
-  { value: 'last_30_days', label: 'Last 30 Days' },
-  { value: 'this_week', label: 'This Week' },
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: 'this_quarter', label: 'This Quarter' },
-  { value: 'this_year', label: 'This Year' },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "last_7_days", label: "Last 7 Days" },
+  { value: "last_30_days", label: "Last 30 Days" },
+  { value: "this_month", label: "This Month" },
+  { value: "this_quarter", label: "This Quarter" },
 ];
 
-// ==================== Main Component ====================
+// ============================================================================
+// Main Analytics Dashboard Page
+// ============================================================================
 
-export default function AnalyticsPage() {
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('last_30_days');
-  const [isRealtime, setIsRealtime] = useState(false);
-  const [realtimeData, setRealtimeData] = useState<DashboardOverview | null>(null);
+export default function AnalyticsDashboardPage() {
+  const [timePeriod, setTimePeriod] = React.useState<TimePeriod>("last_30_days");
+  const [dashboardPreset, setDashboardPreset] = React.useState("executive");
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [showQueryDialog, setShowQueryDialog] = React.useState(false);
 
-  // Fetch dashboard overview
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['analytics', 'dashboard', timePeriod],
-    queryFn: async () => {
-      const tenantId = 'your-tenant-id'; // TODO: Get from auth context
-      const [result, error] = await analyticsAPI.getDashboardOverview({
-        tenant_id: tenantId,
-        time_period: timePeriod,
+  // Get data from store
+  const {
+    kpiCards,
+    charts,
+    insights,
+    alerts,
+    sentimentData,
+    isLoading,
+    setTimeRange,
+    fetchDashboardData,
+    dismissAlert,
+  } = useAnalyticsStore();
+
+  // Generate mock time series data
+  const appointmentTrendData = React.useMemo(() => {
+    const data = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = subDays(new Date(), i);
+      data.push({
+        date: date.toISOString(),
+        value: Math.floor(100 + Math.random() * 60),
+        label: format(date, "MMM d"),
       });
-      if (error) throw new Error(error.message);
-      return result;
+    }
+    return data;
+  }, []);
+
+  const revenueTrendData = React.useMemo(() => {
+    const data = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = subDays(new Date(), i);
+      data.push({
+        date: date.toISOString(),
+        value: Math.floor(150000 + Math.random() * 50000),
+      });
+    }
+    return data;
+  }, []);
+
+  // Generate mock department data
+  const departmentRevenueData = React.useMemo(() => [
+    { category: "Cardiology", value: 3210000, color: "#6366f1" },
+    { category: "Orthopedics", value: 2580000, color: "#22c55e" },
+    { category: "General Med", value: 1720000, color: "#f59e0b" },
+    { category: "Pediatrics", value: 1610000, color: "#ec4899" },
+    { category: "Dermatology", value: 1340000, color: "#8b5cf6" },
+  ], []);
+
+  const appointmentStatusData = React.useMemo(() => [
+    { name: "Completed", value: 65, color: "#22c55e" },
+    { name: "Scheduled", value: 20, color: "#6366f1" },
+    { name: "Canceled", value: 10, color: "#ef4444" },
+    { name: "No-Show", value: 5, color: "#f59e0b" },
+  ], []);
+
+  // Mock insights
+  const mockInsights: AIInsight[] = React.useMemo(() => [
+    {
+      id: "1",
+      title: "Cardiology revenue is 15% above target",
+      description: "Cardiology department has exceeded revenue targets for the 3rd consecutive month, driven by increased referrals and new patient volume.",
+      category: "revenue",
+      sentiment: "positive",
+      impact: "high",
+      metrics: [
+        { label: "Current Revenue", value: "₹32.1L", change: 12.6 },
+        { label: "Target", value: "₹28L" },
+      ],
+      suggestedActions: [
+        { id: "1", label: "View revenue breakdown" },
+        { id: "2", label: "Analyze top procedures" },
+      ],
+      createdAt: new Date().toISOString(),
     },
-  });
+    {
+      id: "2",
+      title: "Pediatrics no-show rate spiked to 22%",
+      description: "No-show rate in Pediatrics increased significantly compared to last week. Contributing factors: first-time appointments and Monday mornings.",
+      category: "operations",
+      sentiment: "warning",
+      impact: "high",
+      metrics: [
+        { label: "Current Rate", value: "22%", change: -7 },
+        { label: "Benchmark", value: "10%" },
+      ],
+      suggestedActions: [
+        { id: "3", label: "Enable WhatsApp reminders" },
+        { id: "4", label: "View high-risk patients" },
+      ],
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "3",
+      title: "3 high-risk patients identified for outreach",
+      description: "AI has identified 3 patients with high readmission risk who may benefit from proactive outreach.",
+      category: "clinical",
+      sentiment: "neutral",
+      impact: "medium",
+      suggestedActions: [
+        { id: "5", label: "View patient list" },
+        { id: "6", label: "Schedule follow-ups" },
+      ],
+      createdAt: new Date().toISOString(),
+    },
+  ], []);
 
-  // Real-time updates via Server-Sent Events
-  useEffect(() => {
-    if (!isRealtime) return;
+  // Mock alerts
+  const mockAlerts: ProactiveAlert[] = React.useMemo(() => [
+    {
+      id: "1",
+      title: "No-Show Prediction Alert",
+      description: "8 appointments tomorrow flagged as 'High No-Show Risk' based on past behavior, distance, and weather forecast.",
+      type: "no_show_risk",
+      priority: "high",
+      affectedItems: [
+        { name: "Rahul Verma", time: "9:00 AM", riskScore: 85, reason: "3 past no-shows" },
+        { name: "Sunita Devi", time: "10:30 AM", riskScore: 78, reason: "Far distance" },
+        { name: "Amit Kumar", time: "11:00 AM", riskScore: 72, reason: "First visit" },
+        { name: "Priya Sharma", time: "2:00 PM", riskScore: 68, reason: "Weather alert" },
+      ],
+      suggestedAction: "Send WhatsApp confirmation request to all 8 patients",
+      primaryAction: "Send Confirmations Now",
+      secondaryAction: "Review List",
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "2",
+      title: "Dr. Sharma has 3 cancellations tomorrow",
+      description: "3 appointment slots became available due to last-minute cancellations.",
+      type: "cancellation",
+      priority: "medium",
+      affectedItems: [
+        { name: "Slot 1", time: "10:00 AM" },
+        { name: "Slot 2", time: "11:30 AM" },
+        { name: "Slot 3", time: "3:00 PM" },
+      ],
+      suggestedAction: "Notify waitlisted patients about available slots",
+      primaryAction: "Notify Waitlist",
+      secondaryAction: "Ignore",
+      createdAt: new Date().toISOString(),
+    },
+  ], []);
 
-    const tenantId = 'your-tenant-id'; // TODO: Get from auth context
-    const eventSource = analyticsAPI.createRealtimeStream(tenantId);
+  // Mock sentiment data
+  const mockSentimentData: SentimentData = React.useMemo(() => ({
+    overallScore: 76,
+    previousScore: 78,
+    totalFeedback: 1250,
+    departments: [
+      { id: "1", name: "Cardiology", score: 85, previousScore: 82, change: 3, totalFeedback: 180, sources: { voice: 45, whatsapp: 80, survey: 40, email: 15 }, topThemes: { positive: ["Friendly staff", "Quick service"], negative: ["Wait times"] } },
+      { id: "2", name: "Orthopedics", score: 82, previousScore: 81, change: 1, totalFeedback: 150, sources: { voice: 30, whatsapp: 70, survey: 35, email: 15 }, topThemes: { positive: ["Expert care", "Clean facility"], negative: ["Parking"] } },
+      { id: "3", name: "Pediatrics", score: 68, previousScore: 76, change: -8, totalFeedback: 200, sources: { voice: 60, whatsapp: 90, survey: 35, email: 15 }, topThemes: { positive: ["Child-friendly"], negative: ["Long wait", "Scheduling issues"] } },
+      { id: "4", name: "General Med", score: 78, previousScore: 80, change: -2, totalFeedback: 300, sources: { voice: 80, whatsapp: 120, survey: 70, email: 30 }, topThemes: { positive: ["Convenient location"], negative: ["Crowded"] } },
+      { id: "5", name: "Dermatology", score: 90, previousScore: 85, change: 5, totalFeedback: 120, sources: { voice: 25, whatsapp: 50, survey: 35, email: 10 }, topThemes: { positive: ["Professional", "Great results"], negative: [] } },
+      { id: "6", name: "Reception", score: 52, previousScore: 67, change: -15, totalFeedback: 300, sources: { voice: 100, whatsapp: 80, survey: 80, email: 40 }, topThemes: { positive: [], negative: ["Long wait times", "Rude staff", "Billing confusion"] } },
+    ],
+  }), []);
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        setRealtimeData(data);
-      } catch (error) {
-        console.error('Failed to parse real-time data:', error);
-      }
+  // Handle analytics query
+  const handleAnalyticsQuery = async (query: string) => {
+    // Mock response - in production, this would call the AI API
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return {
+      type: "table" as const,
+      content: {
+        headers: ["Department", "Q3 2024", "Q4 2024", "Change", "Trend"],
+        rows: [
+          ["Cardiology", "₹28.5L", "₹32.1L", "+12.6%", "📈"],
+          ["Orthopedics", "₹24.2L", "₹25.8L", "+6.6%", "📈"],
+          ["General Med", "₹18.7L", "₹17.2L", "-8.0%", "📉"],
+          ["Pediatrics", "₹15.3L", "₹16.1L", "+5.2%", "📈"],
+          ["Dermatology", "₹12.1L", "₹13.4L", "+10.7%", "📈"],
+        ],
+      },
+      insights: [
+        "Overall revenue grew 5.9% quarter-over-quarter",
+        "Cardiology is the top performer with 12.6% growth",
+        "General Medicine declined 8% - warrants investigation",
+      ],
+      followUpQuestions: [
+        "Why did General Medicine revenue decline?",
+        "Show me Cardiology revenue breakdown by doctor",
+        "What's the forecast for next quarter?",
+      ],
     };
+  };
 
-    eventSource.onerror = (error) => {
-      console.error('EventSource error:', error);
-      eventSource.close();
-      setIsRealtime(false);
-      toast.error('Real-time connection lost');
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [isRealtime]);
-
-  const overview = realtimeData || data;
-
-  const handleExport = async (format: 'csv' | 'pdf' | 'excel') => {
-    try {
-      const tenantId = 'your-tenant-id'; // TODO: Get from auth context
-      const [blob, error] = await analyticsAPI.exportData({
-        tenant_id: tenantId,
-        time_period: timePeriod,
-        format,
-      });
-
-      if (error) throw new Error(error.message);
-
-      // Download blob
-      const url = window.URL.createObjectURL(blob!);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `analytics-${timePeriod}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.success(`Exported as ${format.toUpperCase()}`);
-    } catch (error) {
-      toast.error('Export failed');
+  // Handle alert actions
+  const handleAlertAction = (alertId: string, action: "primary" | "secondary" | "dismiss" | "review") => {
+    if (action === "dismiss") {
+      dismissAlert(alertId);
+      toast.success("Alert dismissed");
+    } else if (action === "primary") {
+      toast.success("Action initiated successfully");
     }
   };
 
-  if (isLoading || !overview) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
-          <p className="text-gray-500 mt-1">
-            Comprehensive metrics and insights across your PRM
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Real-time Toggle */}
-          <Button
-            variant={isRealtime ? 'default' : 'outline'}
-            onClick={() => setIsRealtime(!isRealtime)}
-          >
-            <Activity className={`w-4 h-4 mr-2 ${isRealtime ? 'animate-pulse' : ''}`} />
-            {isRealtime ? 'Live' : 'Enable Live'}
-          </Button>
-
-          {/* Refresh */}
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-
-          {/* Export Dropdown */}
-          <div className="relative group">
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-              <ChevronDown className="w-4 h-4 ml-2" />
-            </Button>
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-              <button
-                onClick={() => handleExport('csv')}
-                className="w-full px-4 py-2 text-left hover:bg-gray-50 rounded-t-lg"
-              >
-                Export as CSV
-              </button>
-              <button
-                onClick={() => handleExport('excel')}
-                className="w-full px-4 py-2 text-left hover:bg-gray-50"
-              >
-                Export as Excel
-              </button>
-              <button
-                onClick={() => handleExport('pdf')}
-                className="w-full px-4 py-2 text-left hover:bg-gray-50 rounded-b-lg"
-              >
-                Export as PDF
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Time Period Selector */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-2 flex-wrap">
-            {TIME_PERIODS.map((period) => (
-              <Button
-                key={period.value}
-                variant={timePeriod === period.value ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTimePeriod(period.value)}
-              >
-                {period.label}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Total Appointments"
-          value={overview.appointments.total_appointments}
-          change={calculateChange(overview.appointments.trend)}
-          icon={<Calendar className="w-5 h-5" />}
-          color="blue"
-        />
-        <MetricCard
-          title="Active Journeys"
-          value={overview.journeys.total_active}
-          change={calculateChange(overview.journeys.trend)}
-          icon={<Users className="w-5 h-5" />}
-          color="green"
-        />
-        <MetricCard
-          title="Total Messages"
-          value={overview.communication.total_messages}
-          change={calculateChange(overview.communication.trend)}
-          icon={<MessageSquare className="w-5 h-5" />}
-          color="purple"
-        />
-        <MetricCard
-          title="Voice Calls"
-          value={overview.voice_calls.total_calls}
-          change={calculateChange(overview.voice_calls.trend)}
-          icon={<Phone className="w-5 h-5" />}
-          color="pink"
-        />
-      </div>
-
-      {/* Secondary Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Appointment Completion Rate</CardDescription>
-            <CardTitle className="text-3xl">
-              {overview.appointments.completion_rate.toFixed(1)}%
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-500"
-                style={{ width: `${overview.appointments.completion_rate}%` }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Avg Response Time</CardDescription>
-            <CardTitle className="text-3xl">
-              {overview.communication.avg_response_time_minutes.toFixed(0)}m
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
-              {overview.communication.open_conversations} open conversations
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Call Success Rate</CardDescription>
-            <CardTitle className="text-3xl">
-              {overview.voice_calls.booking_success_rate.toFixed(1)}%
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
-              {overview.voice_calls.completed_calls} completed calls
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Row 1: Appointments & Journeys */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Appointments Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Appointment Trends</CardTitle>
-            <CardDescription>Daily appointment volume over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={overview.appointments.trend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={(date) => format(new Date(date), 'MMM d')} />
-                <YAxis />
-                <Tooltip labelFormatter={(date) => format(new Date(date), 'MMM d, yyyy')} />
-                <Area type="monotone" dataKey="value" stroke={COLORS.primary} fill={COLORS.primary} fillOpacity={0.3} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Journey Status Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Journey Status</CardTitle>
-            <CardDescription>Distribution of journey states</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Active', value: overview.journeys.total_active },
-                    { name: 'Completed', value: overview.journeys.completed },
-                    { name: 'Paused', value: overview.journeys.paused },
-                    { name: 'Canceled', value: overview.journeys.canceled },
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {CHART_COLORS.map((color, index) => (
-                    <Cell key={`cell-${index}`} fill={color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Row 2: Communication & Voice Calls */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Communication Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Communication Volume</CardTitle>
-            <CardDescription>Messages sent and received over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={overview.communication.trend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={(date) => format(new Date(date), 'MMM d')} />
-                <YAxis />
-                <Tooltip labelFormatter={(date) => format(new Date(date), 'MMM d, yyyy')} />
-                <Legend />
-                <Line type="monotone" dataKey="value" stroke={COLORS.purple} name="Messages" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Voice Call Metrics */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Voice Call Performance</CardTitle>
-            <CardDescription>Call volume and success metrics</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={overview.voice_calls.trend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={(date) => format(new Date(date), 'MMM d')} />
-                <YAxis />
-                <Tooltip labelFormatter={(date) => format(new Date(date), 'MMM d, yyyy')} />
-                <Legend />
-                <Bar dataKey="value" fill={COLORS.success} name="Calls" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Appointment Status Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Appointment Status Distribution</CardTitle>
-          <CardDescription>Breakdown of appointments by status</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={[
-                { name: 'Scheduled', value: overview.appointments.scheduled, fill: COLORS.primary },
-                { name: 'Confirmed', value: overview.appointments.confirmed, fill: COLORS.success },
-                { name: 'Completed', value: overview.appointments.completed, fill: COLORS.purple },
-                { name: 'Canceled', value: overview.appointments.canceled, fill: COLORS.danger },
-                { name: 'No Show', value: overview.appointments.no_show, fill: COLORS.warning },
-              ]}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ==================== Helper Components ====================
-
-interface MetricCardProps {
-  title: string;
-  value: number;
-  change: number;
-  icon: React.ReactNode;
-  color: 'blue' | 'green' | 'purple' | 'pink';
-}
-
-function MetricCard({ title, value, change, icon, color }: MetricCardProps) {
-  const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    purple: 'bg-purple-100 text-purple-600',
-    pink: 'bg-pink-100 text-pink-600',
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
   };
 
-  const isPositive = change >= 0;
-
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{value.toLocaleString()}</p>
-            <div className="flex items-center mt-2">
-              {isPositive ? (
-                <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-600 mr-1" />
-              )}
-              <span className={`text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                {Math.abs(change).toFixed(1)}%
-              </span>
-              <span className="text-sm text-gray-500 ml-1">vs last period</span>
-            </div>
-          </div>
-          <div className={`p-3 rounded-lg ${colorClasses[color]}`}>{icon}</div>
+    <div className="space-y-6 p-6">
+      {/* Dashboard Header */}
+      <DashboardHeader
+        title="Analytics Dashboard"
+        subtitle="Comprehensive metrics and insights across your PRM"
+        greeting={`${getGreeting()}! Here's your daily briefing.`}
+        date={format(new Date(), "EEEE, MMMM d, yyyy")}
+        isEditing={isEditing}
+        onEditToggle={() => setIsEditing(!isEditing)}
+        onSave={() => {
+          setIsEditing(false);
+          toast.success("Dashboard layout saved");
+        }}
+        onReset={() => toast("Reset to default layout")}
+        onAddWidget={() => toast("Widget library opened")}
+        onSettings={() => toast("Settings opened")}
+      />
+
+      {/* AI Query Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <AnalyticsQueryInput
+            onSubmit={(query) => {
+              setShowQueryDialog(true);
+            }}
+            placeholder="Ask anything about your analytics... (e.g., 'What's our revenue by department this quarter?')"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Time Period & Dashboard Selector */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          {TIME_PERIODS.map((period) => (
+            <Button
+              key={period.value}
+              variant={timePeriod === period.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTimePeriod(period.value)}
+            >
+              {period.label}
+            </Button>
+          ))}
         </div>
-      </CardContent>
-    </Card>
+        <DashboardSelector
+          currentPreset={dashboardPreset}
+          onPresetChange={setDashboardPreset}
+        />
+      </div>
+
+      {/* AI Insights Panel */}
+      <AIInsightsPanel
+        insights={mockInsights}
+        title="AI Insights"
+        maxVisible={3}
+        onSeeAll={() => toast("View all insights")}
+        onInsightAction={(insightId, action) => toast(`Action: ${action} on insight ${insightId}`)}
+        onRefresh={() => toast("Refreshing insights...")}
+      />
+
+      {/* KPI Cards */}
+      <StatCardsGrid columns={5}>
+        <SimpleStatCard
+          title="Today's Appointments"
+          value={142}
+          trend={{ value: 8, direction: "up", label: "vs yesterday" }}
+          status="success"
+          icon={<Calendar className="h-5 w-5" />}
+          onAction={() => toast("View schedule")}
+        />
+        <ProgressStatCard
+          title="Revenue (MTD)"
+          current={4520000}
+          target={5800000}
+          unit="₹"
+          format={(v) => `${(v / 100000).toFixed(1)}L`}
+          subtitle="22 days remaining"
+        />
+        <TrendStatCard
+          title="Patient Satisfaction"
+          value="4.6"
+          sparklineData={[4.2, 4.3, 4.4, 4.3, 4.5, 4.6, 4.6]}
+          trend={{ value: 4.5, direction: "up" }}
+          subtitle="Last 30 days"
+          status="success"
+        />
+        <ComparisonStatCard
+          title="No-Show Rate"
+          yourValue="12%"
+          benchmarkValue="10%"
+          yourLabel="Yours"
+          benchmarkLabel="Benchmark"
+          status="warning"
+          actionLabel="Improve"
+          onAction={() => toast("View no-show analysis")}
+        />
+        <ActionStatCard
+          title="High No-Show Risk"
+          value="8"
+          subtitle="patients tomorrow"
+          priority="high"
+          actionLabel="Send Reminders"
+          onAction={() => toast("Sending reminders...")}
+          icon={<AlertTriangle className="h-5 w-5" />}
+        />
+      </StatCardsGrid>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <TimeSeriesChart
+          title="Appointment Volume"
+          description="Daily appointment trends over the last 30 days"
+          data={appointmentTrendData}
+          type="area"
+          period="day"
+          benchmark={120}
+          benchmarkLabel="Target"
+          onPeriodChange={(p) => toast(`Period: ${p}`)}
+          onExport={() => toast("Exporting...")}
+          className="lg:col-span-2"
+        />
+        <DonutChart
+          title="Appointment Status"
+          description="Distribution by status"
+          data={appointmentStatusData}
+          centerValue="142"
+          centerLabel="Total"
+        />
+      </div>
+
+      {/* Second Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BarChart
+          title="Revenue by Department"
+          description="Q4 2024 revenue breakdown"
+          data={departmentRevenueData}
+          orientation="horizontal"
+          sortBy="value"
+          height={350}
+          onExport={() => toast("Exporting...")}
+        />
+        <ProactiveAlertsPanel
+          alerts={mockAlerts}
+          title="Proactive Alerts"
+          maxVisible={2}
+          showFilters
+          onAlertAction={handleAlertAction}
+          onSeeAll={() => toast("View all alerts")}
+          onSettings={() => toast("Alert settings")}
+        />
+      </div>
+
+      {/* Sentiment Heatmap */}
+      <SentimentHeatmap
+        data={mockSentimentData}
+        title="Patient Sentiment Heatmap"
+        description="Data sources: Zoice Calls, WhatsApp Messages, Post-Visit Surveys"
+        period="7d"
+        onPeriodChange={(p) => toast(`Period: ${p}`)}
+        onDepartmentClick={(dept) => toast(`Viewing ${dept.name} details`)}
+        onExport={() => toast("Exporting sentiment data...")}
+        onRefresh={() => toast("Refreshing...")}
+      />
+
+      {/* Analytics Assistant Dialog */}
+      <AnalyticsAssistantDialog
+        isOpen={showQueryDialog}
+        onClose={() => setShowQueryDialog(false)}
+        onQuery={handleAnalyticsQuery}
+      />
+    </div>
   );
-}
-
-// ==================== Helper Functions ====================
-
-function calculateChange(trend: Array<{ date: string; value: number }>): number {
-  if (trend.length < 2) return 0;
-
-  const recent = trend.slice(-7); // Last 7 days
-  const previous = trend.slice(-14, -7); // Previous 7 days
-
-  if (recent.length === 0 || previous.length === 0) return 0;
-
-  const recentAvg = recent.reduce((sum, d) => sum + d.value, 0) / recent.length;
-  const previousAvg = previous.reduce((sum, d) => sum + d.value, 0) / previous.length;
-
-  if (previousAvg === 0) return 0;
-
-  return ((recentAvg - previousAvg) / previousAvg) * 100;
 }
