@@ -82,9 +82,23 @@ echo_info "Pip: $(pip --version)"
 # Upgrade pip and install dependencies
 # ============================================================================
 echo_step "Installing/updating dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
-echo_info "Dependencies installed"
+pip install --upgrade pip --quiet
+
+# Install requirements with error handling
+set +e  # Temporarily disable exit on error
+pip install -r requirements.txt 2>&1
+PIP_EXIT_CODE=$?
+set -e  # Re-enable exit on error
+
+if [ $PIP_EXIT_CODE -ne 0 ]; then
+    echo_warn "Some dependencies failed to install. Installing core dependencies..."
+    pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic pydantic-settings \
+                python-dotenv loguru redis python-jose passlib httpx aiohttp \
+                python-multipart email-validator confluent-kafka alembic --quiet
+    echo_warn "Core dependencies installed. Some features may not work."
+else
+    echo_info "All dependencies installed successfully"
+fi
 
 # ============================================================================
 # Run database migrations

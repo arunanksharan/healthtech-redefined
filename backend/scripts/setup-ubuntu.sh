@@ -56,7 +56,10 @@ apt-get install -y \
     apt-transport-https \
     ca-certificates \
     gnupg \
-    lsb-release
+    lsb-release \
+    libpq-dev \
+    libffi-dev \
+    libssl-dev
 
 # ============================================================================
 # Install Python
@@ -86,7 +89,7 @@ apt-get install -y nodejs
 # ============================================================================
 echo_info "Installing PM2..."
 npm install -g pm2
-pm2 startup systemd -u ${APP_USER} --hp /home/${APP_USER}
+# Note: pm2 startup will be configured after user creation
 
 # ============================================================================
 # Install PostgreSQL
@@ -127,7 +130,13 @@ echo_info "Setting up application user..."
 if ! id "${APP_USER}" &>/dev/null; then
     useradd -m -s /bin/bash ${APP_USER}
     echo_info "Created user: ${APP_USER}"
+else
+    echo_info "User ${APP_USER} already exists"
 fi
+
+# Configure PM2 startup for the application user
+echo_info "Configuring PM2 startup..."
+pm2 startup systemd -u ${APP_USER} --hp /home/${APP_USER}
 
 # ============================================================================
 # Create application directory
