@@ -669,7 +669,9 @@ class StoredEvent(Base):
 
     # Metadata
     occurred_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    metadata = Column(JSONB, default=dict)
+    # Note: Using 'event_metadata' as Python attribute to avoid SQLAlchemy reserved name conflict
+    # The database column remains named 'metadata' for backwards compatibility
+    event_metadata = Column("metadata", JSONB, default=dict)
 
     # Indexes for efficient queries
     __table_args__ = (
@@ -739,7 +741,9 @@ class FailedEvent(Base):
     resolved_at = Column(DateTime(timezone=True))
 
     # Metadata
-    metadata = Column(JSONB, default=dict)
+    # Note: Using 'event_metadata' as Python attribute to avoid SQLAlchemy reserved name conflict
+    # The database column remains named 'metadata' for backwards compatibility
+    event_metadata = Column("metadata", JSONB, default=dict)
 
     # Indexes
     __table_args__ = (
