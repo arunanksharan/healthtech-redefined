@@ -25,6 +25,11 @@ from shared.database.models import (
 )
 from shared.events.publisher import publish_event
 from shared.events.types import EventType
+from shared.realtime import (
+    websocket_router,
+    startup_realtime,
+    shutdown_realtime,
+)
 
 from .schemas import (
     JourneyCreate, JourneyUpdate, JourneyResponse, JourneyListResponse,
@@ -57,6 +62,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include WebSocket router for real-time features
+app.include_router(websocket_router)
 
 
 # ==================== Health Check ====================
@@ -1199,7 +1207,7 @@ async def _send_communication(communication_id: UUID, db: Session):
             db.commit()
 
 
-# ==================== Startup ====================
+# ==================== Startup & Shutdown ====================
 
 @app.on_event("startup")
 async def startup_event():
@@ -1212,7 +1220,28 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Error creating database tables: {e}")
 
+    # Initialize real-time services
+    try:
+        await startup_realtime()
+        logger.info("Real-time services initialized")
+    except Exception as e:
+        logger.error(f"Error initializing real-time services: {e}")
+
     logger.info("PRM Service ready!")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("PRM Service shutting down...")
+
+    try:
+        await shutdown_realtime()
+        logger.info("Real-time services stopped")
+    except Exception as e:
+        logger.error(f"Error stopping real-time services: {e}")
+
+    logger.info("PRM Service shutdown complete")
 
 
 if __name__ == "__main__":
