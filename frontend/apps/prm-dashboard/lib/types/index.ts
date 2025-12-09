@@ -33,6 +33,10 @@ export interface Patient {
     phone: string;
     relationship: string;
   };
+  /** Patient status for dashboard display */
+  status?: 'active' | 'inactive' | 'pending';
+  /** Avatar URL for profile display */
+  avatar_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +70,8 @@ export interface Appointment {
   practitioner: Practitioner;
   start_time: string;
   end_time: string;
+  /** Alias for start_time used in some views */
+  scheduled_at?: string;
   appointment_type: 'consultation' | 'follow_up' | 'procedure' | 'test';
   status: 'scheduled' | 'confirmed' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
   notes?: string;
@@ -124,6 +130,31 @@ export interface JourneyInstance {
   updated_at: string;
 }
 
+/** Journey type used by the journeys page */
+export interface Journey {
+  id: string;
+  title?: string;
+  description?: string;
+  journey_type?: string;
+  patient_id?: string;
+  patient?: Patient;
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  current_stage?: number;
+  steps?: JourneyStep[];
+  context?: Record<string, any>;
+  started_at?: string;
+  completed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface JourneyStep {
+  id: string;
+  name: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  completed_at?: string;
+}
+
 // ==================== Communication Types ====================
 
 export interface Communication {
@@ -133,7 +164,13 @@ export interface Communication {
   channel: 'whatsapp' | 'sms' | 'email' | 'voice';
   direction: 'inbound' | 'outbound';
   content: string;
-  status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
+  /** @deprecated Use `content` instead. Kept for backward compatibility. */
+  message?: string;
+  /** Email subject line */
+  subject?: string;
+  /** @deprecated Use `content` instead. Kept for backward compatibility. */
+  body?: string;
+  status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'pending';
   media_url?: string;
   template_id?: string;
   sent_by?: string;

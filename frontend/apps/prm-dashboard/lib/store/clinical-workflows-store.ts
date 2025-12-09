@@ -84,6 +84,8 @@ export interface LabTest {
   code: string;
   cptCode: string;
   loincCode?: string;
+  /** Alias for loincCode for compatibility */
+  loinc?: string;
   category: string;
   description: string;
   specimenType: string;
@@ -100,8 +102,10 @@ export interface LabOrder {
   orderingProviderId: string;
   tests: LabTest[];
   priority: "routine" | "urgent" | "stat";
-  collectionType: "in-house" | "external" | "patient-collected";
+  collectionType: "in-house" | "external" | "patient-collected" | "mobile" | "in-office" | "psc";
   labFacility?: LabFacility;
+  /** Alias for labFacility */
+  facility?: LabFacility;
   scheduledDate?: string;
   requiresFasting: boolean;
   fastingInstructionsGiven: boolean;
@@ -111,6 +115,7 @@ export interface LabOrder {
   results?: LabResult[];
   signedAt?: string;
   signedBy?: string;
+  orderedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,8 +124,17 @@ export interface LabFacility {
   id: string;
   name: string;
   address: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   phone: string;
+  fax?: string;
   isInNetwork: boolean;
+  acceptedInsurance?: string[];
+  capabilities?: string[];
+  electronicOrdering?: boolean;
+  averageWaitTime?: string;
+  operatingHours?: string;
 }
 
 export interface LabResult {
@@ -137,7 +151,8 @@ export interface LabResult {
 export interface DiagnosisCode {
   code: string;
   description: string;
-  type: "ICD-10" | "ICD-9" | "SNOMED";
+  type?: "ICD-10" | "ICD-9" | "SNOMED";
+  category?: string;
 }
 
 // ============================================================================
@@ -156,7 +171,7 @@ export interface ClinicalNote {
   assessment?: AssessmentSection;
   plan?: PlanSection;
   freeText?: string;
-  status: "draft" | "final" | "amended" | "deleted";
+  status: "draft" | "final" | "amended" | "deleted" | "signed";
   signedAt?: string;
   signedBy?: string;
   amendedAt?: string;
@@ -168,7 +183,8 @@ export interface ClinicalNote {
 
 export interface SubjectiveSection {
   chiefComplaint: string;
-  historyOfPresentIllness: string;
+  historyOfPresentIllness?: string;
+  hpiNarrative?: string;
   reviewOfSystems?: Record<string, string>;
   pastMedicalHistory?: string;
   medications?: string;
@@ -179,14 +195,18 @@ export interface SubjectiveSection {
 
 export interface ObjectiveSection {
   vitalSigns?: VitalSigns;
+  generalAppearance?: string;
   physicalExam?: Record<string, string>;
+  examFindings?: Record<string, string>;
   labResults?: string;
   imagingResults?: string;
   otherFindings?: string;
 }
 
 export interface AssessmentSection {
-  diagnoses: AssessmentDiagnosis[];
+  diagnoses?: AssessmentDiagnosis[];
+  primaryDiagnosis?: string | AssessmentDiagnosis;
+  assessmentNarrative?: string;
   clinicalImpression?: string;
 }
 
@@ -198,7 +218,8 @@ export interface AssessmentDiagnosis {
 }
 
 export interface PlanSection {
-  items: PlanItem[];
+  items?: PlanItem[];
+  planNarrative?: string;
   followUp?: string;
   patientEducation?: string;
   ordersPlaced?: string[];
@@ -285,6 +306,7 @@ export interface Referral {
   priority: "routine" | "urgent" | "emergent";
   reasonForReferral: string;
   clinicalHistory?: string;
+  clinicalSummary?: string;
   attachedDocuments?: AttachedDocument[];
   appointmentDate?: string;
   status: "draft" | "pending" | "sent" | "accepted" | "scheduled" | "completed" | "cancelled" | "declined";
@@ -301,24 +323,31 @@ export interface Specialist {
   name: string;
   specialty: string;
   facility: string;
+  practice?: string;
   address: string;
   phone: string;
   fax?: string;
   email?: string;
   npi: string;
   isInNetwork: boolean;
+  insuranceAccepted?: string[];
   rating?: number;
   reviewCount?: number;
   nextAvailable?: string;
   estimatedCopay?: number;
+  distance?: string;
+  acceptingNewPatients?: boolean;
 }
 
 export interface AttachedDocument {
   id: string;
   name: string;
-  type: "lab_result" | "imaging" | "clinical_note" | "medication_list" | "other";
-  url: string;
-  attachedAt: string;
+  type: "lab_result" | "imaging" | "clinical_note" | "medication_list" | "clinical_summary" | "image" | "pdf" | "other";
+  url?: string;
+  size?: number;
+  attachedAt?: string;
+  /** Alias for attachedAt */
+  uploadedAt?: string;
 }
 
 // ============================================================================
@@ -359,6 +388,8 @@ interface ClinicalWorkflowsState {
 
   // UI State
   isLoading: boolean;
+  isLoadingLabTests: boolean;
+  isLoadingSpecialists: boolean;
   error: string | null;
 
   // Actions - Prescriptions
@@ -671,6 +702,8 @@ export const useClinicalWorkflowsStore = create<ClinicalWorkflowsState>()(
       diagnosisCodes: [],
 
       isLoading: false,
+      isLoadingLabTests: false,
+      isLoadingSpecialists: false,
       error: null,
 
       // Prescription Actions

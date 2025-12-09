@@ -253,6 +253,7 @@ interface TelehealthState {
   setRecordingEnabled: (enabled: boolean) => void;
   setTranscriptionEnabled: (enabled: boolean) => void;
   resetCallState: () => void;
+  startMockTranscription: () => void;
 }
 
 // ============================================================================

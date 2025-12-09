@@ -242,6 +242,8 @@ export interface PaymentPlan {
 interface PatientPortalState {
   // Patient profile
   patient: PatientProfile | null;
+  /** Alias for patient - for backward compatibility */
+  patientProfile: PatientProfile | null;
   isLoadingProfile: boolean;
 
   // Health records
@@ -256,6 +258,8 @@ interface PatientPortalState {
 
   // Appointments
   appointments: Appointment[];
+  /** Alias for appointments - for backward compatibility */
+  upcomingAppointments: Appointment[];
   availableSlots: AvailableSlot[];
   isLoadingAppointments: boolean;
   isBookingAppointment: boolean;
@@ -276,6 +280,8 @@ interface PatientPortalState {
 
   // Actions
   fetchProfile: () => Promise<void>;
+  /** Alias for fetchProfile - for backward compatibility */
+  fetchPatientProfile: () => Promise<void>;
   updateProfile: (updates: Partial<PatientProfile>) => Promise<void>;
 
   fetchHealthSummary: () => Promise<void>;
@@ -538,6 +544,7 @@ export const usePatientPortalStore = create<PatientPortalState>()(
     subscribeWithSelector((set, get) => ({
       // Initial state
       patient: null,
+      patientProfile: null, // Alias for patient
       isLoadingProfile: false,
       healthSummary: null,
       isLoadingHealth: false,
@@ -546,6 +553,7 @@ export const usePatientPortalStore = create<PatientPortalState>()(
       isLoadingMedications: false,
       isRequestingRefill: false,
       appointments: [],
+      upcomingAppointments: [], // Alias for appointments
       availableSlots: [],
       isLoadingAppointments: false,
       isBookingAppointment: false,
@@ -564,7 +572,14 @@ export const usePatientPortalStore = create<PatientPortalState>()(
       fetchProfile: async () => {
         set({ isLoadingProfile: true });
         await new Promise((r) => setTimeout(r, 500));
-        set({ patient: mockPatient, isLoadingProfile: false });
+        set({ patient: mockPatient, patientProfile: mockPatient, isLoadingProfile: false });
+      },
+
+      // Alias for fetchProfile
+      fetchPatientProfile: async () => {
+        set({ isLoadingProfile: true });
+        await new Promise((r) => setTimeout(r, 500));
+        set({ patient: mockPatient, patientProfile: mockPatient, isLoadingProfile: false });
       },
 
       updateProfile: async (updates) => {
@@ -615,7 +630,11 @@ export const usePatientPortalStore = create<PatientPortalState>()(
       fetchAppointments: async () => {
         set({ isLoadingAppointments: true });
         await new Promise((r) => setTimeout(r, 500));
-        set({ appointments: mockAppointments, isLoadingAppointments: false });
+        set({
+          appointments: mockAppointments,
+          upcomingAppointments: mockAppointments,
+          isLoadingAppointments: false
+        });
       },
 
       searchAvailableSlots: async (providerId, startDate, endDate) => {
