@@ -180,7 +180,7 @@ const NOTE_TEMPLATES: NoteTemplate[] = [
     },
     objective: {
       generalAppearance: "Well-appearing, in no acute distress",
-      examFindings: [],
+      examFindings: {},
     },
     assessment: {
       primaryDiagnosis: {
@@ -903,9 +903,11 @@ export function SOAPNoteEditor({
       setObjective(template.objective.generalAppearance);
     }
     if (template.assessment?.primaryDiagnosis) {
-      setAssessment(
-        `Primary Diagnosis: ${template.assessment.primaryDiagnosis.code} - ${template.assessment.primaryDiagnosis.description}`
-      );
+      const pd = template.assessment.primaryDiagnosis;
+      const diagnosisText = typeof pd === 'string'
+        ? pd
+        : `${pd.code} - ${pd.description}`;
+      setAssessment(`Primary Diagnosis: ${diagnosisText}`);
     }
     if (template.plan?.planNarrative) {
       setPlan(template.plan.planNarrative);
@@ -936,6 +938,7 @@ export function SOAPNoteEditor({
         id: previousNote?.id || `note-${Date.now()}`,
         patientId,
         encounterId,
+        authorId: "current-provider-id",
         noteType: "soap",
         subjective: {
           chiefComplaint: "",
@@ -943,7 +946,7 @@ export function SOAPNoteEditor({
         },
         objective: {
           generalAppearance: objective,
-          examFindings: [],
+          examFindings: {},
         },
         assessment: {
           assessmentNarrative: assessment,
@@ -968,6 +971,7 @@ export function SOAPNoteEditor({
       id: previousNote?.id || `note-${Date.now()}`,
       patientId,
       encounterId,
+      authorId: "current-provider-id",
       noteType: "soap",
       subjective: {
         chiefComplaint: "",
@@ -975,7 +979,7 @@ export function SOAPNoteEditor({
       },
       objective: {
         generalAppearance: objective,
-        examFindings: [],
+        examFindings: {},
       },
       assessment: {
         assessmentNarrative: assessment,

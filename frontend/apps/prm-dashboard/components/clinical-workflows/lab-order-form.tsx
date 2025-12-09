@@ -213,11 +213,12 @@ const LAB_FACILITIES: LabFacility[] = [
     zipCode: "94102",
     phone: "(415) 555-0101",
     fax: "(415) 555-0102",
+    isInNetwork: true,
     acceptedInsurance: ["Blue Cross", "Aetna", "United", "Medicare"],
     capabilities: ["Blood Draw", "Urine Collection", "Drug Screen"],
     operatingHours: "Mon-Fri 7AM-6PM, Sat 8AM-12PM",
     electronicOrdering: true,
-    averageWaitTime: 15,
+    averageWaitTime: "15 min",
   },
   {
     id: "fac-labcorp-downtown",
@@ -228,11 +229,12 @@ const LAB_FACILITIES: LabFacility[] = [
     zipCode: "94103",
     phone: "(415) 555-0201",
     fax: "(415) 555-0202",
+    isInNetwork: true,
     acceptedInsurance: ["Blue Cross", "Cigna", "United", "Medicaid"],
     capabilities: ["Blood Draw", "Urine Collection", "Genetic Testing"],
     operatingHours: "Mon-Fri 6AM-8PM, Sat-Sun 8AM-4PM",
     electronicOrdering: true,
-    averageWaitTime: 20,
+    averageWaitTime: "20 min",
   },
   {
     id: "fac-inhouse",
@@ -243,11 +245,12 @@ const LAB_FACILITIES: LabFacility[] = [
     zipCode: "94102",
     phone: "(415) 555-0001",
     fax: "(415) 555-0002",
+    isInNetwork: true,
     acceptedInsurance: ["All insurances"],
     capabilities: ["Blood Draw", "Rapid Tests", "POC Testing"],
     operatingHours: "During clinic hours",
     electronicOrdering: false,
-    averageWaitTime: 5,
+    averageWaitTime: "5 min",
   },
 ];
 
@@ -340,7 +343,7 @@ function TestSearch({ onSelectTest, selectedTestIds }: TestSearchProps) {
                     </div>
                   </div>
                   <span className="text-sm font-medium text-green-600">
-                    ${test.price.toFixed(2)}
+                    ${(test.price ?? 0).toFixed(2)}
                   </span>
                 </CommandItem>
               ))}
@@ -459,7 +462,7 @@ function SelectedTestItem({ test, onRemove, onUpdateInstructions }: SelectedTest
             <Clock className="h-3 w-3" />
             {test.turnaroundTime}
           </span>
-          <span className="text-green-600 font-medium">${test.price.toFixed(2)}</span>
+          <span className="text-green-600 font-medium">${(test.price ?? 0).toFixed(2)}</span>
         </div>
         {showInstructions && (
           <Textarea
@@ -617,8 +620,8 @@ function FacilitySelector({ selectedFacility, onSelect, patientInsurance }: Faci
       >
         {LAB_FACILITIES.map((facility) => {
           const acceptsInsurance = patientInsurance
-            ? facility.acceptedInsurance.includes(patientInsurance) ||
-              facility.acceptedInsurance.includes("All insurances")
+            ? (facility.acceptedInsurance ?? []).includes(patientInsurance) ||
+              (facility.acceptedInsurance ?? []).includes("All insurances")
             : true;
 
           return (
@@ -711,7 +714,7 @@ function OrderSummary({
   facility,
   diagnosisCodes,
 }: OrderSummaryProps) {
-  const totalPrice = selectedTests.reduce((sum, test) => sum + test.price, 0);
+  const totalPrice = selectedTests.reduce((sum, test) => sum + (test.price ?? 0), 0);
   const hasAnyFasting = selectedTests.some((t) => t.requiresFasting);
 
   return (
