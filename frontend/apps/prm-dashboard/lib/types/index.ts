@@ -69,6 +69,7 @@ export interface Appointment {
   practitioner_id: string;
   practitioner: Practitioner;
   start_time: string;
+  scheduled_at?: string; // Mapped from start_time for frontend compatibility
   end_time: string;
   /** Alias for start_time used in some views */
   scheduled_at?: string;

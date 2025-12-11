@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
  */
 
 // Create axios instance with default configuration
-const apiClient: AxiosInstance = axios.create({
+export const apiClient: AxiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   timeout: 30000,
   headers: {
@@ -104,8 +104,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-export default apiClient;
-export { apiClient };
+
 
 /**
  * API Response Types

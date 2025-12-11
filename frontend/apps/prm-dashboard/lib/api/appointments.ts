@@ -1,4 +1,4 @@
-import apiClient, { PaginatedResponse, apiCall } from './client';
+import { apiClient, PaginatedResponse, apiCall } from './client';
 import type { Appointment, AppointmentSlot } from '@/lib/types';
 
 /**
@@ -19,9 +19,50 @@ export const appointmentsAPI = {
     date_start?: string;
     date_end?: string;
   }) {
-    return apiCall<PaginatedResponse<Appointment>>(
-      apiClient.get('/api/v1/prm/appointments', { params })
-    );
+    // MOCK DATA for Dashboard
+    const mockAppointments: Appointment[] = [
+      {
+        id: '1',
+        patient_id: 'p1',
+        patient: { id: 'p1', name: 'John Doe', mrn: 'MRN001', phone: '555-0101', date_of_birth: '1980-01-01', gender: 'male', created_at: '', updated_at: '' },
+        practitioner_id: 'dr1',
+        practitioner: { id: 'dr1', name: 'Dr. Sarah Wilson', speciality: 'Cardiology', qualification: 'MD' },
+        start_time: new Date().toISOString(), // Today
+        scheduled_at: new Date().toISOString(), // Same as start_time
+        end_time: new Date(Date.now() + 30 * 60000).toISOString(),
+        appointment_type: 'consultation',
+        status: 'confirmed',
+        location: { id: 'l1', name: 'Room 302' },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        patient_id: 'p2',
+        patient: { id: 'p2', name: 'Jane Smith', mrn: 'MRN002', phone: '555-0102', date_of_birth: '1990-05-15', gender: 'female', created_at: '', updated_at: '' },
+        practitioner_id: 'dr1',
+        practitioner: { id: 'dr1', name: 'Dr. Sarah Wilson', speciality: 'Cardiology', qualification: 'MD' },
+        start_time: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+        scheduled_at: new Date(Date.now() + 86400000).toISOString(), // Same as start_time
+        end_time: new Date(Date.now() + 86400000 + 30 * 60000).toISOString(),
+        appointment_type: 'follow_up',
+        status: 'scheduled',
+        location: { id: 'l1', name: 'Room 302' },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+    ];
+
+    return [
+      {
+        items: mockAppointments,
+        total: 2,
+        page: 1,
+        page_size: 20,
+        total_pages: 1
+      } as PaginatedResponse<Appointment>,
+      null
+    ];
   },
 
   /**

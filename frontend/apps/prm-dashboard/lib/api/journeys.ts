@@ -1,10 +1,7 @@
 import { apiClient, apiCall } from './client';
-import { Journey, PaginatedResponse, APIError } from '@/lib/types';
+import { Journey, JourneyListResponse, APIError } from '@/lib/api/types';
 
-/**
- * Journeys API
- * All journey-related API operations
- */
+// ...
 
 export const journeysAPI = {
   /**
@@ -15,10 +12,79 @@ export const journeysAPI = {
     limit?: number;
     status?: string;
     patient_id?: string;
-  }): Promise<[PaginatedResponse<Journey> | null, APIError | null]> {
-    return apiCall<PaginatedResponse<Journey>>(
+  }): Promise<[JourneyListResponse | null, APIError | null]> {
+    return apiCall<JourneyListResponse>(
       apiClient.get('/api/v1/prm/journeys', { params })
     );
+  },
+
+  /**
+   * Get journey instances (Patient Journeys)
+   */
+  async getInstances(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    patient_id?: string;
+  }): Promise<[import('@/lib/api/types').JourneyInstanceListResponse | null, APIError | null]> {
+    // MOCK DATA for Dashboard
+    const mockInstances: import('@/lib/api/types').JourneyInstance[] = [
+      {
+        id: 'j1',
+        tenant_id: 't1',
+        journey_id: 'journey1',
+        patient_id: 'p1',
+        status: 'active',
+        started_at: new Date(Date.now() - 86400000 * 2).toISOString(), // 2 days ago
+        created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+        updated_at: new Date().toISOString(),
+        patient: { id: 'p1', name: 'John Doe', gender: 'male', date_of_birth: '1980-01-01' },
+        journey: { id: 'journey1', name: 'Post-Surgery Recovery', title: 'Post-Surgery Recovery' },
+        current_stage_id: 'stage2',
+        context: { progress: 45 }
+      },
+      {
+        id: 'j2',
+        tenant_id: 't1',
+        journey_id: 'journey2',
+        patient_id: 'p2',
+        status: 'completed',
+        started_at: new Date(Date.now() - 86400000 * 10).toISOString(), // 10 days ago
+        completed_at: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+        created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
+        updated_at: new Date().toISOString(),
+        patient: { id: 'p2', name: 'Jane Smith', gender: 'female', date_of_birth: '1990-05-15' },
+        journey: { id: 'journey2', name: 'Maternity Care', title: 'Maternity Care' },
+        current_stage_id: 'stage_final',
+        context: { progress: 100 }
+      },
+      {
+        id: 'j3',
+        tenant_id: 't1',
+        journey_id: 'journey3',
+        patient_id: 'p3',
+        status: 'active',
+        started_at: new Date().toISOString(), // Today
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        patient: { id: 'p3', name: 'Robert Johnson', gender: 'male', date_of_birth: '1975-08-20' },
+        journey: { id: 'journey3', name: 'Chronic Diabetes Management', title: 'Chronic Diabetes Management' },
+        current_stage_id: 'stage1',
+        context: { progress: 15 }
+      }
+    ];
+
+    return [
+      {
+        total: 3,
+        instances: mockInstances,
+        page: 1,
+        page_size: 20,
+        has_next: false,
+        has_previous: false
+      },
+      null
+    ];
   },
 
   /**

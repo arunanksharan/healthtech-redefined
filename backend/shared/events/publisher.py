@@ -155,7 +155,7 @@ class EventPublisher:
                     published_at=datetime.utcnow(),
                     source_service=event.source_service,
                     source_user_id=event.source_user_id,
-                    metadata=event.metadata,
+                    meta_data=event.metadata,
                 )
                 db.add(db_event)
                 # Session will commit via context manager

@@ -1,10 +1,7 @@
 import { apiClient, apiCall } from './client';
-import { Ticket, PaginatedResponse, APIError } from '@/lib/types';
+import { Ticket, TicketListResponse, APIError } from '@/lib/api/types';
 
-/**
- * Tickets API
- * All ticket-related API operations
- */
+// ...
 
 export const ticketsAPI = {
   /**
@@ -17,8 +14,8 @@ export const ticketsAPI = {
     category?: string;
     priority?: string;
     assigned_to?: string;
-  }): Promise<[PaginatedResponse<Ticket> | null, APIError | null]> {
-    return apiCall<PaginatedResponse<Ticket>>(
+  }): Promise<[TicketListResponse | null, APIError | null]> {
+    return apiCall<TicketListResponse>(
       apiClient.get('/api/v1/prm/tickets', { params })
     );
   },

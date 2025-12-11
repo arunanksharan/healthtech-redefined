@@ -669,9 +669,7 @@ class StoredEvent(Base):
 
     # Metadata
     occurred_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    # Note: Using 'event_metadata' as Python attribute to avoid SQLAlchemy reserved name conflict
-    # The database column remains named 'metadata' for backwards compatibility
-    event_metadata = Column("metadata", JSONB, default=dict)
+    meta_data = Column(JSONB, default=dict)
 
     # Indexes for efficient queries
     __table_args__ = (
@@ -741,9 +739,7 @@ class FailedEvent(Base):
     resolved_at = Column(DateTime(timezone=True))
 
     # Metadata
-    # Note: Using 'event_metadata' as Python attribute to avoid SQLAlchemy reserved name conflict
-    # The database column remains named 'metadata' for backwards compatibility
-    event_metadata = Column("metadata", JSONB, default=dict)
+    meta_data = Column(JSONB, default=dict)
 
     # Indexes
     __table_args__ = (
@@ -857,7 +853,7 @@ class Appointment(Base):
     practitioner = relationship("Practitioner")
     location = relationship("Location")
     time_slot = relationship("TimeSlot", back_populates="appointments")
-    encounter = relationship("Encounter", back_populates="appointment", uselist=False)
+    encounter = relationship("Encounter", foreign_keys=[encounter_id])
 
     # Indexes
     __table_args__ = (
@@ -895,7 +891,7 @@ class Encounter(Base):
     # Relationships
     patient = relationship("Patient", back_populates="encounters")
     practitioner = relationship("Practitioner")
-    appointment = relationship("Appointment", back_populates="encounter")
+    appointment = relationship("Appointment", foreign_keys=[appointment_id])
 
     # Indexes
     __table_args__ = (

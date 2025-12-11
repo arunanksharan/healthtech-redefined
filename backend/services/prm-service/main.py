@@ -12,7 +12,10 @@ import re
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from fastapi import FastAPI, HTTPException, Depends, Query, status, BackgroundTasks
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+from fastapi import FastAPI, HTTPException, Depends, Query, status as http_status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, desc
@@ -31,7 +34,7 @@ from shared.realtime import (
     shutdown_realtime,
 )
 
-from .schemas import (
+from schemas import (
     JourneyCreate, JourneyUpdate, JourneyResponse, JourneyListResponse,
     JourneyStageCreate, JourneyStageUpdate, JourneyStageResponse,
     JourneyInstanceCreate, JourneyInstanceUpdate, JourneyInstanceResponse,
@@ -53,6 +56,13 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+from fastapi.responses import RedirectResponse
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
+
 
 # CORS configuration
 app.add_middleware(
@@ -84,7 +94,7 @@ async def health_check():
 @app.post(
     "/api/v1/prm/journeys",
     response_model=JourneyResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
     tags=["Journeys"]
 )
 async def create_journey(
@@ -148,7 +158,7 @@ async def create_journey(
         db.rollback()
         logger.error(f"Error creating journey: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create journey: {str(e)}"
         )
 
@@ -204,7 +214,7 @@ async def list_journeys(
     except Exception as e:
         logger.error(f"Error listing journeys: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list journeys"
         )
 
@@ -226,7 +236,7 @@ async def get_journey(
 
         if not journey:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Journey not found"
             )
 
@@ -237,7 +247,7 @@ async def get_journey(
     except Exception as e:
         logger.error(f"Error retrieving journey: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve journey"
         )
 
@@ -258,7 +268,7 @@ async def update_journey(
 
         if not journey:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Journey not found"
             )
 
@@ -290,7 +300,7 @@ async def update_journey(
         db.rollback()
         logger.error(f"Error updating journey: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update journey"
         )
 
@@ -300,7 +310,7 @@ async def update_journey(
 @app.post(
     "/api/v1/prm/journeys/{journey_id}/stages",
     response_model=JourneyStageResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
     tags=["Journeys"]
 )
 async def add_journey_stage(
@@ -315,7 +325,7 @@ async def add_journey_stage(
 
         if not journey:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Journey not found"
             )
 
@@ -343,7 +353,7 @@ async def add_journey_stage(
         db.rollback()
         logger.error(f"Error adding journey stage: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to add journey stage"
         )
 
@@ -368,7 +378,7 @@ async def update_journey_stage(
 
         if not stage:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Journey stage not found"
             )
 
@@ -403,7 +413,7 @@ async def update_journey_stage(
         db.rollback()
         logger.error(f"Error updating journey stage: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update journey stage"
         )
 
@@ -413,7 +423,7 @@ async def update_journey_stage(
 @app.post(
     "/api/v1/prm/instances",
     response_model=JourneyInstanceResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
     tags=["Journey Instances"]
 )
 async def create_journey_instance(
@@ -437,7 +447,7 @@ async def create_journey_instance(
 
         if not journey:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Journey not found"
             )
 
@@ -449,7 +459,7 @@ async def create_journey_instance(
 
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Patient not found"
             )
 
@@ -521,7 +531,7 @@ async def create_journey_instance(
         db.rollback()
         logger.error(f"Error creating journey instance: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create journey instance: {str(e)}"
         )
 
@@ -550,7 +560,7 @@ async def list_journey_instances(
             query = query.filter(JourneyInstance.journey_id == journey_id)
 
         if status:
-            query = query.filter(JourneyInstance.status == status.lower())
+            query = query.filter(JourneyInstance.status == http_status.lower())
 
         # Get total count
         total = query.count()
@@ -576,7 +586,7 @@ async def list_journey_instances(
     except Exception as e:
         logger.error(f"Error listing journey instances: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list journey instances"
         )
 
@@ -599,7 +609,7 @@ async def get_journey_instance(
 
         if not instance:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Journey instance not found"
             )
 
@@ -641,7 +651,7 @@ async def get_journey_instance(
     except Exception as e:
         logger.error(f"Error retrieving journey instance: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve journey instance"
         )
 
@@ -672,13 +682,13 @@ async def advance_journey_stage(
 
         if not instance:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Active journey instance not found"
             )
 
         if not instance.current_stage_id:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail="Journey has no current stage"
             )
 
@@ -690,7 +700,7 @@ async def advance_journey_stage(
 
         if not current_stage:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Current stage not found"
             )
 
@@ -789,7 +799,7 @@ async def advance_journey_stage(
         db.rollback()
         logger.error(f"Error advancing journey stage: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to advance journey stage"
         )
 
@@ -799,7 +809,7 @@ async def advance_journey_stage(
 @app.post(
     "/api/v1/prm/communications",
     response_model=CommunicationResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
     tags=["Communications"]
 )
 async def create_communication(
@@ -822,7 +832,7 @@ async def create_communication(
 
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Patient not found"
             )
 
@@ -865,7 +875,7 @@ async def create_communication(
         db.rollback()
         logger.error(f"Error creating communication: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create communication"
         )
 
@@ -898,7 +908,7 @@ async def list_communications(
             query = query.filter(Communication.channel == channel.lower())
 
         if status:
-            query = query.filter(Communication.status == status.lower())
+            query = query.filter(Communication.status == http_status.lower())
 
         # Get total count
         total = query.count()
@@ -924,7 +934,7 @@ async def list_communications(
     except Exception as e:
         logger.error(f"Error listing communications: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list communications"
         )
 
@@ -934,7 +944,7 @@ async def list_communications(
 @app.post(
     "/api/v1/prm/tickets",
     response_model=TicketResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
     tags=["Tickets"]
 )
 async def create_ticket(
@@ -955,7 +965,7 @@ async def create_ticket(
 
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Patient not found"
             )
 
@@ -999,7 +1009,7 @@ async def create_ticket(
         db.rollback()
         logger.error(f"Error creating ticket: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create ticket"
         )
 
@@ -1026,7 +1036,7 @@ async def list_tickets(
             query = query.filter(Ticket.patient_id == patient_id)
 
         if status:
-            query = query.filter(Ticket.status == status.lower())
+            query = query.filter(Ticket.status == http_status.lower())
 
         if priority:
             query = query.filter(Ticket.priority == priority.lower())
@@ -1058,7 +1068,7 @@ async def list_tickets(
     except Exception as e:
         logger.error(f"Error listing tickets: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list tickets"
         )
 
@@ -1079,7 +1089,7 @@ async def update_ticket(
 
         if not ticket:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail="Ticket not found"
             )
 
@@ -1119,7 +1129,7 @@ async def update_ticket(
         db.rollback()
         logger.error(f"Error updating ticket: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update ticket"
         )
 
