@@ -1,4 +1,4 @@
-import apiClient, { PaginatedResponse, apiCall } from './client';
+import { apiClient, PaginatedResponse, apiCall } from './client';
 import type { Appointment, AppointmentSlot } from '@/lib/types';
 
 /**
