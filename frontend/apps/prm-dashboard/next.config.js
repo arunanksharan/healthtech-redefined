@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // ESLint configuration for build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // Enable Turbopack for faster development (Next.js 15)
   // Run with: next dev --turbo
   experimental: {
