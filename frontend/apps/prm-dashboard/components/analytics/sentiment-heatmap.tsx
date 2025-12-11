@@ -42,7 +42,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { SentimentData } from "@/lib/store/analytics-store";
+import type { SentimentDataAggregate, DepartmentSentiment } from "@/lib/store/analytics-store";
 import { format } from "date-fns";
 
 // ============================================================================
@@ -51,24 +51,8 @@ import { format } from "date-fns";
 
 export type SentimentLevel = "good" | "watch" | "critical";
 
-export interface SentimentDepartment {
-  id: string;
-  name: string;
-  score: number;
-  previousScore?: number;
-  change?: number;
-  totalFeedback: number;
-  sources: {
-    voice: number;
-    whatsapp: number;
-    survey: number;
-    email: number;
-  };
-  topThemes: {
-    positive: string[];
-    negative: string[];
-  };
-}
+// Re-export DepartmentSentiment as SentimentDepartment for component compatibility
+export type SentimentDepartment = DepartmentSentiment;
 
 export interface FeedbackItem {
   id: string;
@@ -199,7 +183,7 @@ function SentimentCell({
 // ============================================================================
 
 export interface SentimentHeatmapProps {
-  data: SentimentData;
+  data: SentimentDataAggregate;
   title?: string;
   description?: string;
   period?: string;
@@ -516,7 +500,7 @@ function SentimentDetailDialog({
 // ============================================================================
 
 export interface SentimentSummaryProps {
-  data: SentimentData;
+  data: SentimentDataAggregate;
   onClick?: () => void;
   className?: string;
 }
