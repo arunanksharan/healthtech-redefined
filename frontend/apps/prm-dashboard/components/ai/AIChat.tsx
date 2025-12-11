@@ -262,7 +262,7 @@ export function AIChat({
           </div>
 
           <button
-            onClick={() => toast.info('Voice input coming soon!')}
+            onClick={() => toast('Voice input coming soon!', { icon: 'ℹ️' })}
             className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Voice input (coming soon)"
           >

@@ -55,7 +55,7 @@ import {
 } from "@/components/analytics";
 
 import { useAnalyticsStore } from "@/lib/store/analytics-store";
-import type { AIInsight, ProactiveAlert, SentimentData } from "@/lib/store/analytics-store";
+import type { AIInsight, ProactiveAlert, SentimentDataAggregate } from "@/lib/store/analytics-store";
 
 // ============================================================================
 // Types & Constants
@@ -137,10 +137,11 @@ export default function AnalyticsDashboardPage() {
     { name: "No-Show", value: 5, color: "#f59e0b" },
   ], []);
 
-  // Mock insights
+  // Mock insights with proper AIInsight type
   const mockInsights: AIInsight[] = React.useMemo(() => [
     {
       id: "1",
+      type: "positive",
       title: "Cardiology revenue is 15% above target",
       description: "Cardiology department has exceeded revenue targets for the 3rd consecutive month, driven by increased referrals and new patient volume.",
       category: "revenue",
@@ -155,9 +156,11 @@ export default function AnalyticsDashboardPage() {
         { id: "2", label: "Analyze top procedures" },
       ],
       createdAt: new Date().toISOString(),
+      isRead: false,
     },
     {
       id: "2",
+      type: "warning",
       title: "Pediatrics no-show rate spiked to 22%",
       description: "No-show rate in Pediatrics increased significantly compared to last week. Contributing factors: first-time appointments and Monday mornings.",
       category: "operations",
@@ -172,9 +175,11 @@ export default function AnalyticsDashboardPage() {
         { id: "4", label: "View high-risk patients" },
       ],
       createdAt: new Date().toISOString(),
+      isRead: false,
     },
     {
       id: "3",
+      type: "info",
       title: "3 high-risk patients identified for outreach",
       description: "AI has identified 3 patients with high readmission risk who may benefit from proactive outreach.",
       category: "clinical",
@@ -185,10 +190,11 @@ export default function AnalyticsDashboardPage() {
         { id: "6", label: "Schedule follow-ups" },
       ],
       createdAt: new Date().toISOString(),
+      isRead: false,
     },
   ], []);
 
-  // Mock alerts
+  // Mock alerts with proper ProactiveAlert type
   const mockAlerts: ProactiveAlert[] = React.useMemo(() => [
     {
       id: "1",
@@ -196,11 +202,13 @@ export default function AnalyticsDashboardPage() {
       description: "8 appointments tomorrow flagged as 'High No-Show Risk' based on past behavior, distance, and weather forecast.",
       type: "no_show_risk",
       priority: "high",
+      status: "active",
+      source: "Predictive Analytics",
       affectedItems: [
-        { name: "Rahul Verma", time: "9:00 AM", riskScore: 85, reason: "3 past no-shows" },
-        { name: "Sunita Devi", time: "10:30 AM", riskScore: 78, reason: "Far distance" },
-        { name: "Amit Kumar", time: "11:00 AM", riskScore: 72, reason: "First visit" },
-        { name: "Priya Sharma", time: "2:00 PM", riskScore: 68, reason: "Weather alert" },
+        { id: "p1", name: "Rahul Verma", time: "9:00 AM", riskScore: 85, reason: "3 past no-shows" },
+        { id: "p2", name: "Sunita Devi", time: "10:30 AM", riskScore: 78, reason: "Far distance" },
+        { id: "p3", name: "Amit Kumar", time: "11:00 AM", riskScore: 72, reason: "First visit" },
+        { id: "p4", name: "Priya Sharma", time: "2:00 PM", riskScore: 68, reason: "Weather alert" },
       ],
       suggestedAction: "Send WhatsApp confirmation request to all 8 patients",
       primaryAction: "Send Confirmations Now",
@@ -213,10 +221,12 @@ export default function AnalyticsDashboardPage() {
       description: "3 appointment slots became available due to last-minute cancellations.",
       type: "cancellation",
       priority: "medium",
+      status: "active",
+      source: "Schedule Management",
       affectedItems: [
-        { name: "Slot 1", time: "10:00 AM" },
-        { name: "Slot 2", time: "11:30 AM" },
-        { name: "Slot 3", time: "3:00 PM" },
+        { id: "s1", name: "Slot 1", time: "10:00 AM" },
+        { id: "s2", name: "Slot 2", time: "11:30 AM" },
+        { id: "s3", name: "Slot 3", time: "3:00 PM" },
       ],
       suggestedAction: "Notify waitlisted patients about available slots",
       primaryAction: "Notify Waitlist",
@@ -225,8 +235,8 @@ export default function AnalyticsDashboardPage() {
     },
   ], []);
 
-  // Mock sentiment data
-  const mockSentimentData: SentimentData = React.useMemo(() => ({
+  // Mock sentiment data with proper SentimentDataAggregate type
+  const mockSentimentData: SentimentDataAggregate = React.useMemo(() => ({
     overallScore: 76,
     previousScore: 78,
     totalFeedback: 1250,

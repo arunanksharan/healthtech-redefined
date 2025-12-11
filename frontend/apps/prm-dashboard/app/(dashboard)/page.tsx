@@ -31,13 +31,14 @@ import { Badge } from '@/components/ui/badge';
 import { formatSmartDate } from '@/lib/utils/date';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import type { Appointment } from '@/lib/types';
 
 export default function DashboardPage() {
   // Fetch dashboard data
   const { data: appointmentsData } = useQuery({
     queryKey: ['appointments-dashboard'],
     queryFn: async () => {
-      const [data] = await appointmentsAPI.getAll({ limit: 100 });
+      const [data] = await appointmentsAPI.getAll({ page_size: 100 });
       return data;
     },
   });
@@ -45,7 +46,7 @@ export default function DashboardPage() {
   const { data: patientsData } = useQuery({
     queryKey: ['patients-dashboard'],
     queryFn: async () => {
-      const [data] = await patientsAPI.getAll({ limit: 100 });
+      const [data] = await patientsAPI.getAll({ page_size: 100 });
       return data;
     },
   });
@@ -74,18 +75,22 @@ export default function DashboardPage() {
     },
   });
 
-  const appointments = appointmentsData?.data || [];
-  const patients = patientsData?.data || [];
-  const journeys = journeysData?.data || [];
-  const communications = communicationsData?.data || [];
-  const tickets = ticketsData?.data || [];
+  const appointments = appointmentsData?.items || [];
+  const patients = patientsData?.items || [];
+  const journeys = journeysData?.items || [];
+  const communications = communicationsData?.items || [];
+  const tickets = ticketsData?.items || [];
+
+  // Helper to get appointment date (scheduled_at or start_time)
+  const getAppointmentDate = (apt: Appointment): Date =>
+    new Date(apt.scheduled_at || apt.start_time);
 
   // Calculate today's appointments
   const today = new Date();
   const todayStart = new Date(today.setHours(0, 0, 0, 0));
   const todayEnd = new Date(today.setHours(23, 59, 59, 999));
   const todaysAppointments = appointments.filter(apt => {
-    const aptDate = new Date(apt.scheduled_at);
+    const aptDate = getAppointmentDate(apt);
     return aptDate >= todayStart && aptDate <= todayEnd;
   });
 
@@ -103,8 +108,8 @@ export default function DashboardPage() {
 
   // Get upcoming appointments
   const upcomingAppointments = appointments
-    .filter(apt => new Date(apt.scheduled_at) >= new Date())
-    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+    .filter(apt => getAppointmentDate(apt) >= new Date())
+    .sort((a, b) => getAppointmentDate(a).getTime() - getAppointmentDate(b).getTime())
     .slice(0, 5);
 
   return (
@@ -322,12 +327,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-900">
-                        {new Date(apt.scheduled_at).toLocaleTimeString('en-US', {
+                        {getAppointmentDate(apt).toLocaleTimeString('en-US', {
                           hour: 'numeric',
                           minute: '2-digit',
                         })}
                       </p>
-                      <p className="text-xs text-gray-500">{formatSmartDate(apt.scheduled_at)}</p>
+                      <p className="text-xs text-gray-500">{formatSmartDate(apt.scheduled_at || apt.start_time)}</p>
                     </div>
                     <Badge variant={apt.status === 'confirmed' ? 'success' : 'default'}>
                       {apt.status}

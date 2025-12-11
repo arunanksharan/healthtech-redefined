@@ -50,11 +50,11 @@ export default function AppointmentsPage() {
     },
   });
 
-  const appointments = appointmentsData?.data || [];
+  const appointments = appointmentsData?.items || [];
   const stats = {
     total: appointments.length,
     confirmed: appointments.filter(a => a.status === 'confirmed').length,
-    pending: appointments.filter(a => a.status === 'pending').length,
+    pending: appointments.filter(a => a.status === 'scheduled').length,
     cancelled: appointments.filter(a => a.status === 'cancelled').length,
   };
 

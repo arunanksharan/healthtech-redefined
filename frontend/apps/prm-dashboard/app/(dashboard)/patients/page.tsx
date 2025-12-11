@@ -58,7 +58,7 @@ export default function PatientsPage() {
     toast.success(`Found ${results?.length || 0} patients`);
   };
 
-  const patients = patientsData?.data || [];
+  const patients = patientsData?.items || [];
   const totalCount = patientsData?.total || 0;
 
   return (

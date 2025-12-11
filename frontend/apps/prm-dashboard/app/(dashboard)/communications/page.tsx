@@ -52,7 +52,7 @@ export default function CommunicationsPage() {
     },
   });
 
-  const communications = commsData?.data || [];
+  const communications = commsData?.items || [];
   const filteredCommunications = communications.filter(comm =>
     searchQuery === '' ||
     comm.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||

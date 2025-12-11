@@ -86,7 +86,7 @@ export default function TicketsPage() {
     },
   });
 
-  const tickets = ticketsData?.data || [];
+  const tickets = ticketsData?.items || [];
   const filteredTickets = tickets.filter(ticket =>
     searchQuery === '' ||
     ticket.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||

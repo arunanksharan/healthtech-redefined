@@ -51,7 +51,7 @@ export default function JourneysPage() {
     },
   });
 
-  const journeys = journeysData?.data || [];
+  const journeys = journeysData?.items || [];
   const filteredJourneys = journeys.filter(journey =>
     searchQuery === '' ||
     journey.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -220,7 +220,7 @@ export default function JourneysPage() {
                       {/* Icon */}
                       <div className={cn(
                         "w-12 h-12 rounded-lg flex items-center justify-center",
-                        getJourneyTypeColor(journey.journey_type)
+                        getJourneyTypeColor(journey.journey_type || 'default')
                       )}>
                         <Route className="w-6 h-6" />
                       </div>
@@ -239,7 +239,7 @@ export default function JourneysPage() {
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-4 h-4" />
-                                Started {formatSmartDate(journey.created_at)}
+                                Started {formatSmartDate(journey.created_at || new Date().toISOString())}
                               </div>
                             </div>
                           </div>
@@ -247,7 +247,7 @@ export default function JourneysPage() {
                             <Badge variant={getStatusColor(journey.status)}>
                               {journey.status}
                             </Badge>
-                            <Badge variant="outline" className={getJourneyTypeColor(journey.journey_type)}>
+                            <Badge variant="outline" className={getJourneyTypeColor(journey.journey_type || 'default')}>
                               {journey.journey_type?.replace('_', ' ') || 'General'}
                             </Badge>
                           </div>
