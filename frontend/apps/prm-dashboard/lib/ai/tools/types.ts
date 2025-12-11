@@ -28,6 +28,7 @@ export interface ExecutionContext {
   sessionId: string;
   requestId: string;
   permissions: string[];
+  agentChain?: string[];
 }
 
 /**
