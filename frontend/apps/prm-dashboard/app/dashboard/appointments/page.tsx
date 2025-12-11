@@ -55,7 +55,7 @@ export default function AppointmentsPage() {
     },
   });
 
-  const appointments = appointmentsData?.data || [];
+  const appointments = appointmentsData?.items || [];
   const stats = {
     total: appointments.length,
     confirmed: appointments.filter(a => a.status === 'confirmed').length,

@@ -853,7 +853,7 @@ class Appointment(Base):
     practitioner = relationship("Practitioner")
     location = relationship("Location")
     time_slot = relationship("TimeSlot", back_populates="appointments")
-    encounter = relationship("Encounter", back_populates="appointment", uselist=False)
+    encounter = relationship("Encounter", foreign_keys=[encounter_id])
 
     # Indexes
     __table_args__ = (
@@ -891,7 +891,7 @@ class Encounter(Base):
     # Relationships
     patient = relationship("Patient", back_populates="encounters")
     practitioner = relationship("Practitioner")
-    appointment = relationship("Appointment", back_populates="encounter")
+    appointment = relationship("Appointment", foreign_keys=[appointment_id])
 
     # Indexes
     __table_args__ = (

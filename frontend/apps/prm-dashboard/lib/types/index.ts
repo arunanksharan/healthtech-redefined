@@ -65,6 +65,7 @@ export interface Appointment {
   practitioner_id: string;
   practitioner: Practitioner;
   start_time: string;
+  scheduled_at?: string; // Mapped from start_time for frontend compatibility
   end_time: string;
   appointment_type: 'consultation' | 'follow_up' | 'procedure' | 'test';
   status: 'scheduled' | 'confirmed' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';

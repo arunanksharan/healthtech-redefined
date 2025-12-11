@@ -38,11 +38,11 @@ export default function JourneysPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
-    // Fetch all journeys
+    // Fetch all journey instances
     const { data: journeysData, isLoading, error } = useQuery({
-        queryKey: ['journeys', statusFilter],
+        queryKey: ['journey-instances', statusFilter],
         queryFn: async () => {
-            const [data, error] = await journeysAPI.getAll({
+            const [data, error] = await journeysAPI.getInstances({
                 status: statusFilter === 'all' ? undefined : statusFilter,
             });
             if (error) throw new Error(error.message);
@@ -50,11 +50,12 @@ export default function JourneysPage() {
         },
     });
 
-    const journeys = journeysData?.data || [];
+    const journeys = journeysData?.instances || [];
     const filteredJourneys = journeys.filter(journey =>
         searchQuery === '' ||
         journey.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        journey.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        journey.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        journey.journey_type?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const stats = {

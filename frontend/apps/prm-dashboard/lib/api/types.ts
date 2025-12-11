@@ -52,6 +52,9 @@ export interface JourneyInstance {
     completed_at?: string;
     created_at: string;
     updated_at: string;
+    // Expanded fields commonly needed for UI
+    patient?: { name: string; id: string;[key: string]: any };
+    journey?: { name: string; title?: string;[key: string]: any };
 }
 
 export interface JourneyInstanceWithStages extends JourneyInstance {

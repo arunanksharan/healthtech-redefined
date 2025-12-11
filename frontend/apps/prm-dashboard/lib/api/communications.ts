@@ -71,9 +71,17 @@ export const communicationsAPI = {
     limit?: number;
     channel?: string;
     status?: string;
-  }): Promise<[PaginatedResponse<Communication> | null, APIError | null]> {
-    return apiCall<PaginatedResponse<Communication>>(
-      apiClient.get('/api/v1/prm/communications', { params })
+  }): Promise<[CommunicationListResponse | null, APIError | null]> {
+    // Map frontend 'limit' to backend 'page_size'
+    const queryParams: any = {
+      page: params?.page || 1,
+      page_size: params?.limit || 20,
+      ...params
+    };
+    delete queryParams.limit; // Remove limit to avoid confusion if strict
+
+    return apiCall<CommunicationListResponse>(
+      apiClient.get('/api/v1/prm/communications', { params: queryParams })
     );
   },
 

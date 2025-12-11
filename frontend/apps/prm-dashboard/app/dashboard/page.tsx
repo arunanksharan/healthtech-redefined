@@ -54,7 +54,7 @@ export default function DashboardPage() {
   const { data: journeysData } = useQuery({
     queryKey: ['journeys-dashboard'],
     queryFn: async () => {
-      const [data] = await journeysAPI.getAll({ limit: 100 });
+      const [data] = await journeysAPI.getInstances({ limit: 100 });
       return data;
     },
   });
@@ -75,11 +75,11 @@ export default function DashboardPage() {
     },
   });
 
-  const appointments = appointmentsData?.data || [];
-  const patients = patientsData?.data || [];
-  const journeys = journeysData?.data || [];
-  const communications = communicationsData?.data || [];
-  const tickets = ticketsData?.data || [];
+  const appointments = appointmentsData?.items || [];
+  const patients = patientsData?.items || [];
+  const journeys = journeysData?.instances || [];
+  const communications = communicationsData?.communications || [];
+  const tickets = ticketsData?.tickets || [];
 
   // Calculate today's appointments
   const today = new Date();

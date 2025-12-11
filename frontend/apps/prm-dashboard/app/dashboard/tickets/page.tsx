@@ -83,7 +83,7 @@ export default function TicketsPage() {
     onError: (error: Error) => toast.error(`Failed: ${error.message}`),
   });
 
-  const tickets = ticketsData?.data || [];
+  const tickets = ticketsData?.tickets || [];
   const filteredTickets = tickets.filter(ticket =>
     searchQuery === '' ||
     ticket.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||

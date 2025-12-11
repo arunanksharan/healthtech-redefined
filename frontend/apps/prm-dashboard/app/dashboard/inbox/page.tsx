@@ -32,150 +32,7 @@ import { useInboxStore, selectFilteredItems, selectUnreadCount } from "@/lib/sto
 import type { FeedItem, SuggestedAction } from "@/lib/store/inbox-store";
 
 // Mock data for demonstration
-const mockFeedItems: FeedItem[] = [
-    {
-        id: "1",
-        channel: "zoice",
-        timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 min ago
-        patient: {
-            id: "p1",
-            name: "John Doe",
-            phone: "+1 (555) 123-4567",
-        },
-        context: "Cardiology - Dr. Sharma",
-        sentiment: {
-            label: "frustrated",
-            score: 87,
-            emoji: "😤",
-        },
-        intent: "reschedule_appointment",
-        preview: "I need to reschedule my appointment for tomorrow. The traffic is going to be terrible and I won't be able to make it on time...",
-        priority: "high",
-        status: "unread",
-        suggestedActions: [
-            { id: "a1", type: "reschedule", label: "Reschedule to Tue 2PM", isPrimary: true },
-            { id: "a2", type: "reschedule", label: "Reschedule to Wed 3PM" },
-            { id: "a3", type: "callback", label: "Callback Patient" },
-        ],
-        metadata: {
-            callDuration: 272,
-            recordingUrl: "https://example.com/recording.mp3",
-        },
-        isNew: true,
-    },
-    {
-        id: "2",
-        channel: "whatsapp",
-        timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 min ago
-        patient: {
-            id: "p2",
-            name: "Jane Smith",
-            phone: "+1 (555) 234-5678",
-        },
-        context: "Insurance Verification",
-        sentiment: {
-            label: "positive",
-            score: 92,
-            emoji: "😊",
-        },
-        intent: "document_upload",
-        preview: "Here's my insurance card for the upcoming appointment.",
-        priority: "medium",
-        status: "unread",
-        attachments: [
-            {
-                id: "att1",
-                type: "image",
-                url: "https://example.com/insurance.jpg",
-                name: "insurance_card.jpg",
-                extractedData: {
-                    provider: "Aetna PPO",
-                    memberId: "XYZ123456",
-                },
-            },
-        ],
-        suggestedActions: [
-            { id: "a4", type: "review", label: "Review Extraction", isPrimary: true },
-            { id: "a5", type: "file", label: "File to Record" },
-        ],
-    },
-    {
-        id: "3",
-        channel: "zoice",
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-        patient: {
-            id: "p3",
-            name: "Robert Wilson",
-            phone: "+1 (555) 345-6789",
-        },
-        context: "General Medicine - Dr. Patel",
-        sentiment: {
-            label: "anxious",
-            score: 78,
-            emoji: "😰",
-        },
-        intent: "lab_results_inquiry",
-        preview: "I've been waiting for my lab results for a week now. When will they be ready? I'm really worried about...",
-        priority: "high",
-        status: "pending",
-        suggestedActions: [
-            { id: "a6", type: "check_labs", label: "Check Lab Status", isPrimary: true },
-            { id: "a7", type: "callback", label: "Callback Patient" },
-        ],
-        metadata: {
-            callDuration: 185,
-        },
-    },
-    {
-        id: "4",
-        channel: "email",
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-        patient: {
-            id: "p4",
-            name: "Emily Brown",
-            phone: "+1 (555) 456-7890",
-        },
-        context: "Orthopedics - Dr. Kumar",
-        sentiment: {
-            label: "neutral",
-            score: 65,
-            emoji: "😐",
-        },
-        intent: "appointment_confirmation",
-        preview: "Confirming my appointment for next Monday at 10 AM with Dr. Kumar. Please let me know if there are any pre-visit instructions.",
-        priority: "low",
-        status: "read",
-        suggestedActions: [
-            { id: "a8", type: "confirm", label: "Send Confirmation", isPrimary: true },
-            { id: "a9", type: "instructions", label: "Send Pre-Visit Info" },
-        ],
-    },
-    {
-        id: "5",
-        channel: "sms",
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-        patient: {
-            id: "p5",
-            name: "Michael Davis",
-            phone: "+1 (555) 567-8901",
-        },
-        context: "Dermatology - Dr. Singh",
-        sentiment: {
-            label: "positive",
-            score: 88,
-            emoji: "😊",
-        },
-        intent: "prescription_refill",
-        preview: "Can you please refill my prescription for the skin cream? I'm running low.",
-        priority: "medium",
-        status: "resolved",
-        suggestedActions: [
-            { id: "a10", type: "refill", label: "Process Refill", isPrimary: true },
-        ],
-        resolvedBy: "Dr. Singh",
-        resolvedAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    },
-];
+// Mock data removed - using real API via fetchItems
 
 export default function InboxPage() {
     const {
@@ -188,6 +45,7 @@ export default function InboxPage() {
         isFilterPanelOpen,
         isLoading,
         setItems,
+        fetchItems, // Added fetchItems
         selectItem,
         setFilters,
         resetFilters,
@@ -201,10 +59,10 @@ export default function InboxPage() {
         saveFilter,
     } = useInboxStore();
 
-    // Initialize with mock data
+    // Fetch real data on mount
     React.useEffect(() => {
-        setItems(mockFeedItems);
-    }, [setItems]);
+        fetchItems();
+    }, [fetchItems]);
 
     // Get filtered items
     const filteredItems = useMemo(() => {

@@ -114,6 +114,7 @@ interface InboxState {
 
 interface InboxActions {
   // Item operations
+  fetchItems: () => Promise<void>;
   setItems: (items: FeedItem[]) => void;
   addItem: (item: FeedItem) => void;
   updateItem: (id: string, updates: Partial<FeedItem>) => void;
@@ -292,6 +293,58 @@ export const useInboxStore = create<InboxState & InboxActions>()(
           })),
 
         // Actions
+        fetchItems: async () => {
+          set({ isLoading: true, error: null });
+          try {
+            const [response, error] = await communicationsAPI.getAll({
+              limit: 50,
+              status: get().filters.status[0] // simple filter mapping for now
+            });
+
+            if (error) throw new Error(error.message);
+            if (!response) throw new Error("No response from server");
+
+            // Map Backend Communication to Frontend FeedItem
+            const feedItems: FeedItem[] = response.communications.map((comm) => ({
+              id: comm.id,
+              channel: comm.channel as ChannelType,
+              timestamp: new Date(comm.created_at),
+              patient: {
+                id: comm.patient_id,
+                name: comm.recipient || "Unknown Patient", // Fallback to recipient or placeholder
+                phone: comm.channel === 'whatsapp' || comm.channel === 'sms' ? comm.recipient : undefined,
+                email: comm.channel === 'email' ? comm.recipient : undefined
+              },
+              context: "General Inquiry", // Placeholder
+              sentiment: {
+                label: "neutral",
+                score: 50,
+                emoji: "😐"
+              },
+              intent: "general_inquiry",
+              preview: comm.message || (comm.subject ? `Subject: ${comm.subject}` : "No content"),
+              priority: "medium",
+              status: (comm.status === 'sent' || comm.status === 'delivered') ? 'read' : 'unread', // Rough mapping
+              suggestedActions: [],
+              isNew: false
+            }));
+
+            set({
+              items: feedItems,
+              totalCount: response.total,
+              isLoading: false,
+              isConnected: true,
+              lastSync: new Date()
+            });
+          } catch (err: any) {
+            set({
+              isLoading: false,
+              error: err.message,
+              isConnected: false
+            });
+          }
+        },
+
         markAsRead: (ids) =>
           set((state) => ({
             items: state.items.map((item) =>
@@ -311,11 +364,11 @@ export const useInboxStore = create<InboxState & InboxActions>()(
             items: state.items.map((item) =>
               item.id === id
                 ? {
-                    ...item,
-                    status: "resolved" as ItemStatus,
-                    resolvedBy,
-                    resolvedAt: new Date(),
-                  }
+                  ...item,
+                  status: "resolved" as ItemStatus,
+                  resolvedBy,
+                  resolvedAt: new Date(),
+                }
                 : item
             ),
           })),

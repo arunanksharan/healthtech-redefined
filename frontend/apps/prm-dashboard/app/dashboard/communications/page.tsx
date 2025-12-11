@@ -81,11 +81,12 @@ export default function CommunicationsPage() {
     },
   });
 
-  const communications = commsData?.data || [];
+  const communications = commsData?.communications || [];
   const filteredCommunications = communications.filter(comm =>
     searchQuery === '' ||
     comm.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    comm.message?.toLowerCase().includes(searchQuery.toLowerCase())
+    comm.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    comm.subject?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Auto-select first if none selected and not loading

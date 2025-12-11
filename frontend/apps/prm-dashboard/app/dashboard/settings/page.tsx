@@ -28,18 +28,81 @@ import { MagicCard } from '@/components/ui/magic-card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/cn';
 import toast from 'react-hot-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { settingsAPI, UserSettings } from '@/lib/api/settings';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('account');
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Fetch Settings
+  const { data: settings, isLoading: isFetching } = useQuery({
+    queryKey: ['user-settings'],
+    queryFn: async () => {
+      const [data, error] = await settingsAPI.getSettings();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+
+  // Local state for editing (initialized with defaults or fetched data)
+  const [formData, setFormData] = useState<UserSettings | null>(null);
+
+  // Sync fetched data to local state
+  if (settings && !formData) {
+    setFormData(settings);
+  }
+
+  // Update Settings Mutation
+  const mutation = useMutation({
+    mutationFn: async (newData: UserSettings) => {
+      const [data, error] = await settingsAPI.updateSettings(newData);
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['user-settings'], data);
+      toast.success('Settings saved successfully');
+    },
+    onError: () => {
+      toast.error('Failed to save settings');
+    }
+  });
 
   const handleSave = () => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success('Settings saved successfully');
-    }, 1000);
+    if (formData) {
+      mutation.mutate(formData);
+    }
+  };
+
+  if (isFetching || !formData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Helpers to update nested state
+  const updateAccount = (field: keyof UserSettings['account'], value: string) => {
+    setFormData(prev => prev ? ({
+      ...prev,
+      account: { ...prev.account, [field]: value }
+    }) : null);
+  };
+
+  const updateNotification = (field: keyof UserSettings['notifications'], value: boolean) => {
+    setFormData(prev => prev ? ({
+      ...prev,
+      notifications: { ...prev.notifications, [field]: value }
+    }) : null);
+  };
+
+  const updateTheme = (theme: 'light' | 'dark' | 'system') => {
+    setFormData(prev => prev ? ({
+      ...prev,
+      appearance: { ...prev.appearance, theme }
+    }) : null);
   };
 
   const menuItems = [
@@ -58,8 +121,8 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Settings</h1>
           <p className="text-sm text-gray-500 mt-1">Manage your account preferences and application settings</p>
         </div>
-        <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
-          {isLoading ? (
+        <Button onClick={handleSave} disabled={mutation.isPending} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+          {mutation.isPending ? (
             <>Saving...</>
           ) : (
             <>
@@ -127,24 +190,44 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First name</Label>
-                      <Input id="firstName" defaultValue="Rahul" className="bg-muted/50 border-border focus:bg-background" />
+                      <Input
+                        id="firstName"
+                        value={formData.account.firstName}
+                        onChange={(e) => updateAccount('firstName', e.target.value)}
+                        className="bg-muted/50 border-border focus:bg-background"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last name</Label>
-                      <Input id="lastName" defaultValue="Sharma" className="bg-muted/50 border-border focus:bg-background" />
+                      <Input
+                        id="lastName"
+                        value={formData.account.lastName}
+                        onChange={(e) => updateAccount('lastName', e.target.value)}
+                        className="bg-muted/50 border-border focus:bg-background"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">Email address</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input id="email" defaultValue="rahul.sharma@hospital.com" className="pl-9 bg-muted/50 border-border focus:bg-background" />
+                        <Input
+                          id="email"
+                          value={formData.account.email}
+                          onChange={(e) => updateAccount('email', e.target.value)}
+                          className="pl-9 bg-muted/50 border-border focus:bg-background"
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone number</Label>
                       <div className="relative">
                         <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input id="phone" defaultValue="+91 98765 43210" className="pl-9 bg-muted/50 border-border focus:bg-background" />
+                        <Input
+                          id="phone"
+                          value={formData.account.phone}
+                          onChange={(e) => updateAccount('phone', e.target.value)}
+                          className="pl-9 bg-muted/50 border-border focus:bg-background"
+                        />
                       </div>
                     </div>
                   </div>
@@ -166,7 +249,10 @@ export default function SettingsPage() {
                         <Label className="text-base">Email Notifications</Label>
                         <p className="text-sm text-muted-foreground">Receive daily summaries of patient activity.</p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch
+                        checked={formData.notifications.email}
+                        onCheckedChange={(c) => updateNotification('email', c)}
+                      />
                     </div>
                     <Separator className="bg-border" />
                     <div className="flex items-center justify-between">
@@ -174,7 +260,10 @@ export default function SettingsPage() {
                         <Label className="text-base">Push Notifications</Label>
                         <p className="text-sm text-muted-foreground">Real-time alerts for critical events.</p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch
+                        checked={formData.notifications.push}
+                        onCheckedChange={(c) => updateNotification('push', c)}
+                      />
                     </div>
                     <Separator className="bg-border" />
                     <div className="flex items-center justify-between">
@@ -182,7 +271,10 @@ export default function SettingsPage() {
                         <Label className="text-base">SMS Alerts</Label>
                         <p className="text-sm text-muted-foreground">Get text messages for appointment reminders.</p>
                       </div>
-                      <Switch />
+                      <Switch
+                        checked={formData.notifications.sms}
+                        onCheckedChange={(c) => updateNotification('sms', c)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -198,32 +290,52 @@ export default function SettingsPage() {
                   <Separator className="bg-border" />
 
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2 cursor-pointer group">
-                      <div className="h-32 rounded-lg border-2 border-blue-600 bg-card p-2 shadow-sm flex items-center justify-center">
+                    <div className="space-y-2 cursor-pointer group" onClick={() => updateTheme('light')}>
+                      <div className={cn(
+                        "h-32 rounded-lg border-2 p-2 shadow-sm flex items-center justify-center transition-all",
+                        formData.appearance.theme === 'light' ? "border-blue-600 bg-blue-50/50" : "border-border hover:border-blue-300 bg-card"
+                      )}>
                         <div className="space-y-2 w-full max-w-[80%]">
                           <div className="h-2 w-full bg-muted rounded-full" />
                           <div className="h-2 w-2/3 bg-muted rounded-full" />
                         </div>
                       </div>
-                      <span className="block text-center text-sm font-medium text-blue-600">Light</span>
+                      <span className={cn(
+                        "block text-center text-sm font-medium",
+                        formData.appearance.theme === 'light' ? "text-blue-600" : "text-muted-foreground"
+                      )}>Light</span>
                     </div>
-                    <div className="space-y-2 cursor-pointer group">
-                      <div className="h-32 rounded-lg border-2 border-border hover:border-blue-300 bg-gray-950 p-2 flex items-center justify-center transition-all">
+
+                    <div className="space-y-2 cursor-pointer group" onClick={() => updateTheme('dark')}>
+                      <div className={cn(
+                        "h-32 rounded-lg border-2 p-2 flex items-center justify-center transition-all bg-gray-950",
+                        formData.appearance.theme === 'dark' ? "border-blue-600" : "border-border hover:border-blue-300"
+                      )}>
                         <div className="space-y-2 w-full max-w-[80%]">
                           <div className="h-2 w-full bg-gray-800 rounded-full" />
                           <div className="h-2 w-2/3 bg-gray-800 rounded-full" />
                         </div>
                       </div>
-                      <span className="block text-center text-sm font-medium text-muted-foreground group-hover:text-foreground">Dark</span>
+                      <span className={cn(
+                        "block text-center text-sm font-medium",
+                        formData.appearance.theme === 'dark' ? "text-blue-600" : "text-muted-foreground"
+                      )}>Dark</span>
                     </div>
-                    <div className="space-y-2 cursor-pointer group">
-                      <div className="h-32 rounded-lg border-2 border-border hover:border-blue-300 bg-card p-2 flex items-center justify-center transition-all relative overflow-hidden">
+
+                    <div className="space-y-2 cursor-pointer group" onClick={() => updateTheme('system')}>
+                      <div className={cn(
+                        "h-32 rounded-lg border-2 p-2 flex items-center justify-center transition-all relative overflow-hidden",
+                        formData.appearance.theme === 'system' ? "border-blue-600 bg-blue-50/10" : "border-border hover:border-blue-300 bg-card"
+                      )}>
                         <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-900 opacity-20" />
                         <div className="z-10 text-muted-foreground">
                           <Monitor className="w-8 h-8" />
                         </div>
                       </div>
-                      <span className="block text-center text-sm font-medium text-muted-foreground group-hover:text-foreground">System</span>
+                      <span className={cn(
+                        "block text-center text-sm font-medium",
+                        formData.appearance.theme === 'system' ? "text-blue-600" : "text-muted-foreground"
+                      )}>System</span>
                     </div>
                   </div>
                 </div>
