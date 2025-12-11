@@ -1,116 +1,160 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, Bot, Calendar, MessageSquare, Users } from "lucide-react";
+import { Bot, Calendar, MessageSquare, Shield } from "lucide-react";
+import { GridPattern } from "@/components/ui/grid-pattern";
+import { WordRotate } from "@/components/ui/word-rotate";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
+import { MagicCard } from "@/components/ui/magic-card";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-white text-gray-900 overflow-hidden relative selection:bg-blue-100">
+      <GridPattern
+        width={30}
+        height={30}
+        x={-1}
+        y={-1}
+        strokeDasharray={"4 2"}
+        className="[mask-image:radial-gradient(500px_circle_at_center,white,transparent)] inset-x-0 inset-y-[-30%] h-[200%] skew-y-12 fill-blue-50 stroke-blue-100"
+      />
+
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-20">
-        <div className="text-center max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
-            <Bot className="w-4 h-4" />
-            AI-Native Healthcare Platform
+      <div className="container mx-auto px-4 py-32 relative z-10">
+        <div className="text-center max-w-5xl mx-auto space-y-8">
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 px-4 py-2 rounded-full text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-default">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            </span>
+            System Operational
           </div>
 
-          <h1 className="text-6xl font-bold text-gray-900 mb-6">
-            PRM Dashboard
-          </h1>
+          <div className="flex flex-col items-center justify-center">
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-gray-900 mb-4">
+              Healthcare Redefined by
+            </h1>
+            <WordRotate
+              className="text-5xl md:text-7xl font-bold tracking-tight text-blue-600"
+              words={["Intelligence", "Automation", "Speed", "Empathy"]}
+            />
+          </div>
 
-          <p className="text-2xl text-gray-600 mb-4">
-            Revolutionary Agent-Native Patient Relationship Management
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            Revolutionary Patient Relationship Management.
+            <br />
+            No menus, no forms. Just natural language.
           </p>
 
-          <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
-            Work at the speed of thought with AI assistants. No menus, no forms.
-            Just natural language commands that execute complex workflows instantly.
-          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
+            <Link href="/dashboard">
+              <ShimmerButton
+                background="#2563EB" // blue-600
+                shimmerColor="#93C5FD" // blue-300
+                className="shadow-lg shadow-blue-500/20"
+              >
+                <span className="whitespace-pre-wrap text-center text-sm font-medium leading-none tracking-tight text-white lg:text-lg">
+                  Open Dashboard
+                </span>
+              </ShimmerButton>
+            </Link>
+          </div>
+        </div>
 
-          <div className="flex gap-4 justify-center">
-            <Link
+        {/* Features Bento Grid */}
+        <div className="mt-32">
+          <BentoGrid className="max-w-6xl mx-auto grid-cols-1 md:grid-cols-3 gap-8">
+            <BentoCard
+              name="AI-First Interface"
+              description="Talk to specialized agents using natural language. No clicking through menus."
+              background={<div className="absolute inset-0 bg-blue-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              Icon={Bot}
+              className="md:col-span-2 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard"
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors"
-            >
-              Open Dashboard
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+              cta="Open Agent"
+            />
+            <BentoCard
+              name="Smart Scheduling"
+              description="Book appointments, reschedule, and send reminders with a single command."
+              background={<div className="absolute inset-0 bg-purple-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              Icon={Calendar}
+              className="md:col-span-1 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
+              href="/dashboard/appointments"
+              cta="Manage Calendar"
+            />
+            <BentoCard
+              name="Unified Comms"
+              description="WhatsApp, SMS, Email - all managed through one AI assistant."
+              background={<div className="absolute inset-0 bg-green-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              Icon={MessageSquare}
+              className="md:col-span-1 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
+              href="/dashboard/communications"
+              cta="View Inbox"
+            />
+            <BentoCard
+              name="Secure & Compliant"
+              description="Enterprise-grade security with HIPAA compliance built-in."
+              background={<div className="absolute inset-0 bg-red-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              Icon={Shield}
+              className="md:col-span-2 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
+              href="/dashboard/settings"
+              cta="Security Settings"
+            />
+          </BentoGrid>
+        </div>
 
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-900 px-8 py-4 rounded-lg font-semibold text-lg border-2 border-gray-200 transition-colors"
+        {/* Live Stats */}
+        <div className="mt-32 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[200px]">
+            <MagicCard
+              className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 shadow-md"
+              gradientColor="#D1D5DB" // gray-300 for visible border gradient
+              gradientOpacity={0.4}
+              gradientFrom="#BFDBFE" // blue-200
+              gradientTo="#99F6E4"   // teal-200
             >
-              Sign In
-            </Link>
+              <div className="text-4xl font-bold text-gray-900 mb-2">95%</div>
+              <div className="text-sm text-gray-500 uppercase tracking-widest">Intent Accuracy</div>
+            </MagicCard>
+            <MagicCard
+              className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 shadow-md"
+              gradientColor="#D1D5DB"
+              gradientOpacity={0.4}
+              gradientFrom="#BFDBFE"
+              gradientTo="#99F6E4"
+            >
+              <div className="text-4xl font-bold text-gray-900 mb-2">&lt;2s</div>
+              <div className="text-sm text-gray-500 uppercase tracking-widest">Response Time</div>
+            </MagicCard>
+            <MagicCard
+              className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 shadow-md"
+              gradientColor="#D1D5DB"
+              gradientOpacity={0.4}
+              gradientFrom="#BFDBFE"
+              gradientTo="#99F6E4"
+            >
+              <div className="text-4xl font-bold text-gray-900 mb-2">24/7</div>
+              <div className="text-sm text-gray-500 uppercase tracking-widest">Availability</div>
+            </MagicCard>
+            <MagicCard
+              className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 shadow-md"
+              gradientColor="#D1D5DB"
+              gradientOpacity={0.4}
+              gradientFrom="#BFDBFE"
+              gradientTo="#99F6E4"
+            >
+              <div className="text-4xl font-bold text-gray-900 mb-2">10x</div>
+              <div className="text-sm text-gray-500 uppercase tracking-widest">Productivity</div>
+            </MagicCard>
           </div>
         </div>
 
-        {/* Features Grid */}
-        <div className="grid md:grid-cols-3 gap-8 mt-20 max-w-5xl mx-auto">
-          <FeatureCard
-            icon={<Bot className="w-8 h-8 text-blue-600" />}
-            title="AI-First Interface"
-            description="Talk to specialized agents using natural language. No clicking through menus."
-          />
-          <FeatureCard
-            icon={<Calendar className="w-8 h-8 text-purple-600" />}
-            title="Smart Scheduling"
-            description="Book appointments, reschedule, and send reminders with a single command."
-          />
-          <FeatureCard
-            icon={<MessageSquare className="w-8 h-8 text-green-600" />}
-            title="Unified Communications"
-            description="WhatsApp, SMS, Email - all managed through one AI assistant."
-          />
-        </div>
-
-        {/* Example Commands */}
-        <div className="mt-20 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-center mb-8 text-gray-900">
-            Example Commands
-          </h2>
-          <div className="bg-gray-900 rounded-xl p-8 text-green-400 font-mono space-y-4">
-            <CommandExample command='Schedule callback for patient arunank tomorrow at 2pm' />
-            <CommandExample command='Send reminder to all patients with appointments today' />
-            <CommandExample command='Complete billing for patient 9844111173' />
-            <CommandExample command='Show me patients who missed appointments this week' />
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="mt-20 grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-          <StatCard number="95%" label="Intent Accuracy" />
-          <StatCard number="<2s" label="Response Time" />
-          <StatCard number="90%" label="Success Rate" />
-          <StatCard number="10x" label="Faster Workflows" />
-        </div>
+        {/* Footer */}
+        <footer className="mt-32 pb-8 text-center text-gray-400 text-sm">
+          <p>© 2024 Kuzushi HealthTech. All rights reserved.</p>
+        </footer>
       </div>
-    </div>
-  );
-}
-
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-blue-200 transition-colors">
-      <div className="mb-4">{icon}</div>
-      <h3 className="text-xl font-semibold mb-2 text-gray-900">{title}</h3>
-      <p className="text-gray-600">{description}</p>
-    </div>
-  );
-}
-
-function CommandExample({ command }: { command: string }) {
-  return (
-    <div className="flex items-start gap-2">
-      <span className="text-gray-500">$</span>
-      <span>{command}</span>
-    </div>
-  );
-}
-
-function StatCard({ number, label }: { number: string; label: string }) {
-  return (
-    <div className="bg-white p-6 rounded-xl border-2 border-gray-100 text-center">
-      <div className="text-3xl font-bold text-blue-600 mb-1">{number}</div>
-      <div className="text-sm text-gray-600">{label}</div>
     </div>
   );
 }

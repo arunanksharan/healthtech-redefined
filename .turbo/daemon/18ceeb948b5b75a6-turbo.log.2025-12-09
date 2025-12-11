@@ -1,0 +1,293 @@
+2025-12-09T18:18:52.799017Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-09T18:18:52.850295Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\cookies"), AnchoredSystemPathBuf(".turbo\\cookies\\.turbo-cookie"), AnchoredSystemPathBuf(".turbo\\cookies\\1.cookie")}
+2025-12-09T18:18:52.853250Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:18:53.449496Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:18:53.449515Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:18:54.951262Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon"), AnchoredSystemPathBuf(".turbo"), AnchoredSystemPathBuf(".turbo\\cookies")}
+2025-12-09T18:18:54.951275Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:19:14.337607Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("node_modules")}
+2025-12-09T18:19:14.337622Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:19:14.443833Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\cookies\\2.cookie")}
+2025-12-09T18:19:14.443850Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:19:15.841910Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\cookies")}
+2025-12-09T18:19:15.841923Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:32:26.541519Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\cookies\\3.cookie")}
+2025-12-09T18:32:26.541540Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:32:28.038579Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\cookies")}
+2025-12-09T18:32:28.038594Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:32:57.545651Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T18:32:57.545669Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:32:57.942077Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T18:32:57.942098Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:32:57.983255Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T18:32:58.443650Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T18:32:58.443664Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:32:58.568803Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T18:32:58.569033Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T18:32:58.569040Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:32:58.569174Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T18:53:23.744855Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:23.744885Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:23.853002Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:23.853023Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:23.943809Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:23.943829Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:24.138760Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:24.138774Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:24.246788Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:24.246803Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:24.339437Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:24.339450Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:24.541212Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:24.541226Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:24.644347Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:24.644367Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:24.844815Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:24.844835Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:24.951054Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:24.951070Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:25.043066Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:25.043081Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:25.252663Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:25.252684Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:25.345388Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:25.345415Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:25.545031Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:25.545049Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:25.651159Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:25.651178Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:25.850793Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:25.850813Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:25.938875Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:25.938903Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.046927Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.046949Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.146277Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.146292Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.238220Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.238238Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.346669Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.346688Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.551777Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.551802Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.644620Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.644647Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.844309Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.844329Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:26.952458Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:26.952479Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:53:27.043470Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T18:53:27.043490Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T18:59:17.944220Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components")}
+2025-12-09T18:59:17.944254Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:18.269024Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T18:59:30.247327Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\lib\\utils.ts"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\lib")}
+2025-12-09T18:59:30.247340Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:30.447612Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\lib\\utils.ts")}
+2025-12-09T18:59:30.447631Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:34.648753Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\magic-card.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui")}
+2025-12-09T18:59:34.648776Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:34.844514Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\magic-card.tsx")}
+2025-12-09T18:59:34.844548Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:42.541535Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\bento-grid.tsx")}
+2025-12-09T18:59:42.541557Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:42.935669Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\bento-grid.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui")}
+2025-12-09T18:59:42.935689Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:42.935831Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T18:59:46.649674Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\shimmer-button.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui")}
+2025-12-09T18:59:46.649691Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:46.950378Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\shimmer-button.tsx")}
+2025-12-09T18:59:46.950397Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:57.348203Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\word-rotate.tsx")}
+2025-12-09T18:59:57.348221Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:57.494272Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui")}
+2025-12-09T18:59:57.494285Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:57.494373Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T18:59:57.746120Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\word-rotate.tsx")}
+2025-12-09T18:59:57.746141Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:59.237742Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\animated-grid-pattern.tsx")}
+2025-12-09T18:59:59.237761Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:59.409065Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui")}
+2025-12-09T18:59:59.409082Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T18:59:59.409180Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T18:59:59.451120Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\animated-grid-pattern.tsx")}
+2025-12-09T18:59:59.451140Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:00:30.951398Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\tailwind.config.ts")}
+2025-12-09T19:00:30.951421Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:00:49.249360Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\tailwind.config.ts")}
+2025-12-09T19:00:49.249380Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:00:53.047819Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:00:53.047839Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:01.542510Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\animated-grid-pattern.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\magic-card.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\shimmer-button.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\word-rotate.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\magicui\\bento-grid.tsx")}
+2025-12-09T19:04:01.542535Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:01.699157Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components")}
+2025-12-09T19:04:01.699177Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:01.699304Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:04:44.437874Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components.json"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard")}
+2025-12-09T19:04:44.437906Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:44.844802Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\tailwind.config.ts")}
+2025-12-09T19:04:44.844868Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:45.023000Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\globals.css")}
+2025-12-09T19:04:45.023016Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:45.023124Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:04:52.849732Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\package.json"), AnchoredSystemPathBuf("node_modules")}
+2025-12-09T19:04:52.851892Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }, WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:53.651314Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("package-lock.json")}
+2025-12-09T19:04:53.651336Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T19:04:56.143104Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\word-rotate.tsx")}
+2025-12-09T19:04:56.143126Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:56.539168Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\magic-card.tsx")}
+2025-12-09T19:04:56.539189Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:56.909032Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:04:56.909051Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:56.909223Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:04:56.949762Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\shimmer-button.tsx")}
+2025-12-09T19:04:56.949782Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:57.300937Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:04:57.300959Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:57.301127Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:04:57.446716Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx")}
+2025-12-09T19:04:57.446736Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:57.997998Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\lib\\utils.ts"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:04:57.998018Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:57.998208Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:04:58.242580Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\button.tsx")}
+2025-12-09T19:04:58.242604Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:04:58.655007Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\bento-grid.tsx")}
+2025-12-09T19:04:58.655033Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:05:27.149870Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:05:27.149899Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:05:30.248231Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx")}
+2025-12-09T19:05:30.248256Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:05:33.649623Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\bento-grid.tsx")}
+2025-12-09T19:05:33.649647Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:05:57.752301Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\magic-card.tsx")}
+2025-12-09T19:05:57.752325Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:05:57.882025Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:05:57.882043Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:05:57.882175Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:06:01.041434Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\button.tsx")}
+2025-12-09T19:06:01.041453Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:06:03.438568Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\shimmer-button.tsx")}
+2025-12-09T19:06:03.438587Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:06:03.586199Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:06:03.586219Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:06:03.586340Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:06:05.653381Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\word-rotate.tsx")}
+2025-12-09T19:06:05.653400Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:06:05.792497Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:06:05.792517Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:06:05.792666Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:07:20.749285Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\magic-card.tsx")}
+2025-12-09T19:07:20.749301Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:07:20.883469Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\magic-card.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:07:20.883482Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:07:20.883570Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:07:29.945067Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\bento-grid.tsx")}
+2025-12-09T19:07:29.945091Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:07:34.248714Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\shimmer-button.tsx")}
+2025-12-09T19:07:34.248733Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:07:34.447759Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\shimmer-button.tsx")}
+2025-12-09T19:07:34.447779Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:07:45.837920Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\word-rotate.tsx")}
+2025-12-09T19:07:45.837953Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:08:05.240603Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:08:05.240621Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:08:05.341888Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx")}
+2025-12-09T19:08:05.341910Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:08:05.342029Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:08:07.958762Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:08:07.958782Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:02.738847Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx")}
+2025-12-09T19:12:02.738865Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:02.869374Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:12:02.869396Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:02.869653Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:12:05.140986Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\bento-grid.tsx")}
+2025-12-09T19:12:05.141047Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:05.360328Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:12:05.360348Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:05.360454Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:12:07.047071Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\magic-card.tsx")}
+2025-12-09T19:12:07.047098Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:07.245771Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:12:07.245808Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:07.246035Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:12:09.248945Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\shimmer-button.tsx")}
+2025-12-09T19:12:09.248971Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:09.504362Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:12:09.504389Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:09.504533Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:12:17.838444Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\word-rotate.tsx")}
+2025-12-09T19:12:17.838501Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:18.131780Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:12:18.131804Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:18.131929Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:12:59.848985Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\globals.css")}
+2025-12-09T19:12:59.849011Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:12:59.893161Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:13:02.943260Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("package-lock.json")}
+2025-12-09T19:13:02.943281Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T19:13:04.143534Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\word-rotate.tsx")}
+2025-12-09T19:13:04.143556Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:13:04.253527Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:13:04.253553Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:13:04.253770Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:13:04.342340Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\magic-card.tsx")}
+2025-12-09T19:13:04.342362Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:13:04.569173Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\shimmer-button.tsx")}
+2025-12-09T19:13:04.569191Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:13:04.569338Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:13:04.737944Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx")}
+2025-12-09T19:13:04.737963Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:13:04.876817Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:13:04.876836Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:13:04.876981Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:13:25.745893Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\button.tsx")}
+2025-12-09T19:13:25.745938Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:13:25.851698Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\bento-grid.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:13:25.851716Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:16:19.042557Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:16:19.042578Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:19:23.839623Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx")}
+2025-12-09T19:19:23.839644Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:25:22.939002Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:25:22.939087Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:29:48.646793Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\shimmer-button.tsx")}
+2025-12-09T19:29:48.646830Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:29:48.689712Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:29:50.150882Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\bento-grid.tsx")}
+2025-12-09T19:29:50.150905Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:30:23.741921Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:30:23.741944Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:32:41.649124Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T19:32:41.649166Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:32:41.993945Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:32:50.147997Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf(".turbo\\daemon\\18ceeb948b5b75a6-turbo.log.2025-12-09")}
+2025-12-09T19:32:50.148014Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Root, path: AnchoredSystemPathBuf("") }}))
+2025-12-09T19:34:14.845311Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T19:34:14.845331Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:34:14.932647Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:34:15.546897Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T19:34:15.546936Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:34:15.755939Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:34:15.756138Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\.next")}
+2025-12-09T19:34:15.756144Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:34:15.756282Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:34:35.144654Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\providers.tsx")}
+2025-12-09T19:34:35.144796Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:38:13.545505Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\grid-pattern.tsx")}
+2025-12-09T19:38:13.545528Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:38:53.243054Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:38:53.243077Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:39:20.445744Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui\\animated-grid-pattern.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\components\\ui")}
+2025-12-09T19:39:20.445764Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:40:16.944913Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\page.tsx")}
+2025-12-09T19:40:16.944940Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:43:50.851175Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard")}
+2025-12-09T19:43:50.851197Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:43:51.261215Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\tickets"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\communications"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\analytics\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\patients"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\settings"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\journeys\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\patients\\[id]"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\settings\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\appointments"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\patients\\[id]\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\patients\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\journeys"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\tickets\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\appointments\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\communications\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\layout.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\dashboard\\analytics")}
+2025-12-09T19:43:51.261253Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))
+2025-12-09T19:43:51.261403Z  WARN turborepo_lib::package_changes_watcher: hashes are the same, no need to rerun
+2025-12-09T19:44:21.239107Z  WARN turborepo_lib::package_changes_watcher: changed_files: {AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\tickets\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\appointments"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\communications\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\journeys"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\layout.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\patients"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\patients\\[id]\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\tickets"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\analytics"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\settings\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\journeys\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\settings"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\communications"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\appointments\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\patients\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\patients\\[id]"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\analytics\\page.tsx"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)"), AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard\\app\\(dashboard)\\page.tsx")}
+2025-12-09T19:44:21.239134Z  WARN turborepo_lib::package_changes_watcher: changed_packages: Ok(Some({WorkspacePackage { name: Other("prm-dashboard"), path: AnchoredSystemPathBuf("frontend\\apps\\prm-dashboard") }}))

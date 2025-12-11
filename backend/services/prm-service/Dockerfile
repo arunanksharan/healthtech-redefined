@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements from backend
-COPY ../../requirements.txt .
+COPY requirements.txt .
+
 
 # Install Python dependencies
 RUN pip install --user --no-cache-dir -r requirements.txt
@@ -34,11 +35,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
+COPY --from=builder /root/.local /usr/local
 
-# Make sure scripts in .local are usable
-ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
 COPY . .
@@ -48,7 +46,7 @@ RUN useradd -m -u 1000 prmuser && \
     chown -R prmuser:prmuser /app
 
 # Switch to non-root user
-USER prmuser
+# USER prmuser
 
 # Create logs directory
 RUN mkdir -p /app/logs
@@ -58,7 +56,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Run application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

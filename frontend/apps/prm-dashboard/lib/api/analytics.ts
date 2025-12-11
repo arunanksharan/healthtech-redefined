@@ -1,4 +1,4 @@
-import apiClient, { apiCall } from './client';
+import { apiClient, apiCall } from './client';
 
 /**
  * Analytics API Module
