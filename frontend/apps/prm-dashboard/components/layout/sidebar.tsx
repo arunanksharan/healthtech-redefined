@@ -29,13 +29,11 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  LogOut,
-  Moon,
-  Sun,
+  Route,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { useTheme } from "@/components/providers/theme-provider";
 import { Badge } from "@/components/ui/badge";
 
 // Navigation configuration
@@ -59,9 +57,9 @@ const navigationConfig: NavSection[] = [
     id: "main",
     title: "Main",
     items: [
-      { id: "dashboard", label: "Dashboard", icon: Home, href: "/" },
-      { id: "inbox", label: "Inbox", icon: Inbox, href: "/inbox", badge: "unreadCount" },
-      { id: "schedule", label: "Schedule", icon: Calendar, href: "/schedule" },
+      { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
+      { id: "inbox", label: "Inbox", icon: Inbox, href: "/dashboard/inbox", badge: "unreadCount" },
+      { id: "schedule", label: "Schedule", icon: Calendar, href: "/dashboard/appointments" },
     ],
   },
   {
@@ -69,28 +67,30 @@ const navigationConfig: NavSection[] = [
     title: "FHIR Entities",
     collapsible: true,
     items: [
-      { id: "patients", label: "Patients", icon: Users, href: "/patients" },
-      { id: "practitioners", label: "Practitioners", icon: UserCog, href: "/practitioners" },
-      { id: "organizations", label: "Organizations", icon: Building2, href: "/organizations" },
-      { id: "locations", label: "Locations", icon: MapPin, href: "/locations" },
-      { id: "schedules", label: "Schedules", icon: CalendarDays, href: "/schedules" },
-      { id: "slots", label: "Slots", icon: Clock, href: "/slots" },
-      { id: "appointments", label: "Appointments", icon: ClipboardList, href: "/appointments" },
-      { id: "encounters", label: "Encounters", icon: Hospital, href: "/encounters" },
-      { id: "observations", label: "Observations", icon: Microscope, href: "/observations" },
-      { id: "conditions", label: "Conditions", icon: Stethoscope, href: "/conditions" },
-      { id: "medications", label: "Medications", icon: Pill, href: "/medications" },
-      { id: "diagnostic-reports", label: "DiagnosticReports", icon: FlaskConical, href: "/diagnostic-reports" },
+      { id: "patients", label: "Patients", icon: Users, href: "/dashboard/patients" },
+      { id: "practitioners", label: "Practitioners", icon: UserCog, href: "/dashboard/practitioners" },
+      { id: "organizations", label: "Organizations", icon: Building2, href: "/dashboard/organizations" },
+      { id: "locations", label: "Locations", icon: MapPin, href: "/dashboard/locations" },
+      { id: "schedules", label: "Schedules", icon: CalendarDays, href: "/dashboard/schedules" },
+      { id: "slots", label: "Slots", icon: Clock, href: "/dashboard/slots" },
+
+      { id: "encounters", label: "Encounters", icon: Hospital, href: "/dashboard/encounters" },
+      { id: "observations", label: "Observations", icon: Microscope, href: "/dashboard/observations" },
+      { id: "conditions", label: "Conditions", icon: Stethoscope, href: "/dashboard/conditions" },
+      { id: "medications", label: "Medications", icon: Pill, href: "/dashboard/medications" },
+      { id: "diagnostic-reports", label: "DiagnosticReports", icon: FlaskConical, href: "/dashboard/diagnostic-reports" },
     ],
   },
   {
     id: "workflows",
     title: "Workflows",
     items: [
-      { id: "analytics", label: "Analytics", icon: BarChart3, href: "/analytics" },
-      { id: "collaboration", label: "Collaboration", icon: MessageSquare, href: "/collaboration" },
-      { id: "telehealth", label: "Telehealth", icon: Video, href: "/telehealth" },
-      { id: "billing", label: "Billing", icon: CreditCard, href: "/billing" },
+      { id: "analytics", label: "Analytics", icon: BarChart3, href: "/dashboard/analytics" },
+      { id: "journeys", label: "Care Journeys", icon: Route, href: "/dashboard/journeys" },
+      { id: "tickets", label: "Support Tickets", icon: Ticket, href: "/dashboard/tickets" },
+      { id: "collaboration", label: "Collaboration", icon: MessageSquare, href: "/dashboard/communications" },
+      { id: "telehealth", label: "Telehealth", icon: Video, href: "/dashboard/telehealth" },
+      { id: "billing", label: "Billing", icon: CreditCard, href: "/dashboard/billing" },
     ],
   },
 ];
@@ -109,7 +109,6 @@ interface SidebarProps {
 
 export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
   const pathname = usePathname();
-  const { theme, setTheme, resolvedTheme } = useTheme();
   const badges = useBadgeCounts();
 
   const [collapsed, setCollapsed] = useState(false);
@@ -136,64 +135,70 @@ export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
   }, []);
 
   const isActive = (href: string) => {
-    if (href === "/") {
-      return pathname === "/" || pathname === "/dashboard";
+    // Exact match for root or dashboard home
+    if (href === "/" || href === "/dashboard") {
+      return pathname === href;
     }
+    // Partial match for sub-routes (e.g. /dashboard/appointments matches /dashboard/appointments/123)
     return pathname.startsWith(href);
   };
 
   return (
     <aside
       className={cn(
-        "h-full bg-card border-r border-border flex flex-col transition-all duration-200 ease-in-out",
+        "h-full bg-muted/40 border-r border-border flex flex-col transition-all duration-300 ease-in-out backdrop-blur-sm supports-[backdrop-filter]:bg-muted/40 relative",
         collapsed ? "w-sidebar-collapsed" : "w-sidebar",
         className
       )}
     >
       {/* Logo */}
-      <div className="h-topbar flex items-center justify-between px-4 border-b border-border">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Hospital className="w-5 h-5 text-primary-foreground" />
+      <div className="h-topbar flex items-center px-4 border-b border-border bg-background/50 backdrop-blur-sm">
+        <Link href="/" target="_self" className="flex items-center gap-3 group">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow transition-all">
+            <Hospital className="w-5 h-5 text-white" />
           </div>
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-semibold text-foreground">HealthPRM</span>
-              <span className="text-xs text-muted-foreground">Surya Hospitals</span>
+            <div className="flex flex-col animate-in fade-in slide-in-from-left-2 duration-300">
+              <span className="font-bold text-foreground leading-tight">HealthPRM</span>
+              <span className="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Surya Hospitals</span>
             </div>
           )}
         </Link>
-        <button
-          onClick={toggleCollapsed}
-          className="p-1.5 rounded-md hover:bg-accent transition-colors"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <ChevronsRight className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronsLeft className="w-4 h-4 text-muted-foreground" />
-          )}
-        </button>
       </div>
 
+      {/* Toggle Button - Floating on the separator */}
+      <button
+        onClick={toggleCollapsed}
+        className="absolute -right-3 top-6 z-50 p-1 bg-background border border-border rounded-full shadow-sm text-muted-foreground hover:text-blue-600 hover:border-blue-200 transition-colors"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? (
+          <ChevronsRight className="w-3 h-3" />
+        ) : (
+          <ChevronsLeft className="w-3 h-3" />
+        )}
+      </button>
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2">
+      <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 scrollbar-hide">
         {navigationConfig.map((section) => (
-          <div key={section.id} className="mb-4">
+          <div key={section.id}>
             {/* Section Header */}
             {!collapsed && (
               <div className="px-3 mb-2">
                 {section.collapsible ? (
                   <button
                     onClick={() => toggleSection(section.id)}
-                    className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                    className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group"
                   >
                     <span>{section.title}</span>
-                    {collapsedSections.has(section.id) ? (
-                      <ChevronRight className="w-3 h-3" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3" />
-                    )}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {collapsedSections.has(section.id) ? (
+                        <ChevronRight className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </span>
                   </button>
                 ) : (
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -214,22 +219,23 @@ export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
                     <Link
                       key={item.id}
                       href={item.href}
+                      target="_self"
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group",
-                        "hover:bg-accent hover:text-accent-foreground",
-                        active && "bg-primary/10 text-primary border-l-2 border-primary -ml-0.5 pl-[calc(0.75rem+2px)]",
-                        !active && "text-muted-foreground",
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all relative group",
+                        active
+                          ? "bg-background text-blue-700 shadow-sm ring-1 ring-border"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
                         collapsed && "justify-center px-2"
                       )}
                       title={collapsed ? item.label : undefined}
                     >
-                      <item.icon className={cn("w-5 h-5 shrink-0", active && "text-primary")} />
+                      <item.icon className={cn("w-5 h-5 shrink-0 transition-colors", active ? "text-blue-600" : "text-muted-foreground group-hover:text-foreground")} />
 
                       {!collapsed && (
                         <>
                           <span className="flex-1 truncate">{item.label}</span>
                           {badgeValue !== undefined && badgeValue > 0 && (
-                            <Badge variant="secondary" className="ml-auto text-xs h-5 min-w-5 flex items-center justify-center">
+                            <Badge variant="secondary" className="ml-auto text-xs h-5 min-w-5 flex items-center justify-center bg-blue-100 text-blue-700 hover:bg-blue-100">
                               {badgeValue > 99 ? "99+" : badgeValue}
                             </Badge>
                           )}
@@ -238,19 +244,14 @@ export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
 
                       {/* Tooltip for collapsed state */}
                       {collapsed && (
-                        <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-sm rounded-md shadow-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 border border-border">
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-foreground text-background text-xs rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
                           {item.label}
                           {badgeValue !== undefined && badgeValue > 0 && (
-                            <Badge variant="secondary" className="ml-2 text-xs">
+                            <span className="ml-2 inline-flex items-center justify-center bg-blue-500 text-white rounded-full h-4 min-w-[1rem] px-1">
                               {badgeValue}
-                            </Badge>
+                            </span>
                           )}
                         </div>
-                      )}
-
-                      {/* Badge indicator for collapsed state */}
-                      {collapsed && badgeValue !== undefined && badgeValue > 0 && (
-                        <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
                       )}
                     </Link>
                   );
@@ -261,62 +262,7 @@ export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User Profile & Settings */}
-      <div className="border-t border-border p-2">
-        {/* Theme Toggle */}
-        <button
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-          className={cn(
-            "flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors",
-            "hover:bg-accent text-muted-foreground",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          {resolvedTheme === "dark" ? (
-            <Sun className="w-5 h-5" />
-          ) : (
-            <Moon className="w-5 h-5" />
-          )}
-          {!collapsed && <span>Toggle Theme</span>}
-        </button>
 
-        {/* Settings Link */}
-        <Link
-          href="/settings"
-          className={cn(
-            "flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors",
-            "hover:bg-accent text-muted-foreground",
-            pathname === "/settings" && "bg-primary/10 text-primary",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          <Settings className="w-5 h-5" />
-          {!collapsed && <span>Settings</span>}
-        </Link>
-
-        {/* User Profile */}
-        <div
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 mt-2 rounded-md bg-accent/50",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-sm font-semibold">
-            RS
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Dr. Rohit Sharma</p>
-              <p className="text-xs text-muted-foreground truncate">Cardiologist</p>
-            </div>
-          )}
-          {!collapsed && (
-            <button className="p-1 rounded-md hover:bg-accent transition-colors">
-              <LogOut className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-      </div>
     </aside>
   );
 }

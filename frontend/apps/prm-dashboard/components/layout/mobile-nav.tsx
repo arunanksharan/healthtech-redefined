@@ -23,11 +23,11 @@ interface MobileNavItem {
 }
 
 const navItems: MobileNavItem[] = [
-  { id: "home", label: "Home", icon: Home, href: "/" },
-  { id: "patients", label: "Patients", icon: Users, href: "/patients" },
-  { id: "schedule", label: "Schedule", icon: Calendar, href: "/schedule" },
+  { id: "home", label: "Home", icon: Home, href: "/dashboard" },
+  { id: "patients", label: "Patients", icon: Users, href: "/dashboard/patients" },
+  { id: "schedule", label: "Schedule", icon: Calendar, href: "/dashboard/appointments" },
   { id: "inbox", label: "Inbox", icon: Inbox, href: "/inbox", badge: 12 },
-  { id: "more", label: "More", icon: Menu, href: "/more" },
+  { id: "more", label: "More", icon: Menu, href: "/dashboard/settings" },
 ];
 
 interface MobileNavProps {

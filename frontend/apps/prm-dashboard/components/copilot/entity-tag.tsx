@@ -88,20 +88,20 @@ const entityLabels: Record<EntityType, string> = {
 };
 
 const entityColors: Record<EntityType, { bg: string; text: string; border: string }> = {
-  patient: { bg: "bg-blue-500/10", text: "text-blue-600", border: "border-blue-500/30" },
-  practitioner: { bg: "bg-purple-500/10", text: "text-purple-600", border: "border-purple-500/30" },
-  location: { bg: "bg-green-500/10", text: "text-green-600", border: "border-green-500/30" },
-  time: { bg: "bg-orange-500/10", text: "text-orange-600", border: "border-orange-500/30" },
-  date: { bg: "bg-pink-500/10", text: "text-pink-600", border: "border-pink-500/30" },
-  action: { bg: "bg-indigo-500/10", text: "text-indigo-600", border: "border-indigo-500/30" },
-  medication: { bg: "bg-red-500/10", text: "text-red-600", border: "border-red-500/30" },
-  department: { bg: "bg-teal-500/10", text: "text-teal-600", border: "border-teal-500/30" },
-  duration: { bg: "bg-amber-500/10", text: "text-amber-600", border: "border-amber-500/30" },
-  visit_type: { bg: "bg-cyan-500/10", text: "text-cyan-600", border: "border-cyan-500/30" },
-  recurrence: { bg: "bg-violet-500/10", text: "text-violet-600", border: "border-violet-500/30" },
-  phone: { bg: "bg-emerald-500/10", text: "text-emerald-600", border: "border-emerald-500/30" },
-  mrn: { bg: "bg-slate-500/10", text: "text-slate-600", border: "border-slate-500/30" },
-  unknown: { bg: "bg-gray-500/10", text: "text-gray-600", border: "border-gray-500/30" },
+  patient: { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/30" },
+  practitioner: { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/30" },
+  location: { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", border: "border-green-500/30" },
+  time: { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", border: "border-orange-500/30" },
+  date: { bg: "bg-pink-500/10", text: "text-pink-600 dark:text-pink-400", border: "border-pink-500/30" },
+  action: { bg: "bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-500/30" },
+  medication: { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/30" },
+  department: { bg: "bg-teal-500/10", text: "text-teal-600 dark:text-teal-400", border: "border-teal-500/30" },
+  duration: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/30" },
+  visit_type: { bg: "bg-cyan-500/10", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/30" },
+  recurrence: { bg: "bg-violet-500/10", text: "text-violet-600 dark:text-violet-400", border: "border-violet-500/30" },
+  phone: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/30" },
+  mrn: { bg: "bg-slate-500/10", text: "text-slate-600 dark:text-slate-400", border: "border-slate-500/30" },
+  unknown: { bg: "bg-gray-500/10", text: "text-gray-600 dark:text-gray-400", border: "border-gray-500/30" },
 };
 
 // ============================================================================
