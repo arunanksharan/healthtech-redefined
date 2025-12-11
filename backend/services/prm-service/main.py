@@ -26,7 +26,7 @@ from shared.database.models import (
 from shared.events.publisher import publish_event
 from shared.events.types import EventType
 
-from .schemas import (
+from schemas import (
     JourneyCreate, JourneyUpdate, JourneyResponse, JourneyListResponse,
     JourneyStageCreate, JourneyStageUpdate, JourneyStageResponse,
     JourneyInstanceCreate, JourneyInstanceUpdate, JourneyInstanceResponse,
@@ -48,6 +48,13 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+from fastapi.responses import RedirectResponse
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
+
 
 # CORS configuration
 app.add_middleware(

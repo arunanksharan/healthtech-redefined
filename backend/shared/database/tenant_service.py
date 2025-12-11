@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 class TenantCreate(BaseModel):
     """Schema for creating a new tenant."""
     name: str = Field(..., min_length=2, max_length=255)
-    slug: str = Field(..., min_length=2, max_length=100, regex="^[a-z0-9-]+$")
+    slug: str = Field(..., min_length=2, max_length=100, pattern="^[a-z0-9-]+$")
     tier: TenantTier = TenantTier.FREE
     owner_email: EmailStr
     owner_name: str = Field(..., min_length=2, max_length=255)

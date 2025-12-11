@@ -669,7 +669,7 @@ class StoredEvent(Base):
 
     # Metadata
     occurred_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    metadata = Column(JSONB, default=dict)
+    meta_data = Column(JSONB, default=dict)
 
     # Indexes for efficient queries
     __table_args__ = (
@@ -739,7 +739,7 @@ class FailedEvent(Base):
     resolved_at = Column(DateTime(timezone=True))
 
     # Metadata
-    metadata = Column(JSONB, default=dict)
+    meta_data = Column(JSONB, default=dict)
 
     # Indexes
     __table_args__ = (
