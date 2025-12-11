@@ -60,6 +60,8 @@ interface PatientTimelineProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   onEventAction?: (eventId: string, actionType: string) => void;
+  onEventClick?: (event: TimelineEvent) => void;
+  groupBy?: "day" | "episode" | "type";
   viewMode?: "story" | "list";
   className?: string;
 }
@@ -377,10 +379,10 @@ function TimelineEventCard({
                 <span>{channelInfo.label}</span>
                 <span>•</span>
                 <span>{formatTime(event.timestamp)}</span>
-                {event.metadata?.duration && (
+                {typeof event.metadata?.duration === "number" && (
                   <>
                     <span>•</span>
-                    <span>{formatDuration(event.metadata.duration as number)}</span>
+                    <span>{formatDuration(event.metadata.duration)}</span>
                   </>
                 )}
               </div>

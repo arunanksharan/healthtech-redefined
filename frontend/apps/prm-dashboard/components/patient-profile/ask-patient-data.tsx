@@ -217,7 +217,7 @@ function DocumentResponse({ response, onCopy, onExport }: ResponseRendererProps)
           </div>
         </div>
         <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
-          {doc?.body || response.content}
+          {String(doc?.body || response.content || "")}
         </div>
       </div>
     </div>
