@@ -1101,20 +1101,50 @@ class Ticket(Base):
     description = Column(Text)
     status = Column(String(50), nullable=False, default="open")  # open, in_progress, resolved, closed
     priority = Column(String(50), nullable=False, default="medium")  # low, medium, high, urgent
+    category = Column(String(50), nullable=False, default="general")  # billing, clinical, technical, administrative
 
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     assigned_to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at = Column(DateTime(timezone=True))
+    resolution_notes = Column(Text)
 
     # Relationships
     patient = relationship("Patient", back_populates="tickets")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
+    comments = relationship("TicketComment", back_populates="ticket", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (Index("idx_tickets_patient", "patient_id", "status"),)
+
+
+class TicketComment(Base):
+    """Comments on support tickets"""
+
+    __tablename__ = "ticket_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    ticket_id = Column(UUID(as_uuid=True), ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    content = Column(Text, nullable=False)
+    is_internal = Column(Boolean, nullable=False, default=False)  # Internal notes vs patient visible
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    ticket = relationship("Ticket", back_populates="comments")
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_ticket_comments_ticket", "ticket_id", "created_at"),
+    )
 
 
 # ====================================================================================

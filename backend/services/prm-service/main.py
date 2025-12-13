@@ -24,7 +24,7 @@ from loguru import logger
 from shared.database.connection import get_db, engine
 from shared.database.models import (
     Base, Journey, JourneyStage, JourneyInstance, JourneyInstanceStageStatus,
-    Communication, Ticket, Patient
+    Communication, Ticket, TicketComment, Patient
 )
 from shared.events.publisher import publish_event
 from shared.events.types import EventType
@@ -38,7 +38,7 @@ from schemas import (
     CommunicationCreate, CommunicationUpdate, CommunicationResponse,
     CommunicationListResponse, SendCommunicationRequest,
     TicketCreate, TicketUpdate, TicketResponse, TicketListResponse,
-    TicketCommentCreate, TicketWithComments,
+    TicketCommentCreate, TicketCommentResponse, TicketWithComments,
     TemplateRenderRequest, TemplateRenderResponse,
     JourneyStatus, StageStatus, CommunicationStatus, TicketStatus
 )
@@ -871,6 +871,37 @@ async def create_communication(
         )
 
 
+
+@app.get(
+    "/api/v1/prm/communications/stats",
+    tags=["Communications"]
+)
+async def get_communication_stats(
+    db: Session = Depends(get_db)
+):
+    """Get communication statistics"""
+    try:
+        total = db.query(Communication).count()
+        whatsapp = db.query(Communication).filter(Communication.channel == 'whatsapp').count()
+        sms = db.query(Communication).filter(Communication.channel == 'sms').count()
+        email = db.query(Communication).filter(Communication.channel == 'email').count()
+        delivered = db.query(Communication).filter(Communication.status == 'delivered').count()
+        
+        return {
+            "total": total,
+            "whatsapp": whatsapp,
+            "sms": sms,
+            "email": email,
+            "delivered": delivered
+        }
+    except Exception as e:
+        logger.error(f"Error getting communication stats: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get communication stats"
+        )
+
+
 @app.get(
     "/api/v1/prm/communications",
     response_model=CommunicationListResponse,
@@ -927,6 +958,39 @@ async def list_communications(
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list communications"
+        )
+
+
+
+@app.delete(
+    "/api/v1/prm/communications/{communication_id}",
+    status_code=http_status.HTTP_204_NO_CONTENT,
+    tags=["Communications"]
+)
+async def delete_communication(
+    communication_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Delete a communication"""
+    try:
+        communication = db.query(Communication).filter(Communication.id == communication_id).first()
+        if not communication:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="Communication not found"
+            )
+
+        db.delete(communication)
+        db.commit()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting communication: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete communication"
         )
 
 
@@ -1003,6 +1067,26 @@ async def create_ticket(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create ticket"
         )
+
+
+
+@app.get(
+    "/api/v1/prm/tickets/{ticket_id}",
+    response_model=TicketResponse,
+    tags=["Tickets"]
+)
+async def get_ticket(
+    ticket_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Get ticket by ID"""
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+    return ticket
 
 
 @app.get(
@@ -1127,7 +1211,91 @@ async def update_ticket(
         )
 
 
-# ==================== Helper Functions ====================
+# ==================== Ticket Comments ====================
+
+@app.post(
+    "/api/v1/prm/tickets/{ticket_id}/comments",
+    response_model=TicketCommentResponse,
+    status_code=http_status.HTTP_201_CREATED,
+    tags=["Tickets"]
+)
+async def create_ticket_comment(
+    ticket_id: UUID,
+    comment_data: TicketCommentCreate,
+    db: Session = Depends(get_db)
+):
+    """Add a comment to a ticket"""
+    try:
+        # Validate ticket exists
+        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found"
+            )
+
+        # Create comment
+        comment = TicketComment(
+            tenant_id=ticket.tenant_id,
+            ticket_id=ticket_id,
+            user_id=comment_data.author_id,
+            content=comment_data.comment,
+            is_internal=comment_data.is_internal
+        )
+
+        db.add(comment)
+        db.commit()
+        db.refresh(comment)
+
+        logger.info(f"Added comment to ticket {ticket_id}")
+
+        return comment
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating ticket comment: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create ticket comment"
+        )
+
+
+@app.get(
+    "/api/v1/prm/tickets/{ticket_id}/comments",
+    response_model=List[TicketCommentResponse],
+    tags=["Tickets"]
+)
+async def list_ticket_comments(
+    ticket_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """List comments for a ticket"""
+    try:
+        # Validate ticket exists
+        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found"
+            )
+
+        comments = db.query(TicketComment).filter(
+            TicketComment.ticket_id == ticket_id
+        ).order_by(TicketComment.created_at).all()
+
+        return comments
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing ticket comments: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list ticket comments"
+        )
+
 
 async def _execute_stage_actions(
     instance_id: UUID,

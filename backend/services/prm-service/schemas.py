@@ -517,7 +517,7 @@ class TicketCommentResponse(BaseModel):
 
     id: UUID
     ticket_id: UUID
-    author_id: UUID
+    user_id: UUID
     comment: str
     is_internal: bool
     created_at: datetime
@@ -540,6 +540,7 @@ class TicketResponse(BaseModel):
     assigned_to_user_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
+    comments: List[TicketCommentResponse] = []
 
     class Config:
         from_attributes = True
