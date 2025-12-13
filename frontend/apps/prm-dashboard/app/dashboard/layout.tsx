@@ -66,6 +66,8 @@ export default function DashboardLayout({
       <AppShell
         onCommandBarOpen={handleCommandBarOpen}
         contextPanelOpen={aiPanelOpen}
+        contextPanelOverlay={true}
+        contextPanelWidth="2xl"
         contextPanelTitle="AI Assistant"
         contextPanelSubtitle="Ask me anything"
         onContextPanelClose={() => handleAiPanelToggle(false)}

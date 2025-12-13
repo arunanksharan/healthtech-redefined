@@ -36,15 +36,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
+
 export default function TicketsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch all tickets
-  const { data: ticketsData, isLoading, error } = useQuery({
+  const { data: ticketsData, isLoading, error, refetch } = useQuery({
     queryKey: ['tickets', categoryFilter, statusFilter, priorityFilter],
     queryFn: async () => {
       const [data, error] = await ticketsAPI.getAll({
@@ -126,7 +129,10 @@ export default function TicketsPage() {
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Support Tickets</h1>
           <p className="text-sm text-gray-500 mt-1">Track and resolve patient inquiries</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+        >
           <Plus className="w-4 h-4 mr-2" />
           New Ticket
         </Button>
@@ -292,6 +298,12 @@ export default function TicketsPage() {
           </div>
         )}
       </div>
+
+      <CreateTicketDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={() => refetch()}
+      />
     </div>
   );
 }

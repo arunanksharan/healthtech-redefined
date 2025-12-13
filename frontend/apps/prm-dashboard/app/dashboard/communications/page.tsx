@@ -51,6 +51,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { CreateMessageDialog } from '@/components/communications/create-message-dialog';
+
 // Helper for initials
 const getInitials = (name?: string) => {
   if (!name) return '??';
@@ -67,9 +69,10 @@ export default function CommunicationsPage() {
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Fetch all communications
-  const { data: commsData, isLoading, error } = useQuery({
+  const { data: commsData, isLoading, error, refetch } = useQuery({
     queryKey: ['communications', channelFilter, statusFilter],
     queryFn: async () => {
       const [data, error] = await communicationsAPI.getAll({
@@ -142,7 +145,10 @@ export default function CommunicationsPage() {
           <p className="text-sm text-gray-500 mt-1">Manage patient conversations and alerts</p>
         </div>
         <div className="flex gap-3">
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all hover:scale-105">
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all hover:scale-105"
+          >
             <Plus className="w-4 h-4 mr-2" />
             New Message
           </Button>
@@ -406,6 +412,12 @@ export default function CommunicationsPage() {
           </ResizablePanelGroup>
         </div>
       </div>
+
+      <CreateMessageDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={() => refetch()}
+      />
     </div>
   );
 }

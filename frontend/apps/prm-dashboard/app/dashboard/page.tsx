@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import {
   Calendar,
   Users,
@@ -303,10 +304,12 @@ export default function DashboardPage() {
                 <CardTitle>Upcoming Appointments</CardTitle>
                 <CardDescription>Next {upcomingAppointments.length} scheduled appointments</CardDescription>
               </div>
-              <Button variant="ghost" size="sm">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+              <Link href="/dashboard/appointments">
+                <Button variant="ghost" size="sm">
+                  View All
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
@@ -362,10 +365,12 @@ export default function DashboardPage() {
                 <CardTitle>Recent Communications</CardTitle>
                 <CardDescription>Latest patient messages</CardDescription>
               </div>
-              <Button variant="ghost" size="sm">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+              <Link href="/dashboard/communications">
+                <Button variant="ghost" size="sm">
+                  View All
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>

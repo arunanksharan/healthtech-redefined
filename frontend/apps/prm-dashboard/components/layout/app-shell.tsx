@@ -16,6 +16,8 @@ interface AppShellProps {
   contextPanelContent?: React.ReactNode;
   contextPanelTitle?: string;
   contextPanelSubtitle?: string;
+  contextPanelWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
+  contextPanelOverlay?: boolean;
   onContextPanelClose?: () => void;
   // Command bar
   onCommandBarOpen?: () => void;
@@ -52,6 +54,8 @@ export function AppShell({
   contextPanelContent,
   contextPanelTitle,
   contextPanelSubtitle,
+  contextPanelWidth = "lg",
+  contextPanelOverlay = false,
   onContextPanelClose,
   onCommandBarOpen,
 }: AppShellProps) {
@@ -105,7 +109,7 @@ export function AppShell({
           className={cn(
             "flex-1 p-4 lg:p-6",
             "pb-20 md:pb-6", // Extra padding for mobile nav
-            contextPanelOpen && "lg:pr-context-panel" // Account for context panel
+            (contextPanelOpen && !contextPanelOverlay) && "lg:pr-context-panel" // Account for context panel if not overlay
           )}
         >
           {children}
@@ -118,6 +122,8 @@ export function AppShell({
           <ContextPanel
             title={contextPanelTitle}
             subtitle={contextPanelSubtitle}
+            width={contextPanelWidth}
+            className={contextPanelOverlay ? "shadow-2xl border-l border-border/50" : ""}
             onClose={onContextPanelClose}
           >
             {contextPanelContent}

@@ -34,12 +34,18 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { CreateJourneyDialog } from '@/components/journeys/create-journey-dialog';
+import { JourneyDetailsSheet } from '@/components/journeys/journey-details-sheet';
+
 export default function JourneysPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     // Fetch all journey definitions
-    const { data: journeysData, isLoading, error } = useQuery({
+    const { data: journeysData, isLoading, error, refetch } = useQuery({
         queryKey: ['journey-definitions', statusFilter],
         queryFn: async () => {
             const [data, error] = await journeysAPI.getAll();
@@ -98,7 +104,10 @@ export default function JourneysPage() {
                     <p className="text-sm text-muted-foreground mt-1">Manage patient care pathways and recovery plans</p>
                 </div>
                 <div className="flex gap-3">
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all hover:scale-105">
+                    <Button
+                        onClick={() => setIsCreateDialogOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all hover:scale-105"
+                    >
                         <Plus className="w-4 h-4 mr-2" />
                         New Journey
                     </Button>
@@ -270,7 +279,15 @@ export default function JourneysPage() {
 
                                     {/* Actions */}
                                     <div className="flex md:flex-col items-center justify-center gap-2 border-t md:border-t-0 md:border-l border-border/50 pt-4 md:pt-0 md:pl-6">
-                                        <Button variant="outline" size="sm" className="w-full whitespace-nowrap">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full whitespace-nowrap"
+                                            onClick={() => {
+                                                setSelectedJourneyId(journey.id);
+                                                setIsDetailsOpen(true);
+                                            }}
+                                        >
                                             View Details
                                         </Button>
                                         <DropdownMenu>
@@ -298,6 +315,18 @@ export default function JourneysPage() {
                     </div>
                 )}
             </div>
+
+            <CreateJourneyDialog
+                open={isCreateDialogOpen}
+                onOpenChange={setIsCreateDialogOpen}
+                onSuccess={() => refetch()}
+            />
+
+            <JourneyDetailsSheet
+                journeyId={selectedJourneyId}
+                open={isDetailsOpen}
+                onOpenChange={setIsDetailsOpen}
+            />
         </div>
     );
 }

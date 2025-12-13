@@ -56,12 +56,15 @@ export const journeysAPI = {
   /**
    * Create a new journey
    */
+  /**
+   * Create a new journey definition
+   */
   async create(data: {
-    patient_id: string;
-    journey_type: string;
-    template_id?: string;
-    title: string;
+    tenant_id: string;
+    name: string;
     description?: string;
+    journey_type: string;
+    is_default: boolean;
   }): Promise<[Journey | null, APIError | null]> {
     return apiCall<Journey>(apiClient.post('/api/v1/prm/journeys', data));
   },
