@@ -106,6 +106,16 @@ export interface Ticket {
     resolved_at?: string;
     created_at: string;
     updated_at: string;
+    comments?: TicketComment[];
+}
+
+export interface TicketComment {
+    id: string;
+    ticket_id: string;
+    user_id: string;
+    comment: string;
+    is_internal: boolean;
+    created_at: string;
 }
 
 // ==================== API Responses ====================
