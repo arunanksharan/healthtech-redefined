@@ -59,6 +59,8 @@ async def root():
     return RedirectResponse(url="/docs")
 
 
+
+
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -101,13 +103,12 @@ async def create_journey(
     """
     try:
         # Create journey
+        # Create journey
         journey = Journey(
             tenant_id=journey_data.tenant_id,
             name=journey_data.name,
-            description=journey_data.description,
-            journey_type=journey_data.journey_type.value,
-            is_default=journey_data.is_default,
-            trigger_conditions=journey_data.trigger_conditions
+            code=re.sub(r'[^A-Z0-9]', '_', journey_data.name.upper()),
+            description=journey_data.description
         )
 
         db.add(journey)
@@ -121,6 +122,7 @@ async def create_journey(
                     name=stage_data.name,
                     description=stage_data.description,
                     order_index=stage_data.order_index,
+                    code=re.sub(r'[^A-Z0-9]', '_', stage_data.name.upper()),
                     trigger_event=stage_data.trigger_event,
                     actions=stage_data.actions
                 )
@@ -138,8 +140,8 @@ async def create_journey(
             payload={
                 "journey_id": str(journey.id),
                 "name": journey.name,
-                "journey_type": journey.journey_type,
-                "is_default": journey.is_default
+                "journey_type": journey_data.journey_type.value,
+                "is_default": journey_data.is_default
             },
             source_service="prm-service"
         )
@@ -175,11 +177,7 @@ async def list_journeys(
         if tenant_id:
             query = query.filter(Journey.tenant_id == tenant_id)
 
-        if journey_type:
-            query = query.filter(Journey.journey_type == journey_type.lower())
-
-        if is_default is not None:
-            query = query.filter(Journey.is_default == is_default)
+        # Removed journey_type and is_default filters as they don't exist in model
 
         # Get total count
         total = query.count()
@@ -187,7 +185,6 @@ async def list_journeys(
         # Apply pagination
         offset = (page - 1) * page_size
         journeys = query.order_by(
-            desc(Journey.is_default),
             Journey.name
         ).offset(offset).limit(page_size).all()
 
@@ -205,9 +202,11 @@ async def list_journeys(
 
     except Exception as e:
         logger.error(f"Error listing journeys: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list journeys"
+            detail=f"Failed to list journeys: {str(e)}"
         )
 
 
@@ -552,7 +551,7 @@ async def list_journey_instances(
             query = query.filter(JourneyInstance.journey_id == journey_id)
 
         if status:
-            query = query.filter(JourneyInstance.status == http_status.lower())
+            query = query.filter(JourneyInstance.status == status.lower())
 
         # Get total count
         total = query.count()
@@ -560,7 +559,7 @@ async def list_journey_instances(
         # Apply pagination
         offset = (page - 1) * page_size
         instances = query.order_by(
-            desc(JourneyInstance.started_at)
+            desc(JourneyInstance.created_at)
         ).offset(offset).limit(page_size).all()
 
         has_next = (offset + page_size) < total
@@ -900,7 +899,7 @@ async def list_communications(
             query = query.filter(Communication.channel == channel.lower())
 
         if status:
-            query = query.filter(Communication.status == http_status.lower())
+            query = query.filter(Communication.status == status.lower())
 
         # Get total count
         total = query.count()
@@ -1028,7 +1027,7 @@ async def list_tickets(
             query = query.filter(Ticket.patient_id == patient_id)
 
         if status:
-            query = query.filter(Ticket.status == http_status.lower())
+            query = query.filter(Ticket.status == status.lower())
 
         if priority:
             query = query.filter(Ticket.priority == priority.lower())
@@ -1059,9 +1058,11 @@ async def list_tickets(
 
     except Exception as e:
         logger.error(f"Error listing tickets: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list tickets"
+            detail=f"Failed to list tickets: {str(e)}"
         )
 
 
