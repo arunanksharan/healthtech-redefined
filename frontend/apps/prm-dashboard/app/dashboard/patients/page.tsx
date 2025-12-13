@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, Plus, User, Phone, Mail, Eye, Edit, MoreVertical, Activity, Users, Clock, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { patientsAPI } from '@/lib/api/patients';
+import { Search, Plus, User, Phone, Mail, Eye, Edit, MoreVertical, Activity, Users, Clock, AlertCircle, TrendingUp, Calendar } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { patientsAPI, PatientStatistics } from '@/lib/api/patients';
 import {
   Card,
   CardContent,
@@ -20,17 +20,36 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MagicCard } from '@/components/ui/magic-card';
+import { Label } from '@/components/ui/label';
 import { formatDate } from '@/lib/utils/date';
 import toast from 'react-hot-toast';
 
 export default function PatientsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<'name' | 'phone' | 'mrn'>('name');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: 'male',
+    phone_primary: '',
+    email_primary: '',
+  });
+  const queryClient = useQueryClient();
 
   // Fetch all patients
   const { data: patientsData, isLoading, error } = useQuery({
@@ -39,6 +58,51 @@ export default function PatientsPage() {
       const [data, error] = await patientsAPI.getAll();
       if (error) throw new Error(error.message);
       return data;
+    },
+  });
+
+  // Fetch patient statistics from API
+  const { data: stats } = useQuery({
+    queryKey: ['patient-stats'],
+    queryFn: async () => {
+      const [data, error] = await patientsAPI.getStats();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+
+  // Create patient mutation
+  const createMutation = useMutation({
+    mutationFn: (data: typeof addForm) => patientsAPI.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-stats'] });
+      setIsAddOpen(false);
+      setAddForm({
+        first_name: '',
+        last_name: '',
+        date_of_birth: '',
+        gender: 'male',
+        phone_primary: '',
+        email_primary: '',
+      });
+      toast.success('Patient created successfully');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to create patient: ' + error.message);
+    },
+  });
+
+  // Delete patient mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => patientsAPI.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-stats'] });
+      toast.success('Patient deactivated successfully');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to deactivate patient: ' + error.message);
     },
   });
 
@@ -59,8 +123,22 @@ export default function PatientsPage() {
     toast.success(`Found ${results?.length || 0} patients`);
   };
 
+  // Handle add form submit
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.first_name || !addForm.last_name || !addForm.date_of_birth) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+    createMutation.mutate(addForm);
+  };
+
   const patients = patientsData?.items || [];
-  const totalCount = patientsData?.total || 0;
+  const totalCount = stats?.total_patients ?? patientsData?.total ?? 0;
+  const activeCount = stats?.active_patients ?? patients.filter((p) => p.status === 'active').length;
+  const newThisMonth = stats?.new_this_month ?? 0;
+  const maleCount = stats?.by_gender?.male ?? 0;
+  const femaleCount = stats?.by_gender?.female ?? 0;
 
   return (
     <div className="space-y-8 pb-10">
@@ -72,7 +150,10 @@ export default function PatientsPage() {
             Manage your patient directory and records
           </p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6">
+        <Button
+          onClick={() => setIsAddOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Patient
         </Button>
@@ -87,7 +168,11 @@ export default function PatientsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">{totalCount}</div>
-            <p className="text-xs text-gray-500 mt-1">+12% from last month</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {maleCount > 0 || femaleCount > 0
+                ? `${maleCount} male, ${femaleCount} female`
+                : 'All registered patients'}
+            </p>
           </CardContent>
         </MagicCard>
 
@@ -97,32 +182,34 @@ export default function PatientsPage() {
             <Activity className="w-4 h-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {patients.filter((p) => p.status === 'active').length}
-            </div>
-            <p className="text-xs text-green-600 mt-1 font-medium">98% adherence rate</p>
+            <div className="text-2xl font-bold text-gray-900">{activeCount}</div>
+            <p className="text-xs text-green-600 mt-1 font-medium">
+              {totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0}% of total
+            </p>
           </CardContent>
         </MagicCard>
 
         <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#eff6ff">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-gray-500">New This Month</CardTitle>
-            <User className="w-4 h-4 text-indigo-600" />
+            <TrendingUp className="w-4 h-4 text-indigo-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">12</div>
-            <p className="text-xs text-gray-500 mt-1">4 pending intake</p>
+            <div className="text-2xl font-bold text-gray-900">{newThisMonth}</div>
+            <p className="text-xs text-gray-500 mt-1">Recent registrations</p>
           </CardContent>
         </MagicCard>
 
         <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#fefce8">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Pending Follow-up</CardTitle>
-            <AlertCircle className="w-4 h-4 text-amber-500" />
+            <CardTitle className="text-sm font-medium text-gray-500">Avg Age</CardTitle>
+            <User className="w-4 h-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">3</div>
-            <p className="text-xs text-amber-600 mt-1 font-medium">Action required</p>
+            <div className="text-2xl font-bold text-gray-900">
+              {stats?.average_age ? Math.round(stats.average_age) : '--'}
+            </div>
+            <p className="text-xs text-amber-600 mt-1 font-medium">Years old</p>
           </CardContent>
         </MagicCard>
       </div>
@@ -195,7 +282,7 @@ export default function PatientsPage() {
                         <Avatar className="h-9 w-9 border border-gray-100">
                           <AvatarImage src={patient.avatar_url} />
                           <AvatarFallback className="bg-blue-50 text-blue-600 text-xs font-bold">
-                            {patient.name
+                            {(patient.name || patient.legal_name || 'P')
                               .split(' ')
                               .map((n) => n[0])
                               .join('')
@@ -203,7 +290,7 @@ export default function PatientsPage() {
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium text-gray-900">{patient.name}</div>
+                          <div className="font-medium text-gray-900">{patient.name || patient.legal_name || 'Unknown'}</div>
                           <div className="text-xs text-gray-500">
                             {patient.gender || 'Not specified'}
                           </div>
@@ -212,10 +299,10 @@ export default function PatientsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        {patient.phone && (
+                        {(patient.phone || patient.primary_phone) && (
                           <div className="flex items-center gap-2 text-xs text-gray-600">
                             <Phone className="w-3 h-3 text-gray-400" />
-                            {patient.phone}
+                            {patient.phone || patient.primary_phone}
                           </div>
                         )}
                         {patient.email && (
@@ -276,6 +363,156 @@ export default function PatientsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Patient Dialog */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-2xl border-gray-200">
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-xl">
+                <Plus className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold text-white">Add New Patient</DialogTitle>
+                <DialogDescription className="text-green-100 text-sm mt-0.5">
+                  Enter patient information to create a new record
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleAddSubmit} className="px-6 py-5">
+            <div className="space-y-5">
+              {/* Name Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="add_first_name" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-gray-400" />
+                    First Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="add_first_name"
+                    value={addForm.first_name}
+                    onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
+                    className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                    placeholder="John"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add_last_name" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-gray-400" />
+                    Last Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="add_last_name"
+                    value={addForm.last_name}
+                    onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
+                    className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                    placeholder="Doe"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* DOB and Gender Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="add_dob" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                    Date of Birth <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="add_dob"
+                    type="date"
+                    value={addForm.date_of_birth}
+                    onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })}
+                    className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add_gender" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5 text-gray-400" />
+                    Gender
+                  </Label>
+                  <select
+                    id="add_gender"
+                    value={addForm.gender}
+                    onChange={(e) => setAddForm({ ...addForm, gender: e.target.value })}
+                    className="h-11 w-full rounded-xl border border-gray-200 px-3 text-sm focus:border-green-300 focus:ring-2 focus:ring-green-100 bg-gray-50/50 outline-none"
+                  >
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="add_phone" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-gray-400" />
+                  Phone Number
+                </Label>
+                <Input
+                  id="add_phone"
+                  value={addForm.phone_primary}
+                  onChange={(e) => setAddForm({ ...addForm, phone_primary: e.target.value })}
+                  className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <Label htmlFor="add_email" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-gray-400" />
+                  Email Address
+                </Label>
+                <Input
+                  id="add_email"
+                  type="email"
+                  value={addForm.email_primary}
+                  onChange={(e) => setAddForm({ ...addForm, email_primary: e.target.value })}
+                  className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                  placeholder="john.doe@email.com"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-gray-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddOpen(false)}
+                className="rounded-full px-5 border-gray-200 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="rounded-full px-6 bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md transition-all"
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Patient
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

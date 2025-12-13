@@ -129,6 +129,15 @@ export interface JourneyListResponse {
     has_previous: boolean;
 }
 
+export interface JourneyInstanceStats {
+    total: number;
+    active: number;
+    completed: number;
+    cancelled: number;
+    by_status: Record<string, number>;
+    by_journey: Record<string, number>;
+}
+
 export interface JourneyInstanceListResponse {
     total: number;
     instances: JourneyInstance[];
@@ -154,4 +163,66 @@ export interface TicketListResponse {
     page_size: number;
     has_next: boolean;
     has_previous: boolean;
+}
+
+// ==================== Patient 360 View ====================
+
+export interface Patient360Appointment {
+    id: string;
+    scheduled_at: string | null;
+    status: string;
+    appointment_type: string;
+    practitioner_id: string | null;
+}
+
+export interface Patient360Journey {
+    id: string;
+    journey_id: string;
+    status: string;
+    current_stage_id: string | null;
+}
+
+export interface Patient360Ticket {
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+}
+
+export interface Patient360Communication {
+    id: string;
+    channel: string;
+    direction: string;
+    sent_at: string | null;
+    message_type: string;
+}
+
+export interface PatientSimple {
+    id: string;
+    mrn?: string;
+    first_name: string;
+    last_name: string;
+    legal_name?: string;
+    date_of_birth: string;
+    gender: string;
+    phone_primary?: string;
+    email_primary?: string;
+    is_deceased?: boolean;
+    state?: string; // active, inactive
+    created_at: string;
+}
+
+export interface Patient360Response {
+    patient: PatientSimple;
+    appointments: Patient360Appointment[];
+    journeys: Patient360Journey[];
+    tickets: Patient360Ticket[];
+    communications: Patient360Communication[];
+    total_appointments: number;
+    upcoming_appointments: number;
+    active_journeys: number;
+    open_tickets: number;
+    recent_communications: number;
+    last_visit_date: string | null;
+    next_appointment_date: string | null;
 }
