@@ -78,6 +78,9 @@ app.add_middleware(
 # Include WebSocket router for real-time features
 app.include_router(websocket_router)
 
+# Include modular routers
+from modules.patients.router import router as patients_router
+app.include_router(patients_router, prefix="/api/v1/prm", tags=["Patients"])
 
 # ==================== Health Check ====================
 
@@ -591,6 +594,71 @@ async def list_journey_instances(
 
 
 @app.get(
+    "/api/v1/prm/instances/stats",
+    tags=["Journey Instances"]
+)
+async def get_journey_instance_stats(
+    tenant_id: Optional[UUID] = Query(None),
+    journey_id: Optional[UUID] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Get journey instance statistics
+
+    Returns counts by status and journey type.
+    Used for dashboard "Active Journeys" card.
+    """
+    from sqlalchemy import func
+
+    query = db.query(JourneyInstance)
+
+    if tenant_id:
+        query = query.filter(JourneyInstance.tenant_id == tenant_id)
+
+    if journey_id:
+        query = query.filter(JourneyInstance.journey_id == journey_id)
+
+    # Total
+    total = query.count()
+
+    # Active count
+    active = query.filter(JourneyInstance.status == "active").count()
+
+    # Completed count
+    completed = query.filter(JourneyInstance.status == "completed").count()
+
+    # Cancelled count
+    cancelled = query.filter(JourneyInstance.status == "cancelled").count()
+
+    # By status
+    status_counts = db.query(
+        JourneyInstance.status,
+        func.count(JourneyInstance.id)
+    ).group_by(JourneyInstance.status).all()
+
+    by_status = {s: count for s, count in status_counts}
+
+    # By journey
+    journey_counts = db.query(
+        Journey.name,
+        func.count(JourneyInstance.id)
+    ).join(
+        Journey, JourneyInstance.journey_id == Journey.id
+    ).group_by(Journey.name).all()
+
+    by_journey = {name: count for name, count in journey_counts}
+
+    return {
+        "total": total,
+        "active": active,
+        "completed": completed,
+        "cancelled": cancelled,
+        "by_status": by_status,
+        "by_journey": by_journey
+    }
+
+
+@app.get(
     "/api/v1/prm/instances/{instance_id}",
     response_model=JourneyInstanceWithStages,
     tags=["Journey Instances"]
@@ -1000,6 +1068,74 @@ async def delete_communication(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete communication"
         )
+
+
+@app.get(
+    "/api/v1/prm/communications/{communication_id}",
+    response_model=CommunicationResponse,
+    tags=["Communications"]
+)
+async def get_communication(
+    communication_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Get communication by ID"""
+    communication = db.query(Communication).filter(
+        Communication.id == communication_id
+    ).first()
+
+    if not communication:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Communication not found"
+        )
+
+    return communication
+
+
+@app.patch(
+    "/api/v1/prm/communications/{communication_id}",
+    response_model=CommunicationResponse,
+    tags=["Communications"]
+)
+async def update_communication(
+    communication_id: UUID,
+    update_data: CommunicationUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update a communication
+
+    Common uses:
+    - Mark as read: status="read"
+    - Mark as delivered: status="delivered"
+    - Mark as failed: status="failed"
+    """
+    communication = db.query(Communication).filter(
+        Communication.id == communication_id
+    ).first()
+
+    if not communication:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Communication not found"
+        )
+
+    # Update fields
+    update_dict = update_data.model_dump(exclude_unset=True, exclude_none=True)
+
+    for field, value in update_dict.items():
+        if hasattr(communication, field):
+            setattr(communication, field, value)
+
+    communication.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(communication)
+
+    logger.info(f"Updated communication: {communication_id}")
+
+    return communication
 
 
 # ==================== Tickets ====================

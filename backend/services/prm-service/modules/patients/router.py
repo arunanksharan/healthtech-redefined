@@ -178,19 +178,24 @@ async def get_patient_360(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    # Get appointments
-    appointments = db.query(Appointment).filter(
+    # Get appointments (join with TimeSlot to get scheduled time)
+    from shared.database.models import TimeSlot
+    appointments = db.query(Appointment).join(
+        TimeSlot, Appointment.time_slot_id == TimeSlot.id
+    ).filter(
         Appointment.patient_id == patient_id
-    ).order_by(Appointment.scheduled_at.desc()).limit(10).all()
+    ).order_by(TimeSlot.start_datetime.desc()).limit(10).all()
 
     total_appointments = db.query(Appointment).filter(
         Appointment.patient_id == patient_id
     ).count()
 
-    upcoming_appointments = db.query(Appointment).filter(
+    upcoming_appointments = db.query(Appointment).join(
+        TimeSlot, Appointment.time_slot_id == TimeSlot.id
+    ).filter(
         Appointment.patient_id == patient_id,
-        Appointment.scheduled_at >= datetime.utcnow(),
-        Appointment.status.in_(["scheduled", "confirmed"])
+        TimeSlot.start_datetime >= datetime.utcnow(),
+        Appointment.status.in_(["scheduled", "confirmed", "booked"])
     ).count()
 
     # Get journey instances
@@ -216,29 +221,40 @@ async def get_patient_360(
     # Get communications
     communications = db.query(Communication).filter(
         Communication.patient_id == patient_id
-    ).order_by(Communication.sent_at.desc()).limit(10).all()
+    ).order_by(Communication.created_at.desc()).limit(10).all()
 
     recent_communications = db.query(Communication).filter(
         Communication.patient_id == patient_id
     ).count()
 
-    # Get timeline dates
-    last_visit = db.query(Appointment).filter(
+    # Get timeline dates (last completed appointment)
+    last_visit_apt = db.query(Appointment).join(
+        TimeSlot, Appointment.time_slot_id == TimeSlot.id
+    ).filter(
         Appointment.patient_id == patient_id,
         Appointment.status == "completed"
-    ).order_by(Appointment.scheduled_at.desc()).first()
+    ).order_by(TimeSlot.start_datetime.desc()).first()
 
-    next_apt = db.query(Appointment).filter(
+    # Get next upcoming appointment
+    next_apt = db.query(Appointment).join(
+        TimeSlot, Appointment.time_slot_id == TimeSlot.id
+    ).filter(
         Appointment.patient_id == patient_id,
-        Appointment.scheduled_at >= datetime.utcnow(),
-        Appointment.status.in_(["scheduled", "confirmed"])
-    ).order_by(Appointment.scheduled_at.asc()).first()
+        TimeSlot.start_datetime >= datetime.utcnow(),
+        Appointment.status.in_(["scheduled", "confirmed", "booked"])
+    ).order_by(TimeSlot.start_datetime.asc()).first()
+
+    # Helper to get scheduled time from appointment
+    def get_apt_time(apt):
+        if apt and apt.time_slot:
+            return apt.time_slot.start_datetime
+        return None
 
     return Patient360Response(
         patient=PatientSimpleResponse.model_validate(patient),
         appointments=[{
             "id": str(a.id),
-            "scheduled_at": a.scheduled_at.isoformat() if a.scheduled_at else None,
+            "scheduled_at": a.time_slot.start_datetime.isoformat() if a.time_slot and a.time_slot.start_datetime else None,
             "status": a.status,
             "appointment_type": a.appointment_type,
             "practitioner_id": str(a.practitioner_id) if a.practitioner_id else None
@@ -259,16 +275,16 @@ async def get_patient_360(
             "id": str(c.id),
             "channel": c.channel,
             "direction": c.direction,
-            "sent_at": c.sent_at.isoformat() if c.sent_at else None,
-            "message_type": c.message_type
+            "sent_at": c.created_at.isoformat() if c.created_at else None,
+            "message_type": getattr(c, 'message_type', None) or c.channel
         } for c in communications],
         total_appointments=total_appointments,
         upcoming_appointments=upcoming_appointments,
         active_journeys=active_journeys,
         open_tickets=open_tickets,
         recent_communications=recent_communications,
-        last_visit_date=last_visit.scheduled_at if last_visit else None,
-        next_appointment_date=next_apt.scheduled_at if next_apt else None
+        last_visit_date=get_apt_time(last_visit_apt),
+        next_appointment_date=get_apt_time(next_apt)
     )
 
 
