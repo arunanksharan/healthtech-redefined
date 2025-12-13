@@ -357,7 +357,7 @@ export default function CommunicationsPage() {
                           </p>
                         </div>
                         <div className="flex items-center justify-end gap-1.5 mt-2 text-xs text-gray-400">
-                          <span>{formatSmartDate(selectedComm.sent_at)}</span>
+                          <span>{formatSmartDate(selectedComm.sent_at || selectedComm.created_at)}</span>
                           <span>•</span>
                           <span className="capitalize flex items-center gap-1">
                             {selectedComm.status}

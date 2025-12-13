@@ -38,31 +38,29 @@ export default function JourneysPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
-    // Fetch all journey instances
+    // Fetch all journey definitions
     const { data: journeysData, isLoading, error } = useQuery({
-        queryKey: ['journey-instances', statusFilter],
+        queryKey: ['journey-definitions', statusFilter],
         queryFn: async () => {
-            const [data, error] = await journeysAPI.getInstances({
-                status: statusFilter === 'all' ? undefined : statusFilter,
-            });
+            const [data, error] = await journeysAPI.getAll();
             if (error) throw new Error(error.message);
             return data;
         },
     });
 
-    const journeys = journeysData?.instances || [];
+    const journeys = journeysData?.journeys || [];
     const filteredJourneys = journeys.filter(journey =>
         searchQuery === '' ||
-        journey.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        journey.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        journey.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        journey.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         journey.journey_type?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const stats = {
         total: journeys.length,
-        active: journeys.filter(j => j.status === 'active').length,
-        completed: journeys.filter(j => j.status === 'completed').length,
-        paused: journeys.filter(j => j.status === 'paused').length,
+        active: journeys.filter(j => j.is_default).length,
+        completed: 0,
+        paused: 0,
     };
 
     const getStatusColor = (status: string) => {
@@ -224,64 +222,44 @@ export default function JourneysPage() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between">
                                             <div>
-                                                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                                    {journey.title}
+                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 transition-colors">
+                                                    {journey.name}
                                                 </h3>
                                                 <div className="flex items-center gap-4 mt-1">
                                                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                                        <User className="w-4 h-4 text-muted-foreground" />
-                                                        <span className="font-medium text-foreground/80">{journey.patient?.name}</span>
+                                                        <Route className="w-4 h-4 text-muted-foreground" />
+                                                        <span className="font-medium text-foreground/80">{journey.stages?.length || 0} Stages</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                                         <Calendar className="w-4 h-4" />
-                                                        <span>Started {formatSmartDate(journey.created_at)}</span>
+                                                        <span>Created {formatSmartDate(journey.created_at)}</span>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Status Badge */}
-                                            <Badge variant="secondary" className={cn("capitalize px-2.5 py-0.5", getStatusColor(journey.status))}>
-                                                {journey.status}
+                                            <Badge variant="secondary" className={cn("capitalize px-2.5 py-0.5", journey.is_default ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200')}>
+                                                {journey.is_default ? 'Default' : journey.journey_type}
                                             </Badge>
                                         </div>
 
-                                        {/* Progress Bar */}
-                                        <div className="mt-5">
-                                            <div className="flex justify-between text-xs mb-1.5">
-                                                <span className="font-medium text-foreground/80">Progress</span>
-                                                <span className="text-muted-foreground">{getProgressPercentage(journey)}%</span>
-                                            </div>
-                                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-blue-600 rounded-full transition-all duration-500"
-                                                    style={{ width: `${getProgressPercentage(journey)}%` }}
-                                                />
-                                            </div>
-                                        </div>
+                                        {/* Description */}
+                                        <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
+                                            {journey.description}
+                                        </p>
 
-                                        {/* Steps Timeline Preview */}
-                                        {journey.steps && journey.steps.length > 0 && (
+                                        {/* Stages Timeline Preview */}
+                                        {journey.stages && journey.stages.length > 0 && (
                                             <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                                                {journey.steps.slice(0, 5).map((step: any, idx: number) => (
+                                                {journey.stages.slice(0, 5).map((stage: any, idx: number) => (
                                                     <div key={idx} className="flex items-center shrink-0">
-                                                        <div className={cn(
-                                                            "flex items-start gap-2 px-3 py-1.5 rounded-lg border text-xs whitespace-nowrap transition-colors",
-                                                            step.status === 'completed'
-                                                                ? "bg-muted/50 border-border text-muted-foreground"
-                                                                : step.status === 'in_progress'
-                                                                    ? "bg-blue-50/10 border-blue-200 text-blue-700 font-medium ring-1 ring-blue-100"
-                                                                    : "bg-card border-border/50 text-muted-foreground"
-                                                        )}>
-                                                            {step.status === 'completed' ? (
-                                                                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                                                            ) : step.status === 'in_progress' ? (
-                                                                <Activity className="w-3.5 h-3.5 text-blue-500" />
-                                                            ) : (
-                                                                <div className="w-3.5 h-3.5 rounded-full border border-border" />
-                                                            )}
-                                                            <span>{step.title}</span>
+                                                        <div className="flex items-start gap-2 px-3 py-1.5 rounded-lg border bg-card border-border/50 text-muted-foreground text-xs whitespace-nowrap transition-colors">
+                                                            <div className="w-3.5 h-3.5 rounded-full border border-blue-400 flex items-center justify-center text-[10px] font-medium text-blue-600">
+                                                                {stage.order_index}
+                                                            </div>
+                                                            <span>{stage.name}</span>
                                                         </div>
-                                                        {idx < Math.min(journey.steps.length, 5) - 1 && (
+                                                        {idx < Math.min(journey.stages.length, 5) - 1 && (
                                                             <ArrowRight className="w-3 h-3 text-muted mx-1" />
                                                         )}
                                                     </div>
