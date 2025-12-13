@@ -186,7 +186,7 @@ async def create_journey_instance(
 async def list_journey_instances(
     patient_id: Optional[UUID] = Query(None),
     journey_id: Optional[UUID] = Query(None),
-    status: Optional[str] = Query(None),
+    instance_status: Optional[str] = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
@@ -196,10 +196,73 @@ async def list_journey_instances(
     return await service.list_instances(
         patient_id=patient_id,
         journey_id=journey_id,
-        status=status,
+        status=instance_status,
         page=page,
         page_size=page_size
     )
+
+
+@router.get("/instances/stats")
+async def get_journey_instance_stats(
+    tenant_id: Optional[UUID] = Query(None),
+    journey_id: Optional[UUID] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Get journey instance statistics
+
+    Returns counts by status and journey type.
+    Used for dashboard "Active Journeys" card.
+    """
+    from shared.database.models import JourneyInstance, Journey
+    from sqlalchemy import func
+
+    query = db.query(JourneyInstance)
+
+    if tenant_id:
+        query = query.filter(JourneyInstance.tenant_id == tenant_id)
+
+    if journey_id:
+        query = query.filter(JourneyInstance.journey_id == journey_id)
+
+    # Total
+    total = query.count()
+
+    # Active count
+    active = query.filter(JourneyInstance.status == "active").count()
+
+    # Completed count
+    completed = query.filter(JourneyInstance.status == "completed").count()
+
+    # Cancelled count
+    cancelled = query.filter(JourneyInstance.status == "cancelled").count()
+
+    # By status
+    status_counts = db.query(
+        JourneyInstance.status,
+        func.count(JourneyInstance.id)
+    ).group_by(JourneyInstance.status).all()
+
+    by_status = {s: count for s, count in status_counts}
+
+    # By journey
+    journey_counts = db.query(
+        Journey.name,
+        func.count(JourneyInstance.id)
+    ).join(
+        Journey, JourneyInstance.journey_id == Journey.id
+    ).group_by(Journey.name).all()
+
+    by_journey = {name: count for name, count in journey_counts}
+
+    return {
+        "total": total,
+        "active": active,
+        "completed": completed,
+        "cancelled": cancelled,
+        "by_status": by_status,
+        "by_journey": by_journey
+    }
 
 
 @router.get("/instances/{instance_id}", response_model=JourneyInstanceWithStages)

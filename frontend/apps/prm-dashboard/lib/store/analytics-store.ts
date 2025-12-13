@@ -71,44 +71,110 @@ export interface ChartConfig {
   period: TimePeriod;
 }
 
-// AI Insight
+// AI Insight - Comprehensive type for all insight variations
+export type InsightCategory = "revenue" | "operations" | "clinical" | "experience" | "prediction";
+export type InsightSentiment = "positive" | "negative" | "neutral" | "warning";
+export type InsightImpact = "high" | "medium" | "low";
+export type InsightType = "positive" | "warning" | "info" | "action";
+
+export interface InsightMetric {
+  label: string;
+  value: string;
+  change?: number;
+}
+
+export interface InsightAction {
+  id: string;
+  label: string;
+  type?: string;
+}
+
 export interface AIInsight {
   id: string;
-  type: "positive" | "warning" | "info" | "action";
+  type: InsightType;
   title: string;
   description: string;
+  // Category and sentiment are required for UI display
+  category: InsightCategory;
+  sentiment: InsightSentiment;
+  impact: InsightImpact;
+  // Optional metric reference
   metric?: string;
-  impact?: string;
-  suggestedActions?: string[];
-  timestamp: Date;
+  metrics?: InsightMetric[];
+  suggestedActions?: InsightAction[];
+  // Timestamp for display - createdAt is the ISO string format
+  createdAt: string;
   isRead: boolean;
 }
 
-// Proactive Alert
+// Proactive Alert - Comprehensive type for all alert variations
+export type AlertType = "no_show_risk" | "cancellation" | "sentiment" | "capacity" | "follow_up" | "system";
+
+export interface AlertAffectedItem {
+  id?: string;
+  name: string;
+  time?: string;
+  detail?: string;
+  riskScore?: number;
+  reason?: string;
+}
+
 export interface ProactiveAlert {
   id: string;
   priority: AlertPriority;
   status: AlertStatus;
   title: string;
   description: string;
+  // Source and type information
   source: string;
-  affectedItems?: {
-    id: string;
-    name: string;
-    detail: string;
-    riskScore?: number;
-  }[];
-  suggestedAction?: {
-    label: string;
-    type: string;
-  };
-  createdAt: Date;
+  type?: AlertType;
+  // Affected items with flexible structure
+  affectedItems?: AlertAffectedItem[];
+  // Suggested action as display string
+  suggestedAction?: string;
+  // Action button labels
+  primaryAction?: string;
+  secondaryAction?: string;
+  // Timestamps - createdAt as ISO string for consistency
+  createdAt: string;
   acknowledgedAt?: Date;
   resolvedAt?: Date;
 }
 
-// Sentiment data
+// Sentiment Theme
+export interface SentimentTheme {
+  theme: string;
+  count: number;
+  sentiment: "positive" | "negative" | "neutral";
+}
+
+// Sentiment Sources
+export interface SentimentSources {
+  voice: number;
+  whatsapp: number;
+  survey: number;
+  email: number;
+}
+
+// Department Sentiment - individual department data used in heatmap
+export interface DepartmentSentiment {
+  id: string;
+  name: string;
+  score: number;
+  previousScore?: number;
+  change?: number;
+  // Required for heatmap display
+  totalFeedback: number;
+  sources: SentimentSources;
+  topThemes: {
+    positive: string[];
+    negative: string[];
+  };
+}
+
+// Sentiment data - supports both individual and aggregate formats
 export interface SentimentData {
+  // For individual department view
   id: string;
   department: string;
   location?: string;
@@ -117,12 +183,16 @@ export interface SentimentData {
   trend: MetricTrend;
   changePercent?: number;
   status: MetricStatus;
-  topThemes: {
-    theme: string;
-    count: number;
-    sentiment: "positive" | "negative" | "neutral";
-  }[];
+  topThemes: SentimentTheme[];
   sampleFeedback?: string[];
+}
+
+// Aggregate Sentiment Data - for dashboard overview
+export interface SentimentDataAggregate {
+  overallScore: number;
+  previousScore: number;
+  totalFeedback: number;
+  departments: DepartmentSentiment[];
 }
 
 // Dashboard widget
@@ -204,6 +274,10 @@ export interface AnalyticsState {
   // UI State
   greeting: string;
   lastRefresh: Date;
+
+  // Aliases for compatibility
+  isLoading: boolean;
+  timeRange: TimePeriod;
 }
 
 // ============================================================================
@@ -262,6 +336,10 @@ export interface AnalyticsActions {
 
   // Reset
   reset: () => void;
+
+  // Aliases for compatibility
+  setTimeRange: (range: TimePeriod) => void;
+  fetchDashboardData: () => Promise<void>;
 }
 
 // ============================================================================
@@ -314,6 +392,10 @@ const initialState: AnalyticsState = {
 
   greeting: getGreeting(),
   lastRefresh: new Date(),
+
+  // Aliases
+  isLoading: false,
+  timeRange: "month",
 };
 
 // ============================================================================
@@ -590,6 +672,25 @@ export const useAnalyticsStore = create<AnalyticsState & AnalyticsActions>()(
       // ========================================================================
 
       reset: () => set(initialState),
+
+      // ========================================================================
+      // Aliases for compatibility
+      // ========================================================================
+
+      setTimeRange: (range) => set({ selectedPeriod: range, timeRange: range }),
+
+      fetchDashboardData: async () => {
+        const { loadMetrics, loadCharts, loadInsights, loadAlerts, loadSentimentData } = get();
+        set({ isLoading: true });
+        await Promise.all([
+          loadMetrics(),
+          loadCharts(),
+          loadInsights(),
+          loadAlerts(),
+          loadSentimentData(),
+        ]);
+        set({ isLoading: false, lastRefresh: new Date() });
+      },
     })),
     { name: "analytics-store" }
   )
@@ -808,16 +909,26 @@ function createMockCharts(): ChartConfig[] {
 }
 
 function createMockInsights(): AIInsight[] {
+  const now = new Date().toISOString();
   return [
     {
       id: "insight-1",
       type: "positive",
       title: "Cardiology revenue is 15% above target",
       description: "Strong performance driven by increased procedure volume and new patient referrals.",
+      category: "revenue",
+      sentiment: "positive",
+      impact: "high",
       metric: "revenue-mtd",
-      impact: "+₹4.8L this month",
-      suggestedActions: ["Review capacity for expansion", "Analyze referral sources"],
-      timestamp: new Date(),
+      metrics: [
+        { label: "Current Revenue", value: "₹32.1L", change: 12.6 },
+        { label: "Target", value: "₹28L" },
+      ],
+      suggestedActions: [
+        { id: "1", label: "Review capacity for expansion" },
+        { id: "2", label: "Analyze referral sources" },
+      ],
+      createdAt: now,
       isRead: false,
     },
     {
@@ -825,10 +936,20 @@ function createMockInsights(): AIInsight[] {
       type: "warning",
       title: "Pediatrics no-show rate spiked to 22%",
       description: "No-show rate increased from 15% to 22% over the past 3 weeks.",
+      category: "operations",
+      sentiment: "warning",
+      impact: "high",
       metric: "no-show-rate",
-      impact: "-₹1.2L estimated lost revenue",
-      suggestedActions: ["Enable WhatsApp reminders", "Implement overbooking", "Offer evening slots"],
-      timestamp: new Date(),
+      metrics: [
+        { label: "Current Rate", value: "22%", change: -7 },
+        { label: "Benchmark", value: "10%" },
+      ],
+      suggestedActions: [
+        { id: "3", label: "Enable WhatsApp reminders" },
+        { id: "4", label: "Implement overbooking" },
+        { id: "5", label: "Offer evening slots" },
+      ],
+      createdAt: now,
       isRead: false,
     },
     {
@@ -836,15 +957,21 @@ function createMockInsights(): AIInsight[] {
       type: "action",
       title: "3 high-risk patients identified",
       description: "Predictive model identified patients requiring proactive outreach.",
-      impact: "Prevent potential readmissions",
-      suggestedActions: ["View patient list", "Assign care coordinator"],
-      timestamp: new Date(),
+      category: "clinical",
+      sentiment: "neutral",
+      impact: "medium",
+      suggestedActions: [
+        { id: "6", label: "View patient list" },
+        { id: "7", label: "Assign care coordinator" },
+      ],
+      createdAt: now,
       isRead: false,
     },
   ];
 }
 
 function createMockAlerts(): ProactiveAlert[] {
+  const now = new Date().toISOString();
   return [
     {
       id: "alert-1",
@@ -853,18 +980,18 @@ function createMockAlerts(): ProactiveAlert[] {
       title: "No-Show Prediction Alert",
       description: "8 appointments tomorrow flagged as 'High No-Show Risk'",
       source: "Predictive Analytics",
+      type: "no_show_risk",
       affectedItems: [
-        { id: "p1", name: "Rahul Verma", detail: "9:00 AM", riskScore: 85 },
-        { id: "p2", name: "Sunita Devi", detail: "10:30 AM", riskScore: 78 },
-        { id: "p3", name: "Arun Kumar", detail: "11:00 AM", riskScore: 75 },
-        { id: "p4", name: "Meera Sharma", detail: "2:00 PM", riskScore: 72 },
-        { id: "p5", name: "Vijay Singh", detail: "3:30 PM", riskScore: 70 },
+        { id: "p1", name: "Rahul Verma", time: "9:00 AM", riskScore: 85, reason: "3 past no-shows" },
+        { id: "p2", name: "Sunita Devi", time: "10:30 AM", riskScore: 78, reason: "Far distance" },
+        { id: "p3", name: "Arun Kumar", time: "11:00 AM", riskScore: 75, reason: "First visit" },
+        { id: "p4", name: "Meera Sharma", time: "2:00 PM", riskScore: 72, reason: "Weather alert" },
+        { id: "p5", name: "Vijay Singh", time: "3:30 PM", riskScore: 70, reason: "Late booking" },
       ],
-      suggestedAction: {
-        label: "Send Confirmations Now",
-        type: "send_reminders",
-      },
-      createdAt: new Date(),
+      suggestedAction: "Send WhatsApp confirmation request to all 8 patients",
+      primaryAction: "Send Confirmations Now",
+      secondaryAction: "Review List",
+      createdAt: now,
     },
     {
       id: "alert-2",
@@ -873,11 +1000,16 @@ function createMockAlerts(): ProactiveAlert[] {
       title: "Dr. Sharma has 3 cancellations tomorrow",
       description: "Freed up slots available for waitlisted patients",
       source: "Schedule Management",
-      suggestedAction: {
-        label: "Notify Waitlist",
-        type: "notify_waitlist",
-      },
-      createdAt: new Date(),
+      type: "cancellation",
+      affectedItems: [
+        { id: "s1", name: "Slot 1", time: "10:00 AM" },
+        { id: "s2", name: "Slot 2", time: "11:30 AM" },
+        { id: "s3", name: "Slot 3", time: "3:00 PM" },
+      ],
+      suggestedAction: "Notify waitlisted patients about available slots",
+      primaryAction: "Notify Waitlist",
+      secondaryAction: "Ignore",
+      createdAt: now,
     },
     {
       id: "alert-3",
@@ -886,11 +1018,11 @@ function createMockAlerts(): ProactiveAlert[] {
       title: "Reception sentiment declining",
       description: "Patient satisfaction for reception dropped 15% this week",
       source: "Sentiment Analysis",
-      suggestedAction: {
-        label: "View Feedback",
-        type: "view_feedback",
-      },
-      createdAt: new Date(),
+      type: "sentiment",
+      suggestedAction: "Review recent feedback and identify improvement areas",
+      primaryAction: "View Feedback",
+      secondaryAction: "Dismiss",
+      createdAt: now,
     },
   ];
 }

@@ -148,7 +148,7 @@ class DLQHandler:
                     error_message=str(error),
                     retry_count=retry_count,
                     failed_at=datetime.utcnow(),
-                    metadata=metadata or {},
+                    event_metadata=metadata or {},
                 )
                 db.add(failed_event)
 

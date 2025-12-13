@@ -265,12 +265,12 @@ function SpecialistSearch({ specialty, onSelect, patientInsurance }: SpecialistS
   const sortedSpecialists = useMemo(() => {
     return [...specialists].sort((a, b) => {
       // In-network first
-      const aInNetwork = patientInsurance ? a.insuranceAccepted.includes(patientInsurance) : true;
-      const bInNetwork = patientInsurance ? b.insuranceAccepted.includes(patientInsurance) : true;
+      const aInNetwork = patientInsurance ? (a.insuranceAccepted ?? []).includes(patientInsurance) : true;
+      const bInNetwork = patientInsurance ? (b.insuranceAccepted ?? []).includes(patientInsurance) : true;
       if (aInNetwork !== bInNetwork) return aInNetwork ? -1 : 1;
 
       // Then by rating
-      return b.rating - a.rating;
+      return (b.rating ?? 0) - (a.rating ?? 0);
     });
   }, [specialists, patientInsurance]);
 
@@ -313,7 +313,7 @@ function SpecialistSearch({ specialty, onSelect, patientInsurance }: SpecialistS
             <CommandGroup heading="Available Specialists">
               {sortedSpecialists.map((specialist) => {
                 const isInNetwork = patientInsurance
-                  ? specialist.insuranceAccepted.includes(patientInsurance)
+                  ? (specialist.insuranceAccepted ?? []).includes(patientInsurance)
                   : true;
 
                 return (
@@ -357,7 +357,7 @@ function SpecialistSearch({ specialty, onSelect, patientInsurance }: SpecialistS
                         </span>
                         <span className="flex items-center gap-1">
                           <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                          {specialist.rating.toFixed(1)}
+                          {(specialist.rating ?? 0).toFixed(1)}
                         </span>
                         {specialist.nextAvailable && (
                           <span className="flex items-center gap-1">
@@ -439,7 +439,7 @@ function SelectedSpecialistCard({ specialist, onRemove, isInNetwork }: SelectedS
             <div className="flex items-center gap-4 mt-3">
               <div className="flex items-center gap-1">
                 <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                <span className="font-medium">{specialist.rating.toFixed(1)}</span>
+                <span className="font-medium">{(specialist.rating ?? 0).toFixed(1)}</span>
                 <span className="text-xs text-muted-foreground">
                   ({specialist.reviewCount} reviews)
                 </span>
@@ -540,7 +540,7 @@ function DocumentAttachment({ documents, onAdd, onRemove }: DocumentAttachmentPr
           id: `doc-${Date.now()}`,
           name: file.name,
           type: file.type.includes("pdf") ? "pdf" : "image",
-          size: `${(file.size / 1024).toFixed(1)} KB`,
+          size: file.size,
           uploadedAt: new Date().toISOString(),
         };
         onAdd(doc);
@@ -611,7 +611,7 @@ function DocumentAttachment({ documents, onAdd, onRemove }: DocumentAttachmentPr
               id: `doc-${Date.now()}`,
               name: "Recent Lab Results",
               type: "lab_result",
-              size: "125 KB",
+              size: 128000,
               uploadedAt: new Date().toISOString(),
             })
           }
@@ -627,7 +627,7 @@ function DocumentAttachment({ documents, onAdd, onRemove }: DocumentAttachmentPr
               id: `doc-${Date.now()}`,
               name: "Imaging Report",
               type: "imaging",
-              size: "2.1 MB",
+              size: 2200000,
               uploadedAt: new Date().toISOString(),
             })
           }
@@ -643,7 +643,7 @@ function DocumentAttachment({ documents, onAdd, onRemove }: DocumentAttachmentPr
               id: `doc-${Date.now()}`,
               name: "Clinical Summary",
               type: "clinical_summary",
-              size: "85 KB",
+              size: 87000,
               uploadedAt: new Date().toISOString(),
             })
           }
@@ -846,7 +846,7 @@ export function ReferralForm({
 
   // Computed
   const isInNetwork = patientInsurance && selectedSpecialist
-    ? selectedSpecialist.insuranceAccepted.includes(patientInsurance.provider)
+    ? (selectedSpecialist.insuranceAccepted ?? []).includes(patientInsurance.provider)
     : true;
 
   const canSubmit = selectedSpecialist && reasonForReferral.length > 10;

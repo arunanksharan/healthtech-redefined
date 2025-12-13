@@ -347,3 +347,118 @@ class PatientStatistics(BaseModel):
     patients_by_age_group: dict[str, int]  # 0-18, 19-35, 36-50, 51-65, 66+
     patients_by_status: dict[str, int]
     average_age: float
+
+
+# ==================== List Response ====================
+
+class PatientListResponse(BaseModel):
+    """Paginated patient list response"""
+    items: List[PatientResponse]
+    total: int
+    page: int
+    page_size: int
+    has_next: bool
+    has_previous: bool
+
+
+# ==================== Simple Patient Response (matches DB model) ====================
+
+class PatientSimpleResponse(BaseModel):
+    """Simple patient response matching database model"""
+    id: UUID
+    tenant_id: Optional[UUID] = None
+
+    # Identity
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+
+    # Contact
+    phone_primary: Optional[str] = None
+    phone_secondary: Optional[str] = None
+    email_primary: Optional[str] = None
+
+    # Address
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+
+    # Demographics
+    marital_status: Optional[str] = None
+    blood_group: Optional[str] = None
+    language_preferred: Optional[str] = None
+
+    # Status
+    is_deceased: bool = False
+
+    # Metadata
+    meta_data: Optional[dict] = None
+
+    # Audit
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @property
+    def name(self) -> str:
+        """Full name"""
+        parts = [self.first_name, self.middle_name, self.last_name]
+        return " ".join(p for p in parts if p)
+
+    @property
+    def mrn(self) -> Optional[str]:
+        """Get MRN from metadata if available"""
+        if self.meta_data and "mrn" in self.meta_data:
+            return self.meta_data["mrn"]
+        return None
+
+    class Config:
+        from_attributes = True
+
+
+class PatientSimpleListResponse(BaseModel):
+    """Paginated patient list response with simple model"""
+    items: List[PatientSimpleResponse]
+    total: int
+    page: int
+    page_size: int
+    has_next: bool
+    has_previous: bool
+
+
+# ==================== 360 View ====================
+
+class Patient360Response(BaseModel):
+    """360-degree patient view with all related data"""
+    patient: PatientSimpleResponse
+
+    # Related data summary
+    appointments: List[dict] = []
+    journeys: List[dict] = []
+    tickets: List[dict] = []
+    communications: List[dict] = []
+
+    # Counts
+    total_appointments: int = 0
+    upcoming_appointments: int = 0
+    active_journeys: int = 0
+    open_tickets: int = 0
+    recent_communications: int = 0
+
+    # Timeline
+    last_visit_date: Optional[datetime] = None
+    next_appointment_date: Optional[datetime] = None
+
+
+# ==================== Search Types ====================
+
+class SearchType(str, Enum):
+    """Search type for quick search"""
+    PHONE = "phone"
+    NAME = "name"
+    MRN = "mrn"
+    EMAIL = "email"

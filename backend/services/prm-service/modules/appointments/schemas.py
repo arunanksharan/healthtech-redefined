@@ -218,3 +218,80 @@ class AppointmentListFilters(BaseModel):
     end_date: Optional[datetime] = None
     limit: int = Field(50, ge=1, le=100)
     offset: int = Field(0, ge=0)
+
+
+# ==================== Appointment Statistics ====================
+
+class AppointmentStats(BaseModel):
+    """Appointment statistics"""
+    total: int = 0
+    today: int = 0
+    upcoming: int = 0
+    completed: int = 0
+    cancelled: int = 0
+    no_show: int = 0
+    by_status: Dict[str, int] = Field(default_factory=dict)
+    by_type: Dict[str, int] = Field(default_factory=dict)
+
+
+# ==================== Appointment List Response ====================
+
+class AppointmentListResponse(BaseModel):
+    """Paginated appointment list response"""
+    items: List[AppointmentResponse]
+    total: int
+    page: int
+    page_size: int
+    has_next: bool
+    has_previous: bool
+
+
+# ==================== Direct Appointment Creation ====================
+
+class AppointmentDirectCreate(BaseModel):
+    """Direct appointment creation (without conversation flow)"""
+    tenant_id: UUID
+    patient_id: UUID
+    practitioner_id: UUID
+    location_id: UUID
+    time_slot_id: UUID
+
+    appointment_type: str = Field("consultation", description="new, followup, procedure, consultation")
+    reason_text: Optional[str] = None
+    source_channel: str = Field("web", description="web, whatsapp, callcenter, walk_in")
+
+    meta_data: Optional[Dict[str, Any]] = None
+
+
+# ==================== Enhanced Appointment Response ====================
+
+class AppointmentDetailResponse(BaseModel):
+    """Detailed appointment response with related data"""
+    id: UUID
+    tenant_id: UUID
+    patient_id: UUID
+    practitioner_id: UUID
+    location_id: UUID
+    time_slot_id: UUID
+
+    appointment_type: Optional[str] = None
+    status: str
+    reason_text: Optional[str] = None
+    source_channel: Optional[str] = None
+
+    # Time slot info (joined)
+    scheduled_date: Optional[datetime] = None
+    scheduled_end: Optional[datetime] = None
+
+    # Related entity names (for display)
+    patient_name: Optional[str] = None
+    practitioner_name: Optional[str] = None
+    location_name: Optional[str] = None
+
+    meta_data: Optional[Dict[str, Any]] = None
+
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

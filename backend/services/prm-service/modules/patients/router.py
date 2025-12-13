@@ -2,9 +2,9 @@
 Patients Router
 API endpoints for FHIR-compliant patient management
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from loguru import logger
 
@@ -19,12 +19,257 @@ from modules.patients.schemas import (
     DuplicatePatient,
     PatientMergeRequest,
     PatientMergeResult,
-    PatientStatistics
+    PatientStatistics,
+    PatientSimpleResponse,
+    PatientSimpleListResponse,
+    Patient360Response,
+    SearchType
 )
 from modules.patients.service import PatientService
 
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
+
+
+# ==================== List & Search (GET) ====================
+
+@router.get("", response_model=PatientSimpleListResponse)
+async def list_patients(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    search: str = Query(None, description="Search query (name, phone, email)"),
+    tenant_id: UUID = Query(None, description="Filter by tenant"),
+    status: str = Query(None, description="Filter by status (active, inactive)"),
+    db: Session = Depends(get_db)
+):
+    """
+    List patients with pagination and optional filters
+
+    Returns paginated list of patients. Supports:
+    - Full-text search across name, phone, email
+    - Filter by tenant/organization
+    - Filter by status
+    """
+    from shared.database.models import Patient
+    from sqlalchemy import or_
+
+    query = db.query(Patient)
+
+    # Apply filters
+    if tenant_id:
+        query = query.filter(Patient.tenant_id == tenant_id)
+
+    if status:
+        query = query.filter(Patient.is_deceased == (status == "deceased"))
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Patient.first_name.ilike(search_term),
+                Patient.last_name.ilike(search_term),
+                Patient.phone_primary.ilike(search_term),
+                Patient.email_primary.ilike(search_term)
+            )
+        )
+
+    # Get total count
+    total = query.count()
+
+    # Apply pagination
+    offset = (page - 1) * page_size
+    patients = query.order_by(Patient.created_at.desc()).offset(offset).limit(page_size).all()
+
+    return PatientSimpleListResponse(
+        items=[PatientSimpleResponse.model_validate(p) for p in patients],
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=offset + len(patients) < total,
+        has_previous=page > 1
+    )
+
+
+@router.get("/search", response_model=List[PatientSimpleResponse])
+async def search_patients_get(
+    query: str = Query(..., min_length=2, description="Search query"),
+    type: SearchType = Query(SearchType.NAME, description="Search type"),
+    limit: int = Query(20, ge=1, le=50, description="Max results"),
+    db: Session = Depends(get_db)
+):
+    """
+    Quick search patients by specific field type
+
+    Search types:
+    - name: Search by first/last name
+    - phone: Search by phone number
+    - mrn: Search by MRN in patient_identifiers
+    - email: Search by email
+    """
+    from shared.database.models import Patient, PatientIdentifier
+    from sqlalchemy import or_
+
+    search_term = f"%{query}%"
+
+    if type == SearchType.NAME:
+        patients = db.query(Patient).filter(
+            or_(
+                Patient.first_name.ilike(search_term),
+                Patient.last_name.ilike(search_term)
+            )
+        ).limit(limit).all()
+
+    elif type == SearchType.PHONE:
+        # Clean phone number for search
+        phone_digits = ''.join(c for c in query if c.isdigit())
+        patients = db.query(Patient).filter(
+            Patient.phone_primary.contains(phone_digits)
+        ).limit(limit).all()
+
+    elif type == SearchType.MRN:
+        # Search in patient_identifiers table
+        patient_ids = db.query(PatientIdentifier.patient_id).filter(
+            PatientIdentifier.system == "MRN",
+            PatientIdentifier.value.ilike(search_term)
+        ).all()
+
+        patient_id_list = [pid[0] for pid in patient_ids]
+        patients = db.query(Patient).filter(
+            Patient.id.in_(patient_id_list)
+        ).limit(limit).all()
+
+    elif type == SearchType.EMAIL:
+        patients = db.query(Patient).filter(
+            Patient.email_primary.ilike(search_term)
+        ).limit(limit).all()
+
+    else:
+        patients = []
+
+    return [PatientSimpleResponse.model_validate(p) for p in patients]
+
+
+@router.get("/{patient_id}/360", response_model=Patient360Response)
+async def get_patient_360(
+    patient_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Get 360-degree patient view
+
+    Aggregates:
+    - Patient demographics
+    - Recent appointments (last 5)
+    - Active journey instances
+    - Open tickets
+    - Recent communications
+
+    Includes counts and timeline information.
+    """
+    from shared.database.models import (
+        Patient, Appointment, JourneyInstance,
+        Ticket, Communication
+    )
+    from datetime import datetime
+
+    # Get patient
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    # Get appointments
+    appointments = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id
+    ).order_by(Appointment.scheduled_at.desc()).limit(10).all()
+
+    total_appointments = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id
+    ).count()
+
+    upcoming_appointments = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id,
+        Appointment.scheduled_at >= datetime.utcnow(),
+        Appointment.status.in_(["scheduled", "confirmed"])
+    ).count()
+
+    # Get journey instances
+    journeys = db.query(JourneyInstance).filter(
+        JourneyInstance.patient_id == patient_id
+    ).order_by(JourneyInstance.created_at.desc()).limit(5).all()
+
+    active_journeys = db.query(JourneyInstance).filter(
+        JourneyInstance.patient_id == patient_id,
+        JourneyInstance.status == "active"
+    ).count()
+
+    # Get tickets
+    tickets = db.query(Ticket).filter(
+        Ticket.patient_id == patient_id
+    ).order_by(Ticket.created_at.desc()).limit(5).all()
+
+    open_tickets = db.query(Ticket).filter(
+        Ticket.patient_id == patient_id,
+        Ticket.status.in_(["open", "in_progress"])
+    ).count()
+
+    # Get communications
+    communications = db.query(Communication).filter(
+        Communication.patient_id == patient_id
+    ).order_by(Communication.sent_at.desc()).limit(10).all()
+
+    recent_communications = db.query(Communication).filter(
+        Communication.patient_id == patient_id
+    ).count()
+
+    # Get timeline dates
+    last_visit = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id,
+        Appointment.status == "completed"
+    ).order_by(Appointment.scheduled_at.desc()).first()
+
+    next_apt = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id,
+        Appointment.scheduled_at >= datetime.utcnow(),
+        Appointment.status.in_(["scheduled", "confirmed"])
+    ).order_by(Appointment.scheduled_at.asc()).first()
+
+    return Patient360Response(
+        patient=PatientSimpleResponse.model_validate(patient),
+        appointments=[{
+            "id": str(a.id),
+            "scheduled_at": a.scheduled_at.isoformat() if a.scheduled_at else None,
+            "status": a.status,
+            "appointment_type": a.appointment_type,
+            "practitioner_id": str(a.practitioner_id) if a.practitioner_id else None
+        } for a in appointments],
+        journeys=[{
+            "id": str(j.id),
+            "journey_id": str(j.journey_id),
+            "status": j.status,
+            "current_stage_id": str(j.current_stage_id) if j.current_stage_id else None
+        } for j in journeys],
+        tickets=[{
+            "id": str(t.id),
+            "title": t.title,
+            "status": t.status,
+            "priority": t.priority
+        } for t in tickets],
+        communications=[{
+            "id": str(c.id),
+            "channel": c.channel,
+            "direction": c.direction,
+            "sent_at": c.sent_at.isoformat() if c.sent_at else None,
+            "message_type": c.message_type
+        } for c in communications],
+        total_appointments=total_appointments,
+        upcoming_appointments=upcoming_appointments,
+        active_journeys=active_journeys,
+        open_tickets=open_tickets,
+        recent_communications=recent_communications,
+        last_visit_date=last_visit.scheduled_at if last_visit else None,
+        next_appointment_date=next_apt.scheduled_at if next_apt else None
+    )
 
 
 # ==================== CRUD Operations ====================

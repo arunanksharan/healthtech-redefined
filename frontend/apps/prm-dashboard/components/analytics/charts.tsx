@@ -200,7 +200,6 @@ export function TimeSeriesChart({
               stroke={color}
               fillOpacity={1}
               fill="url(#colorValue)"
-              onClick={(e) => onPointClick?.(e)}
             />
             <Legend />
           </AreaChart>
@@ -224,7 +223,7 @@ export function TimeSeriesChart({
             {comparison && (
               <Bar dataKey="comparisonValue" name="Previous" fill={comparisonColor} radius={[2, 2, 0, 0]} />
             )}
-            <Bar dataKey="value" name="Current" fill={color} radius={[4, 4, 0, 0]} onClick={(e) => onPointClick?.(e)} />
+            <Bar dataKey="value" name="Current" fill={color} radius={[4, 4, 0, 0]} />
             <Legend />
           </RechartsBarChart>
         );
@@ -261,7 +260,7 @@ export function TimeSeriesChart({
               stroke={color}
               strokeWidth={2}
               dot={{ r: 4 }}
-              activeDot={{ r: 6, onClick: (e: any) => onPointClick?.(e) }}
+              activeDot={{ r: 6 }}
             />
             <Legend />
           </LineChart>

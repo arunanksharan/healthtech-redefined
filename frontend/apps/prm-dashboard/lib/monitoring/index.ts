@@ -63,10 +63,10 @@ export const initAnalytics = () => {
 export const trackPerformance = () => {
   if (typeof window === 'undefined') return;
 
-  // Web Vitals
-  import('web-vitals').then(({ onCLS, onFID, onFCP, onLCP, onTTFB }) => {
+  // Web Vitals (using web-vitals 4.x API - onFID replaced by onINP)
+  import('web-vitals').then(({ onCLS, onINP, onFCP, onLCP, onTTFB }) => {
     onCLS(sendToAnalytics);
-    onFID(sendToAnalytics);
+    onINP(sendToAnalytics);
     onFCP(sendToAnalytics);
     onLCP(sendToAnalytics);
     onTTFB(sendToAnalytics);

@@ -2,18 +2,10 @@
 // EPIC-UX-007: Clinical Workflows Interface
 
 // Prescription Form
-export {
-  PrescriptionForm,
-  PrescriptionWidget,
-  PrescriptionFormSkeleton,
-} from "./prescription-form";
+export { PrescriptionForm } from "./prescription-form";
 
 // Vitals Entry
-export {
-  VitalsEntry,
-  VitalsWidget,
-  VitalsEntrySkeleton,
-} from "./vitals-entry";
+export { VitalsEntry } from "./vitals-entry";
 
 // Lab Order Form
 export {

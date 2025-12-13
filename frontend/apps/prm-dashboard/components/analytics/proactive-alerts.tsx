@@ -108,17 +108,20 @@ export function ProactiveAlertCard({
     },
   };
 
-  const typeIcons = {
+  const typeIcons: Record<string, typeof AlertTriangle> = {
     no_show_risk: UserX,
     cancellation: X,
     waitlist: Users,
     capacity: TrendingDown,
     revenue: DollarSign,
     quality: AlertTriangle,
+    sentiment: MessageSquare,
+    follow_up: Calendar,
+    system: Bell,
   };
 
   const styles = priorityStyles[alert.priority];
-  const TypeIcon = typeIcons[alert.type] || AlertTriangle;
+  const TypeIcon = alert.type && typeIcons[alert.type] ? typeIcons[alert.type] : AlertTriangle;
 
   const handlePrimaryAction = async () => {
     setIsActioning(true);

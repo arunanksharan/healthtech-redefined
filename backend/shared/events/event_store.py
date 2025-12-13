@@ -85,7 +85,7 @@ class EventStore:
             tenant_id=tenant_id,
             version=version,
             occurred_at=datetime.utcnow(),
-            metadata=metadata or {},
+            event_metadata=metadata or {},
         )
 
         self.db.add(stored_event)
@@ -139,7 +139,7 @@ class EventStore:
                 tenant_id=se.tenant_id,
                 occurred_at=se.occurred_at,
                 payload=se.event_data,
-                metadata=se.metadata,
+                metadata=se.event_metadata,
             )
             events.append(event)
 
@@ -326,7 +326,7 @@ class EventStore:
                 tenant_id=se.tenant_id,
                 occurred_at=se.occurred_at,
                 payload=se.event_data,
-                metadata=se.metadata,
+                metadata=se.event_metadata,
             )
             events.append(event)
 

@@ -35,7 +35,13 @@ import type {
 // ============================================================================
 
 interface HealthScoreWidgetProps {
-  healthScore: HealthScore;
+  healthScore?: HealthScore;
+  // Allow individual props as alternative to healthScore object
+  score?: number;
+  trend?: TrendDirection;
+  label?: "Excellent" | "Good" | "Fair" | "Poor" | "Critical";
+  components?: HealthScoreComponent[];
+  lastUpdated?: Date;
   className?: string;
 }
 
@@ -99,13 +105,28 @@ const healthScoreLabels: Record<HealthScore["label"], { color: string; descripti
 // Health Score Widget Component
 // ============================================================================
 
-export function HealthScoreWidget({ healthScore, className }: HealthScoreWidgetProps) {
-  const TrendIcon = trendIcons[healthScore.trend];
-  const labelConfig = healthScoreLabels[healthScore.label];
+export function HealthScoreWidget({
+  healthScore: healthScoreProp,
+  score: scoreProp,
+  trend: trendProp,
+  label: labelProp,
+  components: componentsProp,
+  lastUpdated: lastUpdatedProp,
+  className,
+}: HealthScoreWidgetProps) {
+  // Support both passing a healthScore object or individual props
+  const score = healthScoreProp?.score ?? scoreProp ?? 0;
+  const trend = healthScoreProp?.trend ?? trendProp ?? "stable";
+  const label = healthScoreProp?.label ?? labelProp ?? "Fair";
+  const components = healthScoreProp?.components ?? componentsProp ?? [];
+  const lastUpdated = healthScoreProp?.lastUpdated ?? lastUpdatedProp ?? new Date();
+
+  const TrendIcon = trendIcons[trend];
+  const labelConfig = healthScoreLabels[label];
 
   // Calculate score ring
   const circumference = 2 * Math.PI * 45; // radius = 45
-  const strokeDashoffset = circumference - (healthScore.score / 100) * circumference;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "stroke-success";
@@ -145,7 +166,7 @@ export function HealthScoreWidget({ healthScore, className }: HealthScoreWidgetP
                   strokeWidth="10"
                   fill="none"
                   strokeLinecap="round"
-                  className={cn(getScoreColor(healthScore.score), "transition-all duration-500")}
+                  className={cn(getScoreColor(score), "transition-all duration-500")}
                   style={{
                     strokeDasharray: circumference,
                     strokeDashoffset: strokeDashoffset,
@@ -155,7 +176,7 @@ export function HealthScoreWidget({ healthScore, className }: HealthScoreWidgetP
               {/* Score text */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-3xl font-bold text-foreground">
-                  {healthScore.score}
+                  {score}
                 </span>
                 <span className="text-xs text-muted-foreground">/100</span>
               </div>
@@ -164,14 +185,14 @@ export function HealthScoreWidget({ healthScore, className }: HealthScoreWidgetP
             {/* Label */}
             <div className="flex items-center gap-2 mt-2">
               <span className={cn("font-semibold", labelConfig.color)}>
-                {healthScore.label}
+                {label}
               </span>
               <TrendIcon
                 className={cn(
                   "h-4 w-4",
-                  healthScore.trend === "up" && "text-warning",
-                  healthScore.trend === "down" && "text-success",
-                  healthScore.trend === "stable" && "text-muted-foreground"
+                  trend === "up" && "text-warning",
+                  trend === "down" && "text-success",
+                  trend === "stable" && "text-muted-foreground"
                 )}
               />
             </div>
@@ -196,7 +217,7 @@ export function HealthScoreWidget({ healthScore, className }: HealthScoreWidgetP
 
           {/* Vital Components Grid */}
           <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {healthScore.components.map((component) => (
+            {components.map((component) => (
               <VitalCard key={component.name} vital={component} showTrend />
             ))}
           </div>

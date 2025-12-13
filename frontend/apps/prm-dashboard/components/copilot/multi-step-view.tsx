@@ -285,7 +285,7 @@ function StepCard({
             )}
 
             {/* Progress Bar for In-Progress Steps */}
-            {step.status === "in_progress" && step.progress !== undefined && (
+            {step.status === "in_progress" && typeof step.progress === "number" && (
               <div className="space-y-1">
                 <Progress value={step.progress} className="h-1.5" />
                 <p className="text-xs text-muted-foreground text-right">
@@ -295,10 +295,10 @@ function StepCard({
             )}
 
             {/* Preview Data */}
-            {step.previewData && (
+            {step.previewData !== undefined && (
               <div className="p-3 bg-muted/50 rounded-lg">
                 <pre className="text-xs text-muted-foreground overflow-x-auto">
-                  {JSON.stringify(step.previewData, null, 2)}
+                  {String(JSON.stringify(step.previewData, null, 2))}
                 </pre>
               </div>
             )}
@@ -320,9 +320,9 @@ function StepCard({
                 )}
                 <div className="text-sm">
                   <p>{step.result.message}</p>
-                  {step.result.data && (
+                  {step.result.data !== undefined && (
                     <pre className="mt-2 text-xs opacity-70 overflow-x-auto">
-                      {JSON.stringify(step.result.data, null, 2)}
+                      {String(JSON.stringify(step.result.data, null, 2))}
                     </pre>
                   )}
                 </div>

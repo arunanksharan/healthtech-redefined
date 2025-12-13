@@ -57,7 +57,7 @@ export function VoiceInput({ className, onTranscriptComplete }: VoiceInputProps)
       finalTranscriptRef.current = "";
     };
 
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = "";
       let finalTranscript = finalTranscriptRef.current;
 
@@ -74,7 +74,7 @@ export function VoiceInput({ className, onTranscriptComplete }: VoiceInputProps)
       setVoiceTranscript(finalTranscript + interimTranscript);
     };
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("Speech recognition error:", event.error);
       setVoiceState("error");
 
@@ -395,14 +395,6 @@ export function VoiceInputModal({ isOpen, onClose, onComplete }: VoiceInputModal
 }
 
 // ============================================================================
-// Add TypeScript declarations for Web Speech API
-// ============================================================================
-
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
-}
+// Web Speech API types are declared in types/speech-recognition.d.ts
 
 export default VoiceInput;
