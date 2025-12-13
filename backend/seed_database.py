@@ -266,7 +266,7 @@ def generate_time_slots(seed_data: Dict) -> List[Dict]:
             for hour in range(9, 13):
                 for minute in [0, 30]:
                     slot_counter += 1
-                    slot_id = f"TS{slot_counter:06d}-0000-0000-0000-000000000001"
+                    slot_id = f"10{slot_counter:06d}-0000-0000-0000-000000000001"
                     start_time = time(hour, minute)
                     end_time = time(hour, minute + 30) if minute == 0 else time(hour + 1, 0)
 
@@ -287,6 +287,8 @@ def generate_time_slots(seed_data: Dict) -> List[Dict]:
                         "schedule_id": schedule_id,
                         "practitioner_id": practitioner_id,
                         "location_id": location_id,
+                        "start_datetime": datetime.combine(current_date, start_time).isoformat(),
+                        "end_datetime": datetime.combine(current_date, end_time).isoformat(),
                         "slot_date": current_date.isoformat(),
                         "start_time": start_time.strftime("%H:%M:%S"),
                         "end_time": end_time.strftime("%H:%M:%S"),
@@ -299,7 +301,7 @@ def generate_time_slots(seed_data: Dict) -> List[Dict]:
                 for hour in range(14, 17):
                     for minute in [0, 30]:
                         slot_counter += 1
-                        slot_id = f"TS{slot_counter:06d}-0000-0000-0000-000000000001"
+                        slot_id = f"10{slot_counter:06d}-0000-0000-0000-000000000001"
                         start_time = time(hour, minute)
                         end_time = time(hour, minute + 30) if minute == 0 else time(hour + 1, 0)
 
@@ -319,6 +321,8 @@ def generate_time_slots(seed_data: Dict) -> List[Dict]:
                             "schedule_id": schedule_id,
                             "practitioner_id": practitioner_id,
                             "location_id": location_id,
+                            "start_datetime": datetime.combine(current_date, start_time).isoformat(),
+                            "end_datetime": datetime.combine(current_date, end_time).isoformat(),
                             "slot_date": current_date.isoformat(),
                             "start_time": start_time.strftime("%H:%M:%S"),
                             "end_time": end_time.strftime("%H:%M:%S"),
@@ -374,7 +378,7 @@ def generate_appointments(seed_data: Dict, time_slots: List[Dict]) -> List[Dict]
         )
 
         appointment_counter += 1
-        apt_id = f"APT{appointment_counter:05d}-0000-0000-0000-000000000001"
+        apt_id = f"20{appointment_counter:06d}-0000-0000-0000-000000000001"
 
         # Appointment types based on patient and practitioner
         apt_types = ["consultation", "follow_up", "checkup", "routine_visit"]
@@ -391,6 +395,12 @@ def generate_appointments(seed_data: Dict, time_slots: List[Dict]) -> List[Dict]
             "Health screening"
         ]
 
+        meta_data = {
+            "is_first_visit": random.choice([True, False, False]),
+            "scheduled_at": scheduled_at.isoformat(),
+            "duration_minutes": 30
+        }
+
         appointments.append({
             "id": apt_id,
             "tenant_id": TENANT_ID,
@@ -400,13 +410,10 @@ def generate_appointments(seed_data: Dict, time_slots: List[Dict]) -> List[Dict]
             "time_slot_id": slot["id"],
             "status": status,
             "appointment_type": apt_type,
+            "reason_text": random.choice(reasons),
+            "source_channel": random.choice(["web", "phone", "whatsapp", "walk_in"]),
             "scheduled_at": scheduled_at.isoformat(),
-            "duration_minutes": 30,
-            "visit_reason": random.choice(reasons),
-            "source": random.choice(["web", "phone", "whatsapp", "walk_in"]),
-            "is_first_visit": random.choice([True, False, False]),
-            "fhir_resource": {},
-            "meta_data": {}
+            "meta_data": meta_data
         })
 
     logger.info(f"  Generated {len(appointments)} appointments")
@@ -424,7 +431,7 @@ def generate_encounters(seed_data: Dict, appointments: List[Dict]) -> List[Dict]
     encounter_counter = 0
     for apt in eligible_appointments:
         encounter_counter += 1
-        enc_id = f"ENC{encounter_counter:05d}-0000-0000-0000-000000000001"
+        enc_id = f"30{encounter_counter:06d}-0000-0000-0000-000000000001"
 
         # Determine encounter status
         if apt["status"] == "completed":
@@ -451,18 +458,14 @@ def generate_encounters(seed_data: Dict, appointments: List[Dict]) -> List[Dict]
         encounters.append({
             "id": enc_id,
             "tenant_id": TENANT_ID,
+            "encounter_fhir_id": str(uuid4()),
             "patient_id": apt["patient_id"],
             "practitioner_id": apt["practitioner_id"],
-            "location_id": apt["location_id"],
             "appointment_id": apt["id"],
             "status": status,
-            "encounter_class": "AMB",  # Ambulatory
-            "type_code": apt["appointment_type"],
-            "started_at": start_time.isoformat(),
-            "ended_at": end_time.isoformat() if end_time else None,
-            "chief_complaint": random.choice(complaints),
-            "fhir_resource": {},
-            "meta_data": {}
+            "class_code": "AMB",  # Ambulatory
+            "started_at": start_time,
+            "ended_at": end_time
         })
 
     logger.info(f"  Generated {len(encounters)} encounters")
@@ -486,7 +489,7 @@ def generate_communications(seed_data: Dict, appointments: List[Dict]) -> List[D
         # Appointment confirmation (sent when booked)
         if day_offset >= -7:  # Recent appointments
             comm_counter += 1
-            comm_id = f"COMM{comm_counter:05d}-0000-0000-0000-000000000001"
+            comm_id = f"40{comm_counter:06d}-0000-0000-0000-000000000001"
 
             # Confirmation sent 1-3 days before the actual appointment or at booking
             if day_offset > 3:
@@ -501,17 +504,16 @@ def generate_communications(seed_data: Dict, appointments: List[Dict]) -> List[D
                 "direction": "outbound",
                 "channel": random.choice(["sms", "whatsapp", "email"]),
                 "status": "delivered",
-                "message_type": "appointment_confirmation",
-                "subject": "Appointment Confirmation",
-                "content": f"Your appointment is confirmed for {apt_time.strftime('%B %d, %Y at %I:%M %p')}",
-                "sent_at": sent_at.isoformat(),
-                "meta_data": {"appointment_id": apt["id"]}
+                "content": f"Appointment Confirmation: Your appointment is confirmed for {apt_time.strftime('%B %d, %Y at %I:%M %p')}",
+                "template_code": "appointment_confirmation",
+                "created_at": sent_at,
+                "updated_at": sent_at
             })
 
         # Day-before reminder for upcoming appointments
         if 0 < day_offset <= 7:
             comm_counter += 1
-            comm_id = f"COMM{comm_counter:05d}-0000-0000-0000-000000000001"
+            comm_id = f"40{comm_counter:06d}-0000-0000-0000-000000000001"
             reminder_time = apt_time - timedelta(days=1, hours=random.randint(8, 12))
 
             communications.append({
@@ -521,17 +523,16 @@ def generate_communications(seed_data: Dict, appointments: List[Dict]) -> List[D
                 "direction": "outbound",
                 "channel": random.choice(["sms", "whatsapp"]),
                 "status": "delivered",
-                "message_type": "appointment_reminder",
-                "subject": "Appointment Reminder",
-                "content": f"Reminder: You have an appointment tomorrow at {apt_time.strftime('%I:%M %p')}",
-                "sent_at": reminder_time.isoformat(),
-                "meta_data": {"appointment_id": apt["id"]}
+                "content": f"Appointment Reminder: You have an appointment tomorrow at {apt_time.strftime('%I:%M %p')}",
+                "template_code": "appointment_reminder",
+                "created_at": reminder_time,
+                "updated_at": reminder_time
             })
 
         # Same-day reminder (2 hours before)
         if day_offset == 0 and apt_time > today:
             comm_counter += 1
-            comm_id = f"COMM{comm_counter:05d}-0000-0000-0000-000000000001"
+            comm_id = f"40{comm_counter:06d}-0000-0000-0000-000000000001"
             reminder_time = apt_time - timedelta(hours=2)
 
             if reminder_time > today:
@@ -542,17 +543,16 @@ def generate_communications(seed_data: Dict, appointments: List[Dict]) -> List[D
                     "direction": "outbound",
                     "channel": "sms",
                     "status": "sent",
-                    "message_type": "appointment_reminder",
-                    "subject": "Appointment Today",
-                    "content": f"Your appointment is in 2 hours at {apt_time.strftime('%I:%M %p')}",
-                    "sent_at": reminder_time.isoformat(),
-                    "meta_data": {"appointment_id": apt["id"]}
+                    "content": f"Appointment Today: Your appointment is in 2 hours at {apt_time.strftime('%I:%M %p')}",
+                    "template_code": "appointment_reminder_2h",
+                    "created_at": reminder_time,
+                    "updated_at": reminder_time
                 })
 
         # Post-visit follow-up for completed appointments
         if apt["status"] == "completed":
             comm_counter += 1
-            comm_id = f"COMM{comm_counter:05d}-0000-0000-0000-000000000001"
+            comm_id = f"40{comm_counter:06d}-0000-0000-0000-000000000001"
             followup_time = apt_time + timedelta(hours=random.randint(2, 24))
 
             communications.append({
@@ -562,17 +562,16 @@ def generate_communications(seed_data: Dict, appointments: List[Dict]) -> List[D
                 "direction": "outbound",
                 "channel": random.choice(["sms", "whatsapp", "email"]),
                 "status": "delivered",
-                "message_type": "post_visit",
-                "subject": "Thank you for visiting",
                 "content": "Thank you for visiting Apollo Hospital. We hope you had a good experience.",
-                "sent_at": followup_time.isoformat(),
-                "meta_data": {"appointment_id": apt["id"]}
+                "template_code": "post_visit",
+                "created_at": followup_time,
+                "updated_at": followup_time
             })
 
     # Add some general health tips/communications
     for patient_id in PATIENT_IDS[:6]:
         comm_counter += 1
-        comm_id = f"COMM{comm_counter:05d}-0000-0000-0000-000000000001"
+        comm_id = f"40{comm_counter:06d}-0000-0000-0000-000000000001"
         sent_days_ago = random.randint(1, 14)
 
         health_tips = [
@@ -590,11 +589,10 @@ def generate_communications(seed_data: Dict, appointments: List[Dict]) -> List[D
             "direction": "outbound",
             "channel": "whatsapp",
             "status": "delivered",
-            "message_type": "health_tip",
-            "subject": "Health Tip",
-            "content": random.choice(health_tips),
-            "sent_at": (today - timedelta(days=sent_days_ago)).isoformat(),
-            "meta_data": {}
+            "content": f"Health Tip: {random.choice(health_tips)}",
+            "template_code": "health_tip",
+            "created_at": (today - timedelta(days=sent_days_ago)),
+            "updated_at": (today - timedelta(days=sent_days_ago))
         })
 
     logger.info(f"  Generated {len(communications)} communications")
@@ -696,7 +694,7 @@ def generate_tickets(seed_data: Dict) -> List[Dict]:
     ]
 
     for idx, ticket in enumerate(ticket_data):
-        ticket_id = f"TKT{idx+1:05d}-0000-0000-0000-000000000001"
+        ticket_id = f"50{idx+1:06d}-0000-0000-0000-000000000001"
 
         ticket_record = {
             "id": ticket_id,
@@ -706,8 +704,7 @@ def generate_tickets(seed_data: Dict) -> List[Dict]:
             "description": ticket["description"],
             "category": ticket.get("category"),
             "priority": ticket["priority"],
-            "status": ticket["status"],
-            "meta_data": {}
+            "status": ticket["status"]
         }
 
         # Add optional fields if present
@@ -731,9 +728,21 @@ def generate_dynamic_data(seed_data: Dict) -> Dict[str, List[Dict]]:
     # Generate in order (some depend on others)
     time_slots = generate_time_slots(seed_data)
     appointments = generate_appointments(seed_data, time_slots)
+    
+    # Clean up time_slots for database insertion (remove helper keys)
+    for slot in time_slots:
+        slot.pop("slot_date", None)
+        slot.pop("start_time", None)
+        slot.pop("end_time", None)
+        slot.pop("meta_data", None)
+        
     encounters = generate_encounters(seed_data, appointments)
     communications = generate_communications(seed_data, appointments)
     tickets = generate_tickets(seed_data)
+
+    # Clean up appointments (remove helper keys used for generation)
+    for apt in appointments:
+        apt.pop("scheduled_at", None)
 
     return {
         "time_slots": time_slots,
