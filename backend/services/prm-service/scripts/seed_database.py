@@ -93,7 +93,7 @@ TABLE_ORDER = [
     "journeys",
     "journey_stages",
     "journey_instances",
-    "journey_instance_stage_statuses",
+    "journey_instance_stage_status",
 
     # Communication
     "communications",
