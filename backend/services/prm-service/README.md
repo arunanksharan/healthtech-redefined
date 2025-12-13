@@ -70,6 +70,15 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
+## 🗄️ Database Initialization
+
+The application automatically checks and creates tables on startup. However, you can manually initialize the schema if needed.
+
+**Run from `backend` root:**
+```bash
+python create_schema.py
+```
+
 ## 🌱 Database Seeding
 
 Populate the database with sample data for development.
