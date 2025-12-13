@@ -139,6 +139,36 @@ export const patientsAPI = {
       apiClient.get(`/api/v1/prm/patients/${patientId}/duplicates`)
     );
   },
+
+  /**
+   * Get patient by MRN (Medical Record Number)
+   */
+  async getByMrn(mrn: string) {
+    return apiCall<Patient>(
+      apiClient.get(`/api/v1/prm/patients/mrn/${mrn}`)
+    );
+  },
+
+  /**
+   * Get patient media/files
+   */
+  async getMedia(patientId: string) {
+    return apiCall<PatientMedia[]>(
+      apiClient.get(`/api/v1/prm/patients/${patientId}/media`)
+    );
+  },
+
+  /**
+   * Merge duplicate patients into one record
+   */
+  async merge(primaryPatientId: string, duplicatePatientIds: string[]) {
+    return apiCall<Patient>(
+      apiClient.post('/api/v1/prm/patients/merge', {
+        primary_patient_id: primaryPatientId,
+        duplicate_patient_ids: duplicatePatientIds,
+      })
+    );
+  },
 };
 
 // ==================== Type Definitions ====================
@@ -188,4 +218,18 @@ export interface DuplicatePatient {
   phone_primary?: string;
   match_score: number;
   match_reasons: string[];
+}
+
+export interface PatientMedia {
+  id: string;
+  patient_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  mime_type: string;
+  url: string;
+  category?: string; // e.g., 'lab_result', 'imaging', 'document'
+  description?: string;
+  uploaded_by?: string;
+  created_at: string;
 }

@@ -70,6 +70,8 @@ export default function CommunicationsPage() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [replyMessage, setReplyMessage] = useState('');
+    const [isSendingReply, setIsSendingReply] = useState(false);
 
     // Fetch all communications
     const { data: commsData, isLoading, error, refetch } = useQuery({
@@ -113,6 +115,42 @@ export default function CommunicationsPage() {
             toast.error(`Failed to delete: ${error.message}`);
         },
     });
+
+    const handleReply = async () => {
+        if (!selectedComm || !replyMessage.trim()) return;
+
+        setIsSendingReply(true);
+        try {
+            let error = null;
+            if (selectedComm.channel === 'whatsapp') {
+                [_, error] = await communicationsAPI.sendWhatsApp({
+                    patient_id: selectedComm.patient_id,
+                    message: replyMessage,
+                });
+            } else if (selectedComm.channel === 'sms') {
+                [_, error] = await communicationsAPI.sendSMS({
+                    patient_id: selectedComm.patient_id,
+                    message: replyMessage,
+                });
+            } else {
+                [_, error] = await communicationsAPI.sendEmail({
+                    patient_id: selectedComm.patient_id,
+                    subject: `Re: ${selectedComm.subject || 'Message'}`,
+                    body: replyMessage,
+                });
+            }
+
+            if (error) throw new Error(error.message);
+
+            toast.success('Reply sent');
+            setReplyMessage('');
+            refetch();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to send reply');
+        } finally {
+            setIsSendingReply(false);
+        }
+    };
 
     const communications = commsData?.communications || [];
     const filteredCommunications = communications.filter(comm =>
@@ -167,7 +205,7 @@ export default function CommunicationsPage() {
     return (
         <div className="flex flex-col h-[calc(100vh-theme(spacing.16))]">
             {/* Sticky Glassmorphic Header */}
-            <header className="sticky top-16 z-20 flex items-center justify-between p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 supports-[backdrop-filter]:bg-white/60">
+            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 supports-[backdrop-filter]:bg-white/60">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Communications</h1>
                     <p className="text-sm text-gray-500 mt-1">Manage patient conversations and alerts</p>
@@ -417,6 +455,8 @@ export default function CommunicationsPage() {
                                             <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
                                                 <textarea
                                                     placeholder="Type a reply..."
+                                                    value={replyMessage}
+                                                    onChange={(e) => setReplyMessage(e.target.value)}
                                                     className="w-full bg-transparent border-none p-3 h-24 resize-none focus:ring-0 text-sm placeholder:text-gray-400"
                                                 />
                                                 <div className="flex items-center justify-between px-2 pb-2">
@@ -427,8 +467,16 @@ export default function CommunicationsPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <Button className="h-12 w-12 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center justify-center">
-                                                <Send className="w-5 h-5 text-white ml-0.5" />
+                                            <Button
+                                                onClick={handleReply}
+                                                disabled={!replyMessage.trim() || isSendingReply}
+                                                className="h-12 w-12 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center justify-center"
+                                            >
+                                                {isSendingReply ? (
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <Send className="w-5 h-5 text-white ml-0.5" />
+                                                )}
                                             </Button>
                                         </div>
                                         <p className="text-xs text-center text-gray-400 mt-2">

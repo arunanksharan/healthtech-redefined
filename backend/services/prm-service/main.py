@@ -697,7 +697,7 @@ async def get_journey_instance(
                 "status": stage_status.status if stage_status else "not_started",
                 "entered_at": stage_status.entered_at.isoformat() if stage_status and stage_status.entered_at else None,
                 "completed_at": stage_status.completed_at.isoformat() if stage_status and stage_status.completed_at else None,
-                "notes": stage_status.notes if stage_status else None
+                "notes": stage_status.meta_data.get("notes") if stage_status and stage_status.meta_data else None
             })
 
         return JourneyInstanceWithStages(
@@ -708,8 +708,8 @@ async def get_journey_instance(
             patient_id=instance.patient_id,
             status=instance.status,
             current_stage_id=instance.current_stage_id,
-            started_at=instance.started_at,
-            completed_at=instance.completed_at,
+            started_at=instance.created_at,
+            completed_at=datetime.fromisoformat(instance.meta_data.get("completed_at")) if instance.meta_data and instance.meta_data.get("completed_at") else None,
             stages=stages
         )
 
@@ -781,7 +781,11 @@ async def advance_journey_stage(
             current_stage_status.status = "completed"
             current_stage_status.completed_at = datetime.utcnow()
             if advance_request.notes:
-                current_stage_status.notes = advance_request.notes
+                if current_stage_status.meta_data is None:
+                    current_stage_status.meta_data = {}
+                current_meta = dict(current_stage_status.meta_data)
+                current_meta["notes"] = advance_request.notes
+                current_stage_status.meta_data = current_meta
 
         # Find next stage
         sorted_stages = sorted(instance.journey.stages, key=lambda s: s.order_index)
@@ -794,7 +798,10 @@ async def advance_journey_stage(
             # No more stages, complete journey
             instance.status = "completed"
             instance.current_stage_id = None
-            instance.completed_at = datetime.utcnow()
+            if instance.meta_data is None: instance.meta_data = {}
+            current_meta_inst = dict(instance.meta_data)
+            current_meta_inst["completed_at"] = datetime.utcnow().isoformat()
+            instance.meta_data = current_meta_inst
 
             db.commit()
             db.refresh(instance)
@@ -1172,13 +1179,12 @@ async def create_ticket(
         ticket = Ticket(
             tenant_id=ticket_data.tenant_id,
             patient_id=ticket_data.patient_id,
-            journey_instance_id=ticket_data.journey_instance_id,
             title=ticket_data.title,
             description=ticket_data.description,
             status="open",
             priority=ticket_data.priority.value,
             category=ticket_data.category,
-            assigned_to=ticket_data.assigned_to
+            assigned_to_user_id=ticket_data.assigned_to
         )
 
         db.add(ticket)

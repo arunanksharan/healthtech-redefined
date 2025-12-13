@@ -368,14 +368,14 @@ export default function PatientsPage() {
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-2xl border-gray-200">
           {/* Header with gradient */}
-          <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-5 text-white">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-white/20 rounded-xl">
                 <Plus className="h-5 w-5" />
               </div>
               <div>
                 <DialogTitle className="text-lg font-semibold text-white">Add New Patient</DialogTitle>
-                <DialogDescription className="text-green-100 text-sm mt-0.5">
+                <DialogDescription className="text-blue-100 text-sm mt-0.5">
                   Enter patient information to create a new record
                 </DialogDescription>
               </div>
@@ -395,7 +395,7 @@ export default function PatientsPage() {
                     id="add_first_name"
                     value={addForm.first_name}
                     onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
-                    className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                    className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
                     placeholder="John"
                     required
                   />
@@ -409,7 +409,7 @@ export default function PatientsPage() {
                     id="add_last_name"
                     value={addForm.last_name}
                     onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
-                    className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                    className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
                     placeholder="Doe"
                     required
                   />
@@ -428,7 +428,7 @@ export default function PatientsPage() {
                     type="date"
                     value={addForm.date_of_birth}
                     onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })}
-                    className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                    className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
                     required
                   />
                 </div>
@@ -441,7 +441,7 @@ export default function PatientsPage() {
                     id="add_gender"
                     value={addForm.gender}
                     onChange={(e) => setAddForm({ ...addForm, gender: e.target.value })}
-                    className="h-11 w-full rounded-xl border border-gray-200 px-3 text-sm focus:border-green-300 focus:ring-2 focus:ring-green-100 bg-gray-50/50 outline-none"
+                    className="h-11 w-full rounded-xl border border-gray-200 px-3 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-100 bg-gray-50/50 outline-none"
                   >
                     <option value="male">Male</option>
                     <option value="female">Female</option>
@@ -460,7 +460,7 @@ export default function PatientsPage() {
                   id="add_phone"
                   value={addForm.phone_primary}
                   onChange={(e) => setAddForm({ ...addForm, phone_primary: e.target.value })}
-                  className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                  className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
@@ -476,7 +476,7 @@ export default function PatientsPage() {
                   type="email"
                   value={addForm.email_primary}
                   onChange={(e) => setAddForm({ ...addForm, email_primary: e.target.value })}
-                  className="h-11 rounded-xl border-gray-200 focus:border-green-300 focus:ring-green-100 bg-gray-50/50"
+                  className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
                   placeholder="john.doe@email.com"
                 />
               </div>
@@ -495,7 +495,7 @@ export default function PatientsPage() {
               <Button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="rounded-full px-6 bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md transition-all"
+                className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
               >
                 {createMutation.isPending ? (
                   <>

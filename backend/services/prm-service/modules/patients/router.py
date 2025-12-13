@@ -593,9 +593,9 @@ async def get_patient_media(
     - Other documents
 
     Returns list ordered by upload date (most recent first).
+    
+    Note: MediaAsset model not yet implemented - returns empty list
     """
-    from shared.database.models import MediaAsset
-
     # Verify patient exists
     service = PatientService(db)
     patient = await service.get_patient(patient_id)
@@ -603,13 +603,9 @@ async def get_patient_media(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    # Get media
-    media_files = db.query(MediaAsset).filter(
-        MediaAsset.patient_id == patient_id
-    ).order_by(MediaAsset.created_at.desc()).all()
-
-    from modules.media.schemas import MediaResponse
-    return [MediaResponse.from_orm(m) for m in media_files]
+    # TODO: Implement when MediaAsset model is created
+    # MediaAsset model doesn't exist yet, return empty list
+    return []
 
 
 # ==================== Activation ====================

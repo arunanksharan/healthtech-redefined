@@ -339,9 +339,9 @@ class PatientService:
             return []
 
         duplicates = await self._find_potential_duplicates(
-            name=patient.legal_name,
+            name=f"{patient.first_name} {patient.last_name}",
             date_of_birth=patient.date_of_birth,
-            phone=patient.primary_phone,
+            phone=patient.phone_primary or '',
             exclude_id=patient_id
         )
 
@@ -363,16 +363,21 @@ class PatientService:
 
         # Search criteria
         query = self.db.query(Patient).filter(
-            Patient.status == PatientStatus.ACTIVE.value
+            Patient.state == PatientStatus.ACTIVE.value
         )
 
         if exclude_id:
             query = query.filter(Patient.id != exclude_id)
 
-        # Find by exact name + DOB
+        # Find by exact name + DOB - search first and last name
+        name_parts = name.split() if name else []
+        first_name = name_parts[0] if len(name_parts) > 0 else ''
+        last_name = name_parts[-1] if len(name_parts) > 1 else ''
+        
         exact_matches = query.filter(
             and_(
-                Patient.legal_name.ilike(name),
+                Patient.first_name.ilike(f"%{first_name}%"),
+                Patient.last_name.ilike(f"%{last_name}%"),
                 Patient.date_of_birth == date_of_birth
             )
         ).all()
@@ -387,7 +392,7 @@ class PatientService:
         # Find by phone number
         phone_digits = ''.join(c for c in phone if c.isdigit())
         phone_matches = query.filter(
-            Patient.primary_phone.contains(phone_digits)
+            Patient.phone_primary.contains(phone_digits)
         ).all()
 
         for match in phone_matches:

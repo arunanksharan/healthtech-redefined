@@ -98,7 +98,7 @@ export default function JourneysPage() {
     return (
         <div className="flex flex-col min-h-screen bg-muted/40">
             {/* Sticky Glassmorphic Header */}
-            <header className="sticky top-16 z-20 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
                 <div>
                     <h1 className="text-2xl font-bold text-foreground tracking-tight">Care Journeys</h1>
                     <p className="text-sm text-muted-foreground mt-1">Manage patient care pathways and recovery plans</p>

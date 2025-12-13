@@ -17,6 +17,15 @@ import {
   Ticket,
   Send,
   Trash2,
+  AlertTriangle,
+  Files,
+  Copy,
+  FileText,
+  Image,
+  Download,
+  Plus,
+  Layout,
+  ChevronRight,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { patientsAPI } from "@/lib/api/patients";
@@ -54,6 +63,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MagicCard } from "@/components/ui/magic-card";
 import { formatDate } from "@/lib/utils/date";
+import { AssignJourneyDialog } from '@/components/journeys/assign-journey-dialog';
+import { JourneyInstanceSheet } from '@/components/journeys/journey-instance-sheet';
 import type { Patient360Response } from "@/lib/api/types";
 import toast from "react-hot-toast";
 
@@ -129,6 +140,9 @@ export default function PatientDetailPage({
   const [activeTab, setActiveTab] = useState("overview");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isAssignJourneyOpen, setIsAssignJourneyOpen] = useState(false);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [isInstanceSheetOpen, setIsInstanceSheetOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     first_name: "",
     last_name: "",
@@ -144,6 +158,28 @@ export default function PatientDetailPage({
       if (err) throw new Error(err.message);
       return data;
     },
+  });
+
+  // Fetch potential duplicates
+  const { data: duplicates } = useQuery({
+    queryKey: ["patient-duplicates", id],
+    queryFn: async () => {
+      const [data, err] = await patientsAPI.findDuplicates(id);
+      if (err) return [];
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  // Fetch patient media/files
+  const { data: media } = useQuery({
+    queryKey: ["patient-media", id],
+    queryFn: async () => {
+      const [data, err] = await patientsAPI.getMedia(id);
+      if (err) return [];
+      return data || [];
+    },
+    enabled: !!id,
   });
 
   // Update patient mutation
@@ -371,6 +407,47 @@ export default function PatientDetailPage({
         </CardContent>
       </Card>
 
+      {/* Duplicate Alert - Shows when potential duplicates found */}
+      {duplicates && duplicates.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800">
+                  Potential Duplicate Records ({duplicates.length})
+                </h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  We found patients with similar information. Review and merge if needed.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {duplicates.slice(0, 3).map((dup) => (
+                    <Link
+                      key={dup.patient_id}
+                      href={`/dashboard/patients/${dup.patient_id}`}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-amber-200 text-sm hover:bg-amber-100 transition-colors"
+                    >
+                      <Copy className="h-3.5 w-3.5 text-amber-600" />
+                      <span className="font-medium">{dup.first_name} {dup.last_name}</span>
+                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
+                        {Math.round(dup.match_score * 100)}% match
+                      </Badge>
+                    </Link>
+                  ))}
+                  {duplicates.length > 3 && (
+                    <span className="text-sm text-amber-600">
+                      +{duplicates.length - 3} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <MagicCard className="bg-white border border-gray-200" gradientColor="#eff6ff">
@@ -423,7 +500,16 @@ export default function PatientDetailPage({
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="appointments">Appointments</TabsTrigger>
+          <TabsTrigger value="journeys">Care Journeys</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
+          <TabsTrigger value="files" className="gap-2">
+            Files
+            {media && media.length > 0 && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                {media.length}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -501,11 +587,18 @@ export default function PatientDetailPage({
                 ) : (
                   <div className="space-y-3">
                     {patient360.journeys.slice(0, 5).map((journey) => (
-                      <div key={journey.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+                      <div
+                        key={journey.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all"
+                        onClick={() => {
+                          setSelectedInstanceId(journey.id);
+                          setIsInstanceSheetOpen(true);
+                        }}
+                      >
                         <div>
-                          <p className="text-sm font-medium">Journey #{journey.journey_id.slice(0, 8)}</p>
+                          <p className="text-sm font-medium">Journey #{journey.id.slice(0, 8)}</p>
                           <p className="text-xs text-gray-500">
-                            Stage: {journey.current_stage_id?.slice(0, 8) || "Initial"}
+                            Stage: {journey.current_stage_name || "Initial"}
                           </p>
                         </div>
                         <Badge className={getStatusColor(journey.status)}>{journey.status}</Badge>
@@ -587,6 +680,66 @@ export default function PatientDetailPage({
           </Card>
         </TabsContent>
 
+        <TabsContent value="journeys" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium">Patient Care Journeys</CardTitle>
+              <Button size="sm" onClick={() => setIsAssignJourneyOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Start New Journey
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {patient360.journeys.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="p-4 bg-gray-50 rounded-full w-fit mx-auto mb-3">
+                    <Layout className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">No active journeys</p>
+                  <p className="text-sm text-gray-500 mt-1 mb-4">Assign a care pathway to track patient progress</p>
+                  <Button variant="outline" onClick={() => setIsAssignJourneyOpen(true)}>
+                    Browse Templates
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {patient360.journeys.map((journey) => (
+                    <div
+                      key={journey.id}
+                      className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-blue-50/50 hover:border-blue-200 transition-all cursor-pointer group"
+                      onClick={() => {
+                        setSelectedInstanceId(journey.id);
+                        setIsInstanceSheetOpen(true);
+                      }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors">
+                          <Activity className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium flex items-center gap-2">
+                            Journey #{journey.id.slice(0, 8)}
+                            <span className="text-gray-400 font-normal text-xs">• Created {formatDate(journey.start_date || new Date().toISOString())}</span>
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-sm text-gray-500">
+                              Current Stage: <span className="text-gray-900 font-medium">{journey.current_stage_name || "Initial Stage"}</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge className={getStatusColor(journey.status)}>{journey.status}</Badge>
+                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Communications Tab */}
         <TabsContent value="communications" className="mt-6">
           <Card>
@@ -612,6 +765,63 @@ export default function PatientDetailPage({
                         </div>
                       </div>
                       <Badge variant="outline" className="capitalize">{comm.direction}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Files Tab */}
+        <TabsContent value="files" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Files className="h-4 w-4 text-indigo-600" />
+                Patient Files & Documents
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!media || media.length === 0 ? (
+                <div className="text-center py-12">
+                  <Files className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No files uploaded yet</p>
+                  <p className="text-sm text-gray-400 mt-1">Patient documents, lab results, and images will appear here</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {media.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-lg ${file.mime_type?.startsWith('image/') ? 'bg-purple-50' : 'bg-blue-50'
+                          }`}>
+                          {file.mime_type?.startsWith('image/') ? (
+                            <Image className="h-5 w-5 text-purple-600" />
+                          ) : (
+                            <FileText className="h-5 w-5 text-blue-600" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{file.file_name}</p>
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <span>{(file.file_size / 1024).toFixed(1)} KB</span>
+                            {file.category && (
+                              <>
+                                <span>•</span>
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {file.category.replace('_', ' ')}
+                                </Badge>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" className="shrink-0" asChild>
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" download>
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -793,6 +1003,19 @@ export default function PatientDetailPage({
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AssignJourneyDialog
+        open={isAssignJourneyOpen}
+        onOpenChange={setIsAssignJourneyOpen}
+        patientId={id}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["patient-360", id] })}
+      />
+
+      <JourneyInstanceSheet
+        instanceId={selectedInstanceId}
+        open={isInstanceSheetOpen}
+        onOpenChange={setIsInstanceSheetOpen}
+      />
     </div>
   );
 }

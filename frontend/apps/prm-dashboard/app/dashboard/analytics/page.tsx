@@ -144,19 +144,11 @@ export default function AnalyticsDashboardPage() {
             <h1 className="text-2xl font-bold text-foreground tracking-tight">{getGreeting()}</h1>
             <p className="text-sm text-muted-foreground mt-1">Here's your daily practice intelligence briefing</p>
           </div>
-          <div className="flex items-center gap-2">
-            <DashboardSelector
-              currentPreset={dashboardPreset}
-              onPresetChange={setDashboardPreset}
-            />
-            <Button variant="outline" size="icon" onClick={() => toast("Refreshed data")}>
-              <RefreshCw className="h-4 w-4 text-gray-500" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4 text-gray-500" />
-            </Button>
-          </div>
+          <Button variant="outline" size="icon" onClick={() => toast("Refreshed data")}>
+            <RefreshCw className="h-4 w-4 text-gray-500" />
+          </Button>
         </div>
+
 
         {/* Controls Row */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -191,7 +183,7 @@ export default function AnalyticsDashboardPage() {
             </div>
           </div>
         </div>
-      </header>
+      </header >
 
       <div className="p-6 space-y-6">
         {/* Magic KPI Cards */}
@@ -366,6 +358,6 @@ export default function AnalyticsDashboardPage() {
           onQuery={handleAnalyticsQuery}
         />
       </div>
-    </div>
+    </div >
   );
 }

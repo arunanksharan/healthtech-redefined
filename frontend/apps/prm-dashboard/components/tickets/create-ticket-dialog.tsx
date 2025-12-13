@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useQuery } from "@tanstack/react-query";
 import {
     Ticket,
     User,
@@ -11,7 +12,6 @@ import {
     AlertCircle,
     Tag,
     AlignLeft,
-    MessageSquare
 } from 'lucide-react';
 import {
     Dialog,
@@ -24,7 +24,6 @@ import {
 import {
     Form,
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -41,6 +40,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { ticketsAPI } from "@/lib/api/tickets";
+import { patientsAPI } from "@/lib/api/patients";
 import toast from "react-hot-toast";
 
 const formSchema = z.object({
@@ -71,6 +71,17 @@ export function CreateTicketDialog({
     onSuccess,
 }: CreateTicketDialogProps) {
     const [loading, setLoading] = useState(false);
+
+    // Fetch patients for the dropdown
+    const { data: patientsData, isLoading: isLoadingPatients } = useQuery({
+        queryKey: ["patients-list-simple"],
+        queryFn: async () => {
+            const [data, err] = await patientsAPI.getAll({ limit: 100 });
+            if (err) throw new Error(err.message);
+            return data;
+        },
+        enabled: open, // Only fetch when dialog is open
+    });
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -172,16 +183,24 @@ export function CreateTicketDialog({
                                             <Select
                                                 onValueChange={field.onChange}
                                                 defaultValue={field.value}
+                                                disabled={isLoadingPatients}
                                             >
                                                 <FormControl>
                                                     <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
-                                                        <SelectValue placeholder="Select patient" />
+                                                        <SelectValue placeholder={isLoadingPatients ? "Loading patients..." : "Select patient"} />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    <SelectItem value="p1">John Doe (MRN001)</SelectItem>
-                                                    <SelectItem value="p2">Jane Smith (MRN002)</SelectItem>
-                                                    <SelectItem value="p3">Robert Johnson (MRN003)</SelectItem>
+                                                    {patientsData?.items?.map((patient) => (
+                                                        <SelectItem key={patient.id} value={patient.id}>
+                                                            {patient.first_name} {patient.last_name} {(patient.identifiers?.[0]?.value ? `(${patient.identifiers[0].value})` : '')}
+                                                        </SelectItem>
+                                                    ))}
+                                                    {(!patientsData?.items || patientsData.items.length === 0) && (
+                                                        <div className="px-2 py-2 text-sm text-gray-500 text-center">
+                                                            No patients found
+                                                        </div>
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />

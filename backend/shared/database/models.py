@@ -1020,6 +1020,10 @@ class JourneyInstance(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    @property
+    def started_at(self):
+        return self.created_at
+
     # Relationships
     journey = relationship("Journey", back_populates="instances")
     patient = relationship("Patient", back_populates="journey_instances")

@@ -309,8 +309,7 @@ class JourneyService:
                 encounter_id=instance_data.encounter_id,
                 status="active",
                 current_stage_id=first_stage.id if first_stage else None,
-                context=instance_data.context,
-                started_at=datetime.utcnow()
+                context=instance_data.context
             )
 
             self.db.add(instance)
@@ -390,7 +389,7 @@ class JourneyService:
             # Apply pagination
             offset = (page - 1) * page_size
             instances = query.order_by(
-                desc(JourneyInstance.started_at)
+                desc(JourneyInstance.created_at)
             ).offset(offset).limit(page_size).all()
 
             has_next = (offset + page_size) < total
@@ -437,7 +436,7 @@ class JourneyService:
                     "status": stage_status.status if stage_status else "not_started",
                     "entered_at": stage_status.entered_at.isoformat() if stage_status and stage_status.entered_at else None,
                     "completed_at": stage_status.completed_at.isoformat() if stage_status and stage_status.completed_at else None,
-                    "notes": stage_status.notes if stage_status else None
+                    "notes": stage_status.meta_data.get("notes") if stage_status and stage_status.meta_data else None
                 })
 
             return JourneyInstanceWithStages(
@@ -448,8 +447,8 @@ class JourneyService:
                 patient_id=instance.patient_id,
                 status=instance.status,
                 current_stage_id=instance.current_stage_id,
-                started_at=instance.started_at,
-                completed_at=instance.completed_at,
+                started_at=instance.created_at,
+                completed_at=datetime.fromisoformat(instance.meta_data.get("completed_at")) if instance.meta_data and instance.meta_data.get("completed_at") else None,
                 stages=stages
             )
 
@@ -498,8 +497,17 @@ class JourneyService:
             if current_stage_status:
                 current_stage_status.status = "completed"
                 current_stage_status.completed_at = datetime.utcnow()
+                current_stage_status.completed_at = datetime.utcnow()
                 if advance_request.notes:
-                    current_stage_status.notes = advance_request.notes
+                    # Initialize meta_data if None (though default is dict)
+                    if current_stage_status.meta_data is None:
+                        current_stage_status.meta_data = {}
+                    
+                    # Update meta_data with notes
+                    # We need to assign a new dict to ensure SQLAlchemy detects the change for JSON types
+                    current_meta = dict(current_stage_status.meta_data)
+                    current_meta["notes"] = advance_request.notes
+                    current_stage_status.meta_data = current_meta
 
             # Find next stage
             sorted_stages = sorted(instance.journey.stages, key=lambda s: s.order_index)
@@ -512,7 +520,13 @@ class JourneyService:
                 # No more stages, complete journey
                 instance.status = "completed"
                 instance.current_stage_id = None
-                instance.completed_at = datetime.utcnow()
+                
+                # Update meta_data with completed_at
+                if instance.meta_data is None: instance.meta_data = {}
+                current_meta = dict(instance.meta_data)
+                current_meta["completed_at"] = datetime.utcnow().isoformat()
+                instance.meta_data = current_meta
+
 
                 self.db.commit()
                 self.db.refresh(instance)

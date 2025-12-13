@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
     Sheet,
     SheetContent,
@@ -5,10 +6,14 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { journeysAPI } from '@/lib/api/journeys';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import toast from "react-hot-toast";
 import {
     Route,
     Calendar,
@@ -16,7 +21,8 @@ import {
     Clock,
     FileText,
     ChevronRight,
-    Layout
+    Layout,
+    Plus
 } from 'lucide-react';
 import { formatSmartDate } from '@/lib/utils/date';
 import { Separator } from '@/components/ui/separator';
@@ -28,6 +34,9 @@ interface JourneyDetailsSheetProps {
 }
 
 export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDetailsSheetProps) {
+    const queryClient = useQueryClient();
+    const [isAddingStage, setIsAddingStage] = useState(false);
+    const [newStage, setNewStage] = useState({ title: "", description: "" });
     const { data: journey, isLoading } = useQuery({
         queryKey: ['journey', journeyId],
         queryFn: async () => {
@@ -37,6 +46,29 @@ export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDe
             return data;
         },
         enabled: !!journeyId && open,
+    });
+
+    const addStageMutation = useMutation({
+        mutationFn: async () => {
+            if (!journeyId) return;
+            const [data, error] = await journeysAPI.addStep(journeyId, {
+                title: newStage.title,
+                description: newStage.description,
+                step_type: 'task'
+            });
+            if (error) throw new Error(error.message);
+            return data;
+        },
+        onSuccess: () => {
+            toast.success("Stage added successfully");
+            setNewStage({ title: "", description: "" });
+            setIsAddingStage(false);
+            queryClient.invalidateQueries({ queryKey: ['journey', journeyId] });
+            queryClient.invalidateQueries({ queryKey: ['journey-definitions'] });
+        },
+        onError: (error: any) => {
+            toast.error("Failed to add stage: " + error.message);
+        }
     });
 
     const getJourneyTypeColor = (type?: string) => {
@@ -57,6 +89,10 @@ export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDe
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="sm:max-w-xl w-full p-0 overflow-hidden bg-white dark:bg-zinc-950 border-l border-border shadow-2xl">
+                <SheetHeader className="sr-only">
+                    <SheetTitle>Journey Details</SheetTitle>
+                    <SheetDescription>Details and stages of the selected journey template</SheetDescription>
+                </SheetHeader>
                 {isLoading ? (
                     <div className="h-full flex items-center justify-center">
                         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -77,12 +113,12 @@ export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDe
                                         {journey.journey_type?.replace('_', ' ')}
                                     </Badge>
                                 </div>
-                                <SheetTitle className="text-3xl font-bold text-white mb-3 tracking-tight">
+                                <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">
                                     {journey.name}
-                                </SheetTitle>
-                                <SheetDescription className="text-blue-50/90 text-sm leading-relaxed max-w-md">
+                                </h2>
+                                <p className="text-blue-50/90 text-sm leading-relaxed max-w-md">
                                     {journey.description}
-                                </SheetDescription>
+                                </p>
 
                                 <div className="flex items-center gap-6 mt-6 text-sm font-medium text-blue-100">
                                     <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-1.5 rounded-full border border-blue-400/30">
@@ -172,7 +208,48 @@ export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDe
 
                         {/* Footer (Actions) */}
                         <div className="p-6 border-t border-border bg-gray-50/50 dark:bg-zinc-900/50 shrink-0">
-                            {/* Placeholder for future actions like 'Edit Journey' */}
+                            {!isAddingStage ? (
+                                <Button
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                    onClick={() => setIsAddingStage(true)}
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add New Stage
+                                </Button>
+                            ) : (
+                                <div className="space-y-4 bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
+                                    <h4 className="font-semibold text-sm">New Stage Details</h4>
+                                    <Input
+                                        placeholder="Stage Title (e.g. Initial Consultation)"
+                                        value={newStage.title}
+                                        onChange={(e) => setNewStage({ ...newStage, title: e.target.value })}
+                                    />
+                                    <Textarea
+                                        placeholder="Description of this stage..."
+                                        value={newStage.description}
+                                        onChange={(e) => setNewStage({ ...newStage, description: e.target.value })}
+                                        className="min-h-[80px]"
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="flex-1"
+                                            onClick={() => setIsAddingStage(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="flex-1 bg-blue-600 text-white"
+                                            onClick={() => addStageMutation.mutate()}
+                                            disabled={!newStage.title || addStageMutation.isPending}
+                                        >
+                                            {addStageMutation.isPending ? "Adding..." : "Save Stage"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : (

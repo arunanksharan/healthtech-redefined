@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useQuery } from "@tanstack/react-query";
 import {
     MessageSquare,
     User,
@@ -42,6 +43,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { communicationsAPI } from "@/lib/api/communications";
+import { patientsAPI } from "@/lib/api/patients";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils/cn";
 
@@ -67,7 +69,18 @@ export function CreateMessageDialog({
 }: CreateMessageDialogProps) {
     const [loading, setLoading] = useState(false);
 
-    // Mock templates
+    // Fetch patients for the dropdown
+    const { data: patientsData, isLoading: isLoadingPatients } = useQuery({
+        queryKey: ["patients-list-simple"],
+        queryFn: async () => {
+            const [data, err] = await patientsAPI.getAll({ limit: 100 });
+            if (err) throw new Error(err.message);
+            return data;
+        },
+        enabled: open, // Only fetch when dialog is open
+    });
+
+    // Mock templates (keep for now until templates API integrated fully or verified)
     const templates = [
         { id: "appt_reminder", name: "Appointment Reminder", content: "Hi {{patient_name}}, this is a reminder for your appointment tomorrow at 10 AM." },
         { id: "welcome", name: "Welcome Message", content: "Welcome to our clinic, {{patient_name}}! We are here to support your health journey." },
@@ -86,40 +99,44 @@ export function CreateMessageDialog({
         },
     });
 
-    // Auto-fill recipient based on mocked patient data
-    // In real app, this would fetch patient details
+    // Auto-fill recipient based on real patient data
     const watchPatient = form.watch("patient_id");
     const watchChannel = form.watch("channel");
     const watchTemplate = form.watch("template_id");
 
     useEffect(() => {
-        if (watchPatient) {
-            // Mock data mapping
-            const mockContact = {
-                "p1": { phone: "+15550001", email: "john@example.com" },
-                "p2": { phone: "+15550002", email: "jane@example.com" },
-                "p3": { phone: "+15550003", email: "robert@example.com" },
-            }[watchPatient] || { phone: "", email: "" };
-
-            if (watchChannel === "email") {
-                form.setValue("recipient", mockContact.email);
-            } else {
-                form.setValue("recipient", mockContact.phone);
+        if (watchPatient && patientsData?.items) {
+            const patient = patientsData.items.find(p => p.id === watchPatient);
+            if (patient) {
+                if (watchChannel === "email") {
+                    form.setValue("recipient", patient.email || "");
+                } else {
+                    form.setValue("recipient", patient.phone_primary || "");
+                }
             }
         }
-    }, [watchPatient, watchChannel, form]);
+    }, [watchPatient, watchChannel, form, patientsData]);
 
     useEffect(() => {
         if (watchTemplate && watchTemplate !== "none") {
             const template = templates.find(t => t.id === watchTemplate);
             if (template) {
-                form.setValue("message", template.content);
+                // Determine patient name for template replacement
+                let patientName = "{{patient_name}}";
+                if (watchPatient && patientsData?.items) {
+                    const p = patientsData.items.find(p => p.id === watchPatient);
+                    if (p) patientName = `${p.first_name} ${p.last_name}`;
+                }
+
+                const filledContent = template.content.replace("{{patient_name}}", patientName);
+
+                form.setValue("message", filledContent);
                 if (watchChannel === "email" && !form.getValues("subject")) {
                     form.setValue("subject", template.name);
                 }
             }
         }
-    }, [watchTemplate, form, watchChannel]);
+    }, [watchTemplate, form, watchChannel, watchPatient, patientsData]);
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setLoading(true);
@@ -207,16 +224,24 @@ export function CreateMessageDialog({
                                             <Select
                                                 onValueChange={field.onChange}
                                                 defaultValue={field.value}
+                                                disabled={isLoadingPatients}
                                             >
                                                 <FormControl>
                                                     <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
-                                                        <SelectValue placeholder="Select patient" />
+                                                        <SelectValue placeholder={isLoadingPatients ? "Loading..." : "Select patient"} />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    <SelectItem value="p1">John Doe (MRN001)</SelectItem>
-                                                    <SelectItem value="p2">Jane Smith (MRN002)</SelectItem>
-                                                    <SelectItem value="p3">Robert Johnson (MRN003)</SelectItem>
+                                                    {patientsData?.items?.map((patient) => (
+                                                        <SelectItem key={patient.id} value={patient.id}>
+                                                            {patient.first_name} {patient.last_name}
+                                                        </SelectItem>
+                                                    ))}
+                                                    {(!patientsData?.items || patientsData.items.length === 0) && (
+                                                        <div className="px-2 py-2 text-sm text-gray-500 text-center">
+                                                            No patients found
+                                                        </div>
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />

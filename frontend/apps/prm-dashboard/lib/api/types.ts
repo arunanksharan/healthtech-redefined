@@ -165,6 +165,12 @@ export interface TicketListResponse {
     has_previous: boolean;
 }
 
+export interface CommunicationStats {
+    total: number;
+    by_channel: Record<string, number>;
+    by_status: Record<string, number>;
+}
+
 // ==================== Patient 360 View ====================
 
 export interface Patient360Appointment {
