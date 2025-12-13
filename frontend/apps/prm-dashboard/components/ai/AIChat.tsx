@@ -176,17 +176,21 @@ export function AIChat({
   };
 
   return (
-    <Card className="flex flex-col h-full bg-white border-none shadow-none rounded-none md:rounded-xl md:border md:shadow-sm overflow-hidden">
+    <Card className="flex flex-col h-full bg-white dark:bg-zinc-950 border-0 shadow-xl rounded-2xl overflow-hidden ring-1 ring-gray-200 dark:ring-gray-800">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
-          <Sparkles className="w-5 h-5 text-white" />
+      <div className="flex items-center gap-4 px-6 py-5 bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-900 dark:to-indigo-900 text-white shrink-0 shadow-md relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full blur-xl -ml-12 -mb-12 pointer-events-none" />
+
+        <div className="relative z-10 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-inner border border-white/20">
+          <Sparkles className="w-6 h-6 text-white animate-pulse" />
         </div>
-        <div>
-          <h2 className="font-semibold text-gray-900 leading-tight">Clinical Assistant</h2>
-          <div className="flex items-center gap-1.5">
-            <span className={cn("w-2 h-2 rounded-full", isInitialized ? "bg-green-500 animate-pulse" : "bg-gray-300")} />
-            <p className="text-xs text-gray-500 font-medium">
+        <div className="relative z-10">
+          <h2 className="font-bold text-lg text-white leading-tight tracking-tight">Clinical Assistant</h2>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={cn("w-2 h-2 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]", isInitialized ? "bg-green-400" : "bg-gray-400")} />
+            <p className="text-xs text-blue-100 font-medium">
               {isInitialized ? 'Online & Ready' : 'Initializing...'}
             </p>
           </div>
@@ -194,49 +198,67 @@ export function AIChat({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 bg-gray-50/30">
-        <div className="px-6 py-6 space-y-6">
+      <ScrollArea className="flex-1 bg-gray-50/50 dark:bg-zinc-900/50 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:16px_16px]">
+        <div className="px-6 py-6 space-y-6 min-h-full">
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+              className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} group`}
             >
               {/* Avatar */}
-              <Avatar className="w-8 h-8 mt-1 border border-gray-200">
+              <Avatar className={cn(
+                "w-9 h-9 mt-1 shadow-sm border-2",
+                message.role === 'assistant'
+                  ? "border-blue-100 dark:border-blue-900"
+                  : "border-gray-100 dark:border-gray-800"
+              )}>
                 {message.role === 'assistant' ? (
                   <>
                     <AvatarImage src="/bot-avatar.png" />
-                    <AvatarFallback className="bg-blue-50 text-blue-600"><Bot className="w-4 h-4" /></AvatarFallback>
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white"><Bot className="w-5 h-5" /></AvatarFallback>
                   </>
                 ) : (
                   <>
-                    <AvatarFallback className="bg-gray-100 text-gray-600"><User className="w-4 h-4" /></AvatarFallback>
+                    <AvatarFallback className="bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600 dark:from-zinc-800 dark:to-zinc-700 dark:text-gray-300"><User className="w-5 h-5" /></AvatarFallback>
                   </>
                 )}
               </Avatar>
 
               {/* Message Bubble */}
-              <div className={cn(
-                "max-w-[85%] rounded-2xl px-5 py-3 shadow-sm text-sm leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-300",
-                message.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-tr-none'
-                  : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-              )}>
-                <p className="whitespace-pre-wrap">{message.content}</p>
+              <div className="flex flex-col max-w-[80%]">
+                <div className={cn(
+                  "rounded-2xl px-5 py-3.5 shadow-sm text-sm leading-relaxed transition-all duration-300",
+                  message.role === 'user'
+                    ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-none shadow-blue-500/20'
+                    : 'bg-white dark:bg-zinc-900 border border-gray-100 dark:border-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-none shadow-gray-200/50 dark:shadow-none'
+                )}>
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                </div>
 
-                {/* Metadata & Actions */}
+                {/* Metadata & Timestamp */}
+                <div className={cn(
+                  "flex items-center gap-2 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]",
+                  message.role === 'user' ? "justify-end text-gray-400" : "justify-start text-gray-400"
+                )}>
+                  <span>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {message.role === 'assistant' && message.metadata && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        {message.metadata.agentsUsed?.length ? 'Multi-Agent' : 'AI'}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Actions (Assistant Only) */}
                 {message.metadata && message.role === 'assistant' && (
-                  <div className="mt-3 pt-2 border-t border-gray-100/50 text-xs opacity-75 space-y-1">
-                    {message.metadata.agentsUsed && (
-                      <div className="flex items-center gap-1">
-                        <span className="font-medium">Agents:</span> {message.metadata.agentsUsed.join(', ')}
-                      </div>
-                    )}
+                  <div className="mt-2 text-xs space-y-2">
                     {message.metadata.requiresConfirmation && (
-                      <div className="mt-2">
+                      <div className="flex animate-in fade-in slide-in-from-top-2">
                         <Button
                           size="sm"
-                          className="bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 hover:text-blue-700 shadow-sm transition-all"
+                          className="bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 shadow-sm transition-all font-medium rounded-lg"
                         >
                           Confirm Action
                         </Button>
@@ -244,14 +266,6 @@ export function AIChat({
                     )}
                   </div>
                 )}
-
-                {/* Timestamp */}
-                <div className={cn(
-                  "text-[10px] mt-1 opacity-60 text-right",
-                  message.role === 'user' ? "text-blue-100" : "text-gray-400"
-                )}>
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
               </div>
             </div>
           ))}
@@ -259,15 +273,16 @@ export function AIChat({
           {/* Thinking Indicator */}
           {isLoading && (
             <div className="flex gap-4 animate-in fade-in duration-300">
-              <Avatar className="w-8 h-8 mt-1 border border-gray-200">
-                <AvatarFallback className="bg-blue-50 text-blue-600"><Bot className="w-4 h-4" /></AvatarFallback>
+              <Avatar className="w-9 h-9 mt-1 border border-blue-100 bg-blue-50">
+                <AvatarFallback className="bg-transparent text-blue-600"><Bot className="w-5 h-5" /></AvatarFallback>
               </Avatar>
-              <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none px-5 py-4 shadow-sm flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                </span>
-                <span className="text-xs text-gray-500 font-medium">Processing request...</span>
+              <div className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-gray-800 rounded-2xl rounded-tl-none px-6 py-4 shadow-sm flex items-center gap-3">
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                </div>
+                <span className="text-xs text-muted-foreground font-medium">Analyzing...</span>
               </div>
             </div>
           )}
@@ -277,21 +292,21 @@ export function AIChat({
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="p-4 bg-white border-t border-gray-100">
-        <div className="relative rounded-xl border border-gray-200 bg-gray-50/50 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all shadow-sm">
+      <div className="p-4 bg-white dark:bg-zinc-950 border-t border-gray-100 dark:border-gray-800 shrink-0">
+        <div className="relative rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-zinc-900/50 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-zinc-900 transition-all duration-200 shadow-sm">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Type your instruction here..."
-            className="min-h-[60px] max-h-[180px] w-full resize-none border-0 bg-transparent py-4 pl-4 pr-24 placeholder:text-gray-400 focus-visible:ring-0 text-gray-800"
+            placeholder="Describe your task or ask a question..."
+            className="min-h-[70px] max-h-[180px] w-full resize-none border-0 bg-transparent py-4 pl-5 pr-28 placeholder:text-muted-foreground text-foreground focus-visible:ring-0 font-medium"
           />
 
-          <div className="absolute bottom-2 right-2 flex items-center gap-1">
+          <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-200/50"
+              className="h-9 w-9 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
               onClick={() => toast.info('Attachments coming soon!')}
             >
               <Paperclip className="h-4 w-4" />
@@ -299,38 +314,39 @@ export function AIChat({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-200/50"
+              className="h-9 w-9 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
               onClick={() => toast.info('Voice input coming soon!')}
             >
               <Mic className="h-4 w-4" />
             </Button>
+            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
             <Button
               onClick={handleSend}
               disabled={!input.trim() || isLoading || !isInitialized}
               size="icon"
-              className="h-8 w-8 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm disabled:opacity-50 transition-all ml-1"
+              className="h-9 w-9 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-[0_0_15px_rgba(37,99,235,0.4)] disabled:opacity-50 transition-all duration-300"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4 ml-0.5" />
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-2.5 px-1">
-          <p className="text-[10px] text-gray-400">
-            AI can make mistakes. Please verify important clinical details.
-          </p>
-          {/* Suggestions as pills */}
-          <div className="flex gap-2 hidden md:flex">
-            {['Check Schedule', 'Find Patient'].map(s => (
+        <div className="flex items-center justify-between mt-3 px-2">
+          <div className="flex gap-2">
+            {/* Quick Actions / Suggestions */}
+            {['Summarize Visits', 'Check Alerts'].map(s => (
               <button
                 key={s}
-                className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md hover:bg-gray-200 transition-colors"
+                className="text-[10px] sm:text-xs font-medium bg-gray-100 dark:bg-zinc-900 text-gray-600 dark:text-gray-400 px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
                 onClick={() => setInput(s)}
               >
                 {s}
               </button>
             ))}
           </div>
+          <p className="text-[10px] text-muted-foreground hidden sm:block">
+            Powering clinical workflows securely
+          </p>
         </div>
       </div>
     </Card>

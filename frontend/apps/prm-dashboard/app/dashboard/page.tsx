@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import {
   Calendar,
   Users,
@@ -75,6 +76,15 @@ export default function DashboardPage() {
     },
   });
 
+  // Real journey instance stats from backend
+  const { data: journeyInstanceStats } = useQuery({
+    queryKey: ['journey-instance-stats'],
+    queryFn: async () => {
+      const [data] = await journeysAPI.getInstanceStats();
+      return data;
+    },
+  });
+
   const appointments = appointmentsData?.items || [];
   const patients = patientsData?.items || [];
   const journeys = journeysData?.instances || [];
@@ -93,13 +103,17 @@ export default function DashboardPage() {
   // Calculate stats
   const stats = {
     todaysAppointments: todaysAppointments.length,
-    activeJourneys: journeys.filter(j => j.status === 'active').length,
+    activeJourneys: journeyInstanceStats?.active ?? journeys.filter(j => j.status === 'active').length,
     messagesSent: communications.length,
     pendingTickets: tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length,
     totalPatients: patients.length,
     completedAppointments: appointments.filter(a => a.status === 'completed').length,
     confirmedAppointments: appointments.filter(a => a.status === 'confirmed').length,
     cancelledAppointments: appointments.filter(a => a.status === 'cancelled').length,
+    // New journey stats from backend
+    totalJourneys: journeyInstanceStats?.total ?? journeys.length,
+    completedJourneys: journeyInstanceStats?.completed ?? 0,
+    cancelledJourneys: journeyInstanceStats?.cancelled ?? 0,
   };
 
   // Get upcoming appointments
@@ -303,10 +317,12 @@ export default function DashboardPage() {
                 <CardTitle>Upcoming Appointments</CardTitle>
                 <CardDescription>Next {upcomingAppointments.length} scheduled appointments</CardDescription>
               </div>
-              <Button variant="ghost" size="sm">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+              <Link href="/dashboard/appointments">
+                <Button variant="ghost" size="sm">
+                  View All
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
@@ -362,10 +378,12 @@ export default function DashboardPage() {
                 <CardTitle>Recent Communications</CardTitle>
                 <CardDescription>Latest patient messages</CardDescription>
               </div>
-              <Button variant="ghost" size="sm">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+              <Link href="/dashboard/communications">
+                <Button variant="ghost" size="sm">
+                  View All
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>

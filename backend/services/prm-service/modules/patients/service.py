@@ -10,9 +10,9 @@ from uuid import UUID, uuid4
 from datetime import datetime, date
 import random
 
-from shared.database.models import Patient, Appointment, Conversation, MediaAsset
+from shared.database.models import Patient, Appointment, Communication
 from shared.events.publisher import publish_event
-from shared.events.schemas import EventType
+from shared.events.types import EventType
 
 from modules.patients.schemas import (
     PatientCreate,
@@ -431,8 +431,7 @@ class PatientService:
 
             merged_data = {
                 "appointments_moved": 0,
-                "conversations_moved": 0,
-                "media_moved": 0
+                "communications_moved": 0
             }
 
             # Move appointments
@@ -444,23 +443,17 @@ class PatientService:
                 appt.patient_id = primary.id
                 merged_data["appointments_moved"] += 1
 
-            # Move conversations
-            conversations = self.db.query(Conversation).filter(
-                Conversation.patient_id == duplicate.id
+            # Move communications
+            communications = self.db.query(Communication).filter(
+                Communication.patient_id == duplicate.id
             ).all()
 
-            for conv in conversations:
-                conv.patient_id = primary.id
-                merged_data["conversations_moved"] += 1
+            for comm in communications:
+                comm.patient_id = primary.id
+                merged_data["communications_moved"] += 1
 
-            # Move media
-            media_files = self.db.query(MediaAsset).filter(
-                MediaAsset.patient_id == duplicate.id
-            ).all()
-
-            for media in media_files:
-                media.patient_id = primary.id
-                merged_data["media_moved"] += 1
+            # Note: MediaAsset not currently in shared models
+            # If needed, add MediaAsset model to shared.database.models
 
             # Deactivate duplicate
             duplicate.status = PatientStatus.INACTIVE.value
@@ -521,10 +514,10 @@ class PatientService:
         # Total counts
         total_patients = query.count()
         active_patients = query.filter(
-            Patient.status == PatientStatus.ACTIVE.value
+            Patient.state == PatientStatus.ACTIVE.value
         ).count()
         inactive_patients = query.filter(
-            Patient.status == PatientStatus.INACTIVE.value
+            Patient.state == PatientStatus.INACTIVE.value
         ).count()
 
         # New patients this month
@@ -574,9 +567,9 @@ class PatientService:
 
         # By status
         status_results = self.db.query(
-            Patient.status,
+            Patient.state,
             func.count(Patient.id)
-        ).group_by(Patient.status).all()
+        ).group_by(Patient.state).all()
 
         patients_by_status = {status: count for status, count in status_results}
 
@@ -620,15 +613,13 @@ class PatientService:
             )
         ).count()
 
-        # Count conversations
-        total_conversations = self.db.query(Conversation).filter(
-            Conversation.patient_id == patient_id
+        # Count communications
+        total_communications = self.db.query(Communication).filter(
+            Communication.patient_id == patient_id
         ).count()
 
-        # Count media
-        total_media = self.db.query(MediaAsset).filter(
-            MediaAsset.patient_id == patient_id
-        ).count()
+        # Count media (MediaAsset not currently in shared models)
+        total_media = 0
 
         # Get last visit
         last_appt = self.db.query(Appointment).filter(
@@ -652,7 +643,7 @@ class PatientService:
             **PatientResponse.from_orm(patient).dict(),
             total_appointments=total_appointments,
             upcoming_appointments=upcoming_appointments,
-            total_conversations=total_conversations,
+            total_conversations=total_communications,
             total_media_files=total_media,
             last_visit_date=last_appt.confirmed_start if last_appt else None,
             next_appointment_date=next_appt.confirmed_start if next_appt else None

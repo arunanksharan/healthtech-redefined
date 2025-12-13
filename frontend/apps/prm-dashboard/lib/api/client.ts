@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 
 // Create axios instance with default configuration
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -28,12 +28,14 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      // Add organization ID to all requests
+      // Add organization ID to all requests only if it has a valid value
       const orgId = localStorage.getItem('org_id');
-      if (orgId && config.params) {
-        config.params.org_id = orgId;
-      } else if (orgId) {
-        config.params = { org_id: orgId };
+      if (orgId && orgId.trim() !== '') {
+        if (config.params) {
+          config.params.org_id = orgId;
+        } else {
+          config.params = { org_id: orgId };
+        }
       }
     }
 

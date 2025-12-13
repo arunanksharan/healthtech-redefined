@@ -123,8 +123,8 @@ export const ticketsAPI = {
     ticketId: string,
     comment: string,
     isInternal: boolean = false
-  ): Promise<[any | null, APIError | null]> {
-    return apiCall<any>(
+  ): Promise<[TicketComment | null, APIError | null]> {
+    return apiCall<TicketComment>(
       apiClient.post(`/api/v1/prm/tickets/${ticketId}/comments`, {
         comment,
         is_internal: isInternal,
@@ -135,8 +135,8 @@ export const ticketsAPI = {
   /**
    * Get ticket comments
    */
-  async getComments(ticketId: string): Promise<[any[] | null, APIError | null]> {
-    return apiCall<any[]>(
+  async getComments(ticketId: string): Promise<[TicketComment[] | null, APIError | null]> {
+    return apiCall<TicketComment[]>(
       apiClient.get(`/api/v1/prm/tickets/${ticketId}/comments`)
     );
   },

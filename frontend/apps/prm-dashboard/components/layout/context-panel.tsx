@@ -11,7 +11,7 @@ interface ContextPanelProps {
   subtitle?: string;
   onClose: () => void;
   className?: string;
-  width?: "sm" | "md" | "lg" | "xl";
+  width?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
   headerActions?: React.ReactNode;
   footer?: React.ReactNode;
 }
@@ -21,6 +21,8 @@ const widthClasses = {
   md: "w-80",
   lg: "w-96",
   xl: "w-[420px]",
+  "2xl": "w-[600px]",
+  "3xl": "w-[800px]",
 };
 
 export function ContextPanel({
@@ -47,10 +49,11 @@ export function ContextPanel({
   return (
     <aside
       className={cn(
-        "fixed right-0 top-topbar h-[calc(100vh-var(--topbar-height))]",
+        "fixed right-0 top-0 h-screen",
         "bg-card border-l border-border",
         "flex flex-col overflow-hidden",
         "animate-slide-in-from-right shadow-xl",
+        "z-[100]",
         widthClasses[width],
         className
       )}

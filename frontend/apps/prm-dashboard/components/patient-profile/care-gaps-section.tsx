@@ -150,64 +150,64 @@ function CareGapCard({ gap, onAction }: CareGapCardProps) {
         statusConfig.borderColor
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          {/* Icon */}
-          <div className={cn("p-2 rounded-lg bg-background/80", statusConfig.textColor)}>
-            <CategoryIcon className="h-4 w-4" />
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h4 className="font-medium text-foreground">{gap.title}</h4>
-              {gap.status !== "up-to-date" && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs",
-                    statusConfig.textColor,
-                    statusConfig.borderColor
-                  )}
-                >
-                  <StatusIcon className="h-3 w-3 mr-1" />
-                  {formatDueDate(gap)}
-                </Badge>
-              )}
-            </div>
-
-            {gap.description && (
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                {gap.description}
-              </p>
-            )}
-
-            {gap.lastCompletedDate && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Last: {format(new Date(gap.lastCompletedDate), "MMM d, yyyy")}
-                {gap.status === "up-to-date" && " ✓"}
-              </p>
-            )}
-          </div>
+      {/* Main content row */}
+      <div className="flex items-start gap-3">
+        {/* Icon */}
+        <div className={cn("p-2 rounded-lg bg-background/80 shrink-0", statusConfig.textColor)}>
+          <CategoryIcon className="h-4 w-4" />
         </div>
 
-        {/* Actions */}
-        {gap.actions.length > 0 && gap.status !== "up-to-date" && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {gap.actions.slice(0, 2).map((action) => (
-              <Button
-                key={action.id}
-                variant={action.type.includes("order") || action.type.includes("referral") ? "default" : "outline"}
-                size="sm"
-                className="text-xs h-8"
-                onClick={() => onAction?.(gap.id, action)}
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h4 className="font-medium text-foreground truncate">{gap.title}</h4>
+              {gap.description && (
+                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
+                  {gap.description}
+                </p>
+              )}
+            </div>
+            {gap.status !== "up-to-date" && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs shrink-0 whitespace-nowrap",
+                  statusConfig.textColor,
+                  statusConfig.borderColor
+                )}
               >
-                {action.label}
-              </Button>
-            ))}
+                <StatusIcon className="h-3 w-3 mr-1" />
+                {formatDueDate(gap)}
+              </Badge>
+            )}
           </div>
-        )}
+
+          {gap.lastCompletedDate && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Last: {format(new Date(gap.lastCompletedDate), "MMM d, yyyy")}
+              {gap.status === "up-to-date" && " ✓"}
+            </p>
+          )}
+        </div>
       </div>
+
+      {/* Actions - separate row for better spacing */}
+      {gap.actions.length > 0 && gap.status !== "up-to-date" && (
+        <div className="flex items-center gap-2 mt-3 ml-11">
+          {gap.actions.slice(0, 2).map((action) => (
+            <Button
+              key={action.id}
+              variant={action.type.includes("order") || action.type.includes("referral") ? "default" : "outline"}
+              size="sm"
+              className="text-xs h-7 px-3"
+              onClick={() => onAction?.(gap.id, action)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

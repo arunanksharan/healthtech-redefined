@@ -136,9 +136,12 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+
   .theme {
     --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
     --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+    --animate-marquee: marquee var(--duration) infinite linear;
+    --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
   }
 }
 
@@ -146,6 +149,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -174,6 +178,7 @@
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -183,6 +188,7 @@
   from {
     transform: translateX(0);
   }
+
   to {
     transform: translateX(100%);
   }
@@ -192,15 +198,19 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -220,26 +230,24 @@
 
 .animate-pulse-slow {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  /* End of globals.css */
 }
 
 @theme inline {
-  @keyframes shimmer-slide {
+  @keyframes marquee {
+  from {
+    transform: translateX(0);
+    }
   to {
-    transform: translate(calc(100cqw - 100%), 0);
+    transform: translateX(calc(-100% - var(--gap)));
     }
   }
-  @keyframes spin-around {
-  0% {
-    transform: translateZ(0) rotate(0);
+  @keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
     }
-  15%, 35% {
-    transform: translateZ(0) rotate(90deg);
-    }
-  65%, 85% {
-    transform: translateZ(0) rotate(270deg);
-    }
-  100% {
-    transform: translateZ(0) rotate(360deg);
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
     }
   }
 }

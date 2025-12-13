@@ -36,15 +36,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
+import { TicketDetailSheet } from '@/components/tickets/ticket-detail-sheet';
+
 export default function TicketsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch all tickets
-  const { data: ticketsData, isLoading, error } = useQuery({
+  const { data: ticketsData, isLoading, error, refetch } = useQuery({
     queryKey: ['tickets', categoryFilter, statusFilter, priorityFilter],
     queryFn: async () => {
       const [data, error] = await ticketsAPI.getAll({
@@ -126,7 +133,10 @@ export default function TicketsPage() {
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Support Tickets</h1>
           <p className="text-sm text-gray-500 mt-1">Track and resolve patient inquiries</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+        >
           <Plus className="w-4 h-4 mr-2" />
           New Ticket
         </Button>
@@ -237,9 +247,7 @@ export default function TicketsPage() {
                       <h3 className="text-base font-semibold text-foreground truncate group-hover:text-blue-600 transition-colors">
                         {ticket.title}
                       </h3>
-                      <Badge variant="secondary" className={cn("capitalize text-xs font-normal", getStatusColor(ticket.status))}>
-                        {ticket.status.replace('_', ' ')}
-                      </Badge>
+
                     </div>
                     <p className="text-sm text-gray-600 line-clamp-1 mb-2">{ticket.description}</p>
 
@@ -252,8 +260,8 @@ export default function TicketsPage() {
                         <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                         <span>{formatSmartDate(ticket.created_at)}</span>
                       </div>
-                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-muted-foreground border-border capitalize">
-                        {ticket.category}
+                      <Badge variant="secondary" className={cn("capitalize text-[10px] h-5 px-1.5 font-normal", getStatusColor(ticket.status))}>
+                        {ticket.status.replace('_', ' ')}
                       </Badge>
                     </div>
                   </div>
@@ -269,7 +277,15 @@ export default function TicketsPage() {
                         Resolve
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2"
+                      onClick={() => {
+                        setSelectedTicketId(ticket.id);
+                        setIsDetailSheetOpen(true);
+                      }}
+                    >
                       <MessageSquare className="w-4 h-4 text-muted-foreground" />
                     </Button>
                     <DropdownMenu>
@@ -279,7 +295,10 @@ export default function TicketsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedTicketId(ticket.id);
+                          setIsDetailSheetOpen(true);
+                        }}>View Details</DropdownMenuItem>
                         <DropdownMenuItem className="text-red-600" onClick={() => closeMutation.mutate(ticket.id)}>
                           Close Ticket
                         </DropdownMenuItem>
@@ -292,6 +311,18 @@ export default function TicketsPage() {
           </div>
         )}
       </div>
+
+      <CreateTicketDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={() => refetch()}
+      />
+
+      <TicketDetailSheet
+        ticketId={selectedTicketId}
+        open={isDetailSheetOpen}
+        onOpenChange={setIsDetailSheetOpen}
+      />
     </div>
   );
 }

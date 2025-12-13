@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { Bot, Calendar, MessageSquare, Shield } from "lucide-react";
-import { GridPattern } from "@/components/ui/grid-pattern";
+import { DotPattern } from "@/components/ui/dot-pattern";
+import { cn } from "@/lib/utils";
 import { WordRotate } from "@/components/ui/word-rotate";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
@@ -11,14 +12,21 @@ import { MagicCard } from "@/components/ui/magic-card";
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-white text-gray-900 overflow-hidden relative selection:bg-blue-100">
-      <GridPattern
-        width={30}
-        height={30}
-        x={-1}
-        y={-1}
-        strokeDasharray={"4 2"}
-        className="[mask-image:radial-gradient(500px_circle_at_center,white,transparent)] inset-x-0 inset-y-[-30%] h-[200%] skew-y-12 fill-blue-50 stroke-blue-100"
+      <DotPattern
+        width={20}
+        height={20}
+        cx={1}
+        cy={1}
+        cr={1}
+        className={cn(
+          "fill-gray-300/40"
+        )}
       />
+
+      {/* Radiant Background Blobs */}
+      <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+      <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+      <div className="absolute -bottom-8 left-20 w-72 h-72 bg-teal-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
 
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-32 relative z-10">
@@ -68,7 +76,7 @@ export default function HomePage() {
             <BentoCard
               name="AI-First Interface"
               description="Talk to specialized agents using natural language. No clicking through menus."
-              background={<div className="absolute inset-0 bg-blue-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              background={<div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-indigo-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
               Icon={Bot}
               className="md:col-span-2 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard"
@@ -77,7 +85,7 @@ export default function HomePage() {
             <BentoCard
               name="Smart Scheduling"
               description="Book appointments, reschedule, and send reminders with a single command."
-              background={<div className="absolute inset-0 bg-purple-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              background={<div className="absolute inset-0 bg-gradient-to-br from-purple-100 to-pink-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
               Icon={Calendar}
               className="md:col-span-1 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard/appointments"
@@ -86,7 +94,7 @@ export default function HomePage() {
             <BentoCard
               name="Unified Comms"
               description="WhatsApp, SMS, Email - all managed through one AI assistant."
-              background={<div className="absolute inset-0 bg-green-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              background={<div className="absolute inset-0 bg-gradient-to-br from-green-100 to-emerald-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
               Icon={MessageSquare}
               className="md:col-span-1 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard/communications"
@@ -95,7 +103,7 @@ export default function HomePage() {
             <BentoCard
               name="Secure & Compliant"
               description="Enterprise-grade security with HIPAA compliance built-in."
-              background={<div className="absolute inset-0 bg-red-50 opacity-100 transition-opacity group-hover:opacity-50" />}
+              background={<div className="absolute inset-0 bg-gradient-to-br from-red-100 to-orange-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
               Icon={Shield}
               className="md:col-span-2 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard/settings"
