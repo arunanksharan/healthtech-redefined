@@ -1,5 +1,5 @@
 import { apiClient, apiCall } from './client';
-import { Journey, JourneyListResponse, APIError } from '@/lib/api/types';
+import { Journey, JourneyListResponse, JourneyInstance, JourneyInstanceWithStages, JourneyInstanceStats, APIError } from '@/lib/api/types';
 
 // ...
 
@@ -166,6 +166,53 @@ export const journeysAPI = {
       apiClient.patch(`/api/v1/prm/journeys/${id}`, {
         status: 'active',
       })
+    );
+  },
+
+  /**
+   * Get journey instance statistics
+   * Used for dashboard "Active Journeys" card
+   */
+  async getInstanceStats(params?: {
+    tenant_id?: string;
+    journey_id?: string;
+  }): Promise<[JourneyInstanceStats | null, APIError | null]> {
+    return apiCall<JourneyInstanceStats>(
+      apiClient.get('/api/v1/prm/instances/stats', { params })
+    );
+  },
+
+  /**
+   * Get journey instance by ID with stage statuses
+   */
+  async getInstance(instanceId: string): Promise<[JourneyInstanceWithStages | null, APIError | null]> {
+    return apiCall<JourneyInstanceWithStages>(
+      apiClient.get(`/api/v1/prm/instances/${instanceId}`)
+    );
+  },
+
+  /**
+   * Create a journey instance for a patient
+   */
+  async createInstance(data: {
+    tenant_id: string;
+    journey_id: string;
+    patient_id: string;
+  }): Promise<[JourneyInstance | null, APIError | null]> {
+    return apiCall<JourneyInstance>(
+      apiClient.post('/api/v1/prm/instances', data)
+    );
+  },
+
+  /**
+   * Advance journey instance to next stage
+   */
+  async advanceStage(
+    instanceId: string,
+    notes?: string
+  ): Promise<[JourneyInstance | null, APIError | null]> {
+    return apiCall<JourneyInstance>(
+      apiClient.post(`/api/v1/prm/instances/${instanceId}/advance`, { notes })
     );
   },
 };
