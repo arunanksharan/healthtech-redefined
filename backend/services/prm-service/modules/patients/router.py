@@ -3,7 +3,7 @@ Patients Router
 API endpoints for FHIR-compliant patient management
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from uuid import UUID
 from loguru import logger
@@ -78,7 +78,7 @@ async def list_patients(
 
     # Apply pagination
     offset = (page - 1) * page_size
-    patients = query.order_by(Patient.created_at.desc()).offset(offset).limit(page_size).all()
+    patients = query.options(joinedload(Patient.identifiers)).order_by(Patient.created_at.desc()).offset(offset).limit(page_size).all()
 
     return PatientSimpleListResponse(
         items=[PatientSimpleResponse.model_validate(p) for p in patients],

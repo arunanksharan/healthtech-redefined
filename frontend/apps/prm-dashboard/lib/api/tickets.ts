@@ -1,5 +1,5 @@
 import { apiClient, apiCall } from './client';
-import { Ticket, TicketListResponse, APIError } from '@/lib/api/types';
+import { Ticket, TicketListResponse, APIError, TicketStats } from '@/lib/api/types';
 
 // ...
 
@@ -139,5 +139,12 @@ export const ticketsAPI = {
     return apiCall<TicketComment[]>(
       apiClient.get(`/api/v1/prm/tickets/${ticketId}/comments`)
     );
+  },
+
+  /**
+   * Get ticket stats
+   */
+  async getStats(): Promise<[TicketStats | null, APIError | null]> {
+    return apiCall<TicketStats>(apiClient.get('/api/v1/prm/tickets/stats'));
   },
 };

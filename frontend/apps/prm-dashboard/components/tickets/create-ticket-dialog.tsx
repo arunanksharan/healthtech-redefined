@@ -125,7 +125,7 @@ export function CreateTicketDialog({
             case 'high': return <AlertCircle className="w-4 h-4 text-orange-500" />;
             case 'medium': return <AlertCircle className="w-4 h-4 text-amber-500" />;
             case 'low': return <AlertCircle className="w-4 h-4 text-blue-500" />;
-            default: return <AlertCircle className="w-4 h-4 text-gray-500" />;
+            default: return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
         }
     };
 
@@ -153,7 +153,7 @@ export function CreateTicketDialog({
                                 name="title"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
+                                        <FormLabel className="text-foreground font-semibold flex items-center gap-2">
                                             <FileText className="w-4 h-4 text-blue-600" />
                                             Ticket Title
                                         </FormLabel>
@@ -161,7 +161,7 @@ export function CreateTicketDialog({
                                             <Input
                                                 placeholder="Brief summary of the issue"
                                                 {...field}
-                                                className="h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-100 bg-gray-50/50"
+                                                className="h-10 border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -176,8 +176,8 @@ export function CreateTicketDialog({
                                     name="patient_id"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                                <User className="w-4 h-4 text-gray-500" />
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                                <User className="w-4 h-4 text-muted-foreground" />
                                                 Patient
                                             </FormLabel>
                                             <Select
@@ -186,7 +186,7 @@ export function CreateTicketDialog({
                                                 disabled={isLoadingPatients}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
+                                                    <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
                                                         <SelectValue placeholder={isLoadingPatients ? "Loading patients..." : "Select patient"} />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -197,7 +197,7 @@ export function CreateTicketDialog({
                                                         </SelectItem>
                                                     ))}
                                                     {(!patientsData?.items || patientsData.items.length === 0) && (
-                                                        <div className="px-2 py-2 text-sm text-gray-500 text-center">
+                                                        <div className="px-2 py-2 text-sm text-muted-foreground text-center">
                                                             No patients found
                                                         </div>
                                                     )}
@@ -214,8 +214,8 @@ export function CreateTicketDialog({
                                     name="category"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                                <Tag className="w-4 h-4 text-gray-500" />
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                                <Tag className="w-4 h-4 text-muted-foreground" />
                                                 Category
                                             </FormLabel>
                                             <Select
@@ -223,7 +223,7 @@ export function CreateTicketDialog({
                                                 defaultValue={field.value}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
+                                                    <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
                                                         <SelectValue placeholder="Select category" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -246,7 +246,7 @@ export function CreateTicketDialog({
                                 name="priority"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
+                                        <FormLabel className="text-foreground font-semibold flex items-center gap-2">
                                             {getPriorityIcon(field.value)}
                                             Priority
                                         </FormLabel>
@@ -255,7 +255,7 @@ export function CreateTicketDialog({
                                             defaultValue={field.value}
                                         >
                                             <FormControl>
-                                                <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
+                                                <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
                                                     <SelectValue placeholder="Select priority" />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -277,15 +277,15 @@ export function CreateTicketDialog({
                                 name="description"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                            <AlignLeft className="w-4 h-4 text-gray-500" />
+                                        <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                            <AlignLeft className="w-4 h-4 text-muted-foreground" />
                                             Description
                                         </FormLabel>
                                         <FormControl>
                                             <Textarea
                                                 placeholder="Detailed description of the issue..."
                                                 {...field}
-                                                className="resize-none min-h-[100px] border-gray-200 focus:border-blue-500 focus:ring-blue-100 bg-gray-50/50"
+                                                className="resize-none min-h-[100px] border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -293,12 +293,12 @@ export function CreateTicketDialog({
                                 )}
                             />
 
-                            <DialogFooter className="pt-4 border-t border-gray-100">
+                            <DialogFooter className="pt-4 border-t border-border">
                                 <Button
                                     variant="outline"
                                     type="button"
                                     onClick={() => onOpenChange(false)}
-                                    className="border-gray-200 hover:bg-gray-100 hover:text-gray-900"
+                                    className="border-border hover:bg-muted hover:text-foreground"
                                 >
                                     Cancel
                                 </Button>

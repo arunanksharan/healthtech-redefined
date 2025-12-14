@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -17,9 +17,20 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
-  CalendarDays
+  CalendarDays,
+  Stethoscope,
+  Ban,
+  UserCheck,
+  ClipboardCheck,
+  Trash2,
+  Eye,
+  MoreHorizontal,
+  LogIn,
+  UserX
 } from 'lucide-react';
 import { appointmentsAPI } from '@/lib/api/appointments';
+import { patientsAPI } from '@/lib/api/patients';
+import { practitionersAPI } from '@/lib/api/practitioners';
 import {
   Card,
   CardContent,
@@ -31,6 +42,24 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MagicCard } from '@/components/ui/magic-card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatDate, formatSmartDate } from '@/lib/utils/date';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -41,31 +70,215 @@ export default function AppointmentsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
+  const [appointmentForm, setAppointmentForm] = useState({
+    patient_id: '',
+    practitioner_id: '',
+    appointment_date: format(new Date(), 'yyyy-MM-dd'),
+    appointment_time: '09:00',
+    appointment_type: 'consultation',
+    reason_text: '',
+  });
+  const queryClient = useQueryClient();
 
   // Fetch appointments
   const { data: appointmentsData, isLoading } = useQuery({
     queryKey: ['appointments', currentDate, viewMode],
     queryFn: async () => {
       const [data, error] = await appointmentsAPI.getAll({
-        date_start: format(currentDate, 'yyyy-MM-dd'),
-        date_end: format(addDays(currentDate, viewMode === 'week' ? 7 : viewMode === 'day' ? 1 : 30), 'yyyy-MM-dd'),
+        start_date: format(currentDate, 'yyyy-MM-dd'),
+        end_date: format(addDays(currentDate, viewMode === 'week' ? 7 : viewMode === 'day' ? 1 : 30), 'yyyy-MM-dd'),
       });
       if (error) throw new Error(error.message);
       return data;
     },
   });
 
+  // Fetch appointment stats
+  const { data: appointmentStats } = useQuery({
+    queryKey: ['appointment-stats'],
+    queryFn: async () => {
+      const [data] = await appointmentsAPI.getStats();
+      return data;
+    },
+    refetchInterval: 30000,
+  });
+
+  // Fetch patients for dropdown
+  const { data: patientsData } = useQuery({
+    queryKey: ['patients-list'],
+    queryFn: async () => {
+      const [data, error] = await patientsAPI.getAll({ page_size: 100 });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+
+  // Fetch practitioners for dropdown
+  const { data: practitionersData } = useQuery({
+    queryKey: ['practitioners-list'],
+    queryFn: async () => {
+      const [data, error] = await practitionersAPI.getAll({ page_size: 100 });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+
+  const patients = patientsData?.items || [];
+  const practitioners = practitionersData?.items || [];
+
+  // Create appointment mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const [result, error] = await appointmentsAPI.create(data);
+      if (error) throw new Error(error.message);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setIsNewAppointmentOpen(false);
+      setAppointmentForm({
+        patient_id: '',
+        practitioner_id: '',
+        appointment_date: format(new Date(), 'yyyy-MM-dd'),
+        appointment_time: '09:00',
+        appointment_type: 'consultation',
+        reason_text: '',
+      });
+      toast.success('Appointment created successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create appointment');
+    },
+  });
+
+  // Confirm appointment mutation
+  const confirmMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const [result, error] = await appointmentsAPI.confirm(id);
+      if (error) throw new Error(error.message);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedAppointment(null);
+      toast.success('Appointment confirmed!');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Check-in mutation
+  const checkInMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const [result, error] = await appointmentsAPI.checkIn(id);
+      if (error) throw new Error(error.message);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedAppointment(null);
+      toast.success('Patient checked in!');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Complete appointment mutation
+  const completeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const [result, error] = await appointmentsAPI.complete(id);
+      if (error) throw new Error(error.message);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedAppointment(null);
+      toast.success('Appointment completed!');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Cancel appointment mutation
+  const cancelMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      const [result, error] = await appointmentsAPI.cancel(id, reason);
+      if (error) throw new Error(error.message);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedAppointment(null);
+      toast.success('Appointment cancelled');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Mark no-show mutation
+  const noShowMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const [result, error] = await appointmentsAPI.markNoShow(id);
+      if (error) throw new Error(error.message);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedAppointment(null);
+      toast.success('Marked as no-show');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Delete appointment mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const [, error] = await appointmentsAPI.delete(id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedAppointment(null);
+      toast.success('Appointment deleted');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const handleNewAppointmentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!appointmentForm.patient_id || !appointmentForm.practitioner_id) {
+      toast.error('Please select both patient and practitioner');
+      return;
+    }
+    createMutation.mutate(appointmentForm);
+  };
+
   const appointments = appointmentsData?.items || [];
   const stats = {
-    total: appointments.length,
-    confirmed: appointments.filter(a => a.status === 'confirmed').length,
-    pending: appointments.filter(a => a.status === 'pending').length,
-    cancelled: appointments.filter(a => a.status === 'cancelled').length,
+    total: appointmentStats?.total || 0,
+    confirmed: appointmentStats?.confirmed || 0,
+    // pending includes requested, pending_confirm, and booked
+    pending: (appointmentStats?.requested || 0) + (appointmentStats?.pending_confirm || 0) + (appointmentStats?.booked || 0),
+    completed: appointmentStats?.completed || 0,
+    cancelled: (appointmentStats?.cancelled || 0) + (appointmentStats?.no_show || 0),
+    checkedIn: appointmentStats?.checked_in || 0,
+    noShow: appointmentStats?.no_show || 0,
   };
 
   const navigateDate = (direction: 'prev' | 'next') => {
     const days = viewMode === 'day' ? 1 : viewMode === 'week' ? 7 : 30;
     setCurrentDate(prev => direction === 'next' ? addDays(prev, days) : addDays(prev, -days));
+  };
+
+  // Get status badge styling
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      booked: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      confirmed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+      checked_in: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      completed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+      cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      no_show: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
+    };
+    return styles[status] || styles.pending;
   };
 
   return (
@@ -76,33 +289,25 @@ export default function AppointmentsPage() {
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Appointments</h1>
           <p className="text-muted-foreground text-sm">Manage and schedule your patient visits</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6">
+        <Button
+          onClick={() => setIsNewAppointmentOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6"
+        >
           <Plus className="w-4 h-4 mr-2" />
           New Appointment
         </Button>
       </div>
 
       {/* Magic Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.2)">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Appointments</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
             <CalendarIcon className="w-4 h-4 text-blue-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">For the selected period</p>
-          </CardContent>
-        </MagicCard>
-
-        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.2)">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Confirmed</CardTitle>
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.confirmed}</div>
-            <p className="text-xs text-green-600 mt-1 font-medium">Ready to visit</p>
+            <p className="text-xs text-muted-foreground mt-1">All appointments</p>
           </CardContent>
         </MagicCard>
 
@@ -113,7 +318,40 @@ export default function AppointmentsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{stats.pending}</div>
-            <p className="text-xs text-amber-600 mt-1 font-medium">Needs confirmation</p>
+            <p className="text-xs text-amber-600 mt-1 font-medium">Needs action</p>
+          </CardContent>
+        </MagicCard>
+
+        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(217 91% 60% / 0.2)">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Checked In</CardTitle>
+            <LogIn className="w-4 h-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{stats.checkedIn}</div>
+            <p className="text-xs text-purple-600 mt-1 font-medium">In progress</p>
+          </CardContent>
+        </MagicCard>
+
+        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.2)">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+            <ClipboardCheck className="w-4 h-4 text-emerald-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{stats.completed}</div>
+            <p className="text-xs text-emerald-600 mt-1 font-medium">Done</p>
+          </CardContent>
+        </MagicCard>
+
+        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(142 76% 36% / 0.2)">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Confirmed</CardTitle>
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{stats.confirmed}</div>
+            <p className="text-xs text-green-600 mt-1 font-medium">Ready</p>
           </CardContent>
         </MagicCard>
 
@@ -124,7 +362,7 @@ export default function AppointmentsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{stats.cancelled}</div>
-            <p className="text-xs text-red-500 mt-1 font-medium">Reschedule required</p>
+            <p className="text-xs text-red-500 mt-1 font-medium">{stats.noShow} no-shows</p>
           </CardContent>
         </MagicCard>
       </div>
@@ -151,7 +389,7 @@ export default function AppointmentsPage() {
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex bg-muted/50 p-1 rounded-lg border border-border/50">
+        <div className="flex bg-background p-1 rounded-lg border border-border/50">
           <button
             onClick={() => setViewMode('day')}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'day' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
@@ -211,6 +449,357 @@ export default function AppointmentsPage() {
           )}
         </div>
       )}
+
+      {/* New Appointment Dialog */}
+      <Dialog open={isNewAppointmentOpen} onOpenChange={setIsNewAppointmentOpen}>
+        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden rounded-2xl border-border">
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-xl">
+                <CalendarIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold text-white">Schedule New Appointment</DialogTitle>
+                <DialogDescription className="text-blue-100 text-sm mt-0.5">
+                  Book a new appointment for a patient with a practitioner
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleNewAppointmentSubmit} className="px-6 py-5">
+            <div className="space-y-5">
+              {/* Patient Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="patient" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                  Patient <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={appointmentForm.patient_id}
+                  onValueChange={(value) => setAppointmentForm({ ...appointmentForm, patient_id: value })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background">
+                    <SelectValue placeholder="Select a patient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map((patient: any) => (
+                      <SelectItem key={patient.id} value={patient.id}>
+                        {patient.legal_name || patient.name || `${patient.first_name || ''} ${patient.last_name || ''}`.trim()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Practitioner Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="practitioner" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                  Practitioner <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={appointmentForm.practitioner_id}
+                  onValueChange={(value) => setAppointmentForm({ ...appointmentForm, practitioner_id: value })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background">
+                    <SelectValue placeholder="Select a practitioner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {practitioners.map((prac: any) => (
+                      <SelectItem key={prac.id} value={prac.id}>
+                        {prac.name || `${prac.first_name || ''} ${prac.last_name || ''}`.trim()}
+                        {prac.speciality && ` (${prac.speciality})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date and Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                    Date <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={appointmentForm.appointment_date}
+                    onChange={(e) => setAppointmentForm({ ...appointmentForm, appointment_date: e.target.value })}
+                    min={format(new Date(), 'yyyy-MM-dd')}
+                    className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="time" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    Time <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="time"
+                    type="time"
+                    value={appointmentForm.appointment_time}
+                    onChange={(e) => setAppointmentForm({ ...appointmentForm, appointment_time: e.target.value })}
+                    className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Appointment Type */}
+              <div className="space-y-2">
+                <Label htmlFor="type" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  Appointment Type
+                </Label>
+                <Select
+                  value={appointmentForm.appointment_type}
+                  onValueChange={(value) => setAppointmentForm({ ...appointmentForm, appointment_type: value })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="consultation">Consultation</SelectItem>
+                    <SelectItem value="follow_up">Follow-up</SelectItem>
+                    <SelectItem value="checkup">Checkup</SelectItem>
+                    <SelectItem value="procedure">Procedure</SelectItem>
+                    <SelectItem value="test">Test / Lab</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Reason */}
+              <div className="space-y-2">
+                <Label htmlFor="reason" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  Reason for Visit
+                </Label>
+                <Textarea
+                  id="reason"
+                  value={appointmentForm.reason_text}
+                  onChange={(e) => setAppointmentForm({ ...appointmentForm, reason_text: e.target.value })}
+                  placeholder="Brief description of the appointment reason..."
+                  rows={3}
+                  className="rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsNewAppointmentOpen(false)}
+                className="rounded-full px-5 border-border hover:bg-muted"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Scheduling...
+                  </>
+                ) : (
+                  <>
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    Schedule Appointment
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Appointment Detail Dialog */}
+      <Dialog open={!!selectedAppointment} onOpenChange={() => setSelectedAppointment(null)}>
+        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden rounded-2xl border-border">
+          {selectedAppointment && (
+            <>
+              {/* Header with gradient based on status */}
+              <div className={`px-6 py-5 text-white ${selectedAppointment.status === 'completed' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' :
+                selectedAppointment.status === 'cancelled' ? 'bg-gradient-to-r from-red-600 to-rose-600' :
+                  selectedAppointment.status === 'checked_in' ? 'bg-gradient-to-r from-purple-600 to-violet-600' :
+                    selectedAppointment.status === 'no_show' ? 'bg-gradient-to-r from-gray-600 to-slate-600' :
+                      'bg-gradient-to-r from-blue-600 to-indigo-600'
+                }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-xl">
+                      <CalendarIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-lg font-semibold text-white">Appointment Details</DialogTitle>
+                      <DialogDescription className="text-white/80 text-sm mt-0.5">
+                        {selectedAppointment.appointment_type || 'Consultation'} • {selectedAppointment.status?.replace('_', ' ').toUpperCase()}
+                      </DialogDescription>
+                    </div>
+                  </div>
+                  <Badge className={`${getStatusBadge(selectedAppointment.status)} font-medium`}>
+                    {selectedAppointment.status?.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+                {/* Patient Info */}
+                <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400">
+                      {selectedAppointment.patient_name?.charAt(0) || 'P'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground">{selectedAppointment.patient_name || 'Unknown Patient'}</p>
+                    <p className="text-sm text-muted-foreground">Patient</p>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Stethoscope className="h-3.5 w-3.5" /> Practitioner
+                    </p>
+                    <p className="text-sm font-medium text-foreground">{selectedAppointment.practitioner_name || 'Not assigned'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5" /> Location
+                    </p>
+                    <p className="text-sm font-medium text-foreground">{selectedAppointment.location_name || 'Main Clinic'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5" /> Date
+                    </p>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedAppointment.scheduled_at ? format(parseISO(selectedAppointment.scheduled_at), 'EEEE, MMM d, yyyy') : 'Not scheduled'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" /> Time
+                    </p>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedAppointment.scheduled_at ? format(parseISO(selectedAppointment.scheduled_at), 'h:mm a') : '--:--'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Reason */}
+                {selectedAppointment.reason_text && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Reason for Visit</p>
+                    <p className="text-sm text-foreground bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">{selectedAppointment.reason_text}</p>
+                  </div>
+                )}
+
+                {/* Action Buttons based on status */}
+                <div className="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Quick Actions</p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {/* Confirm - for booked/pending */}
+                    {['booked', 'pending'].includes(selectedAppointment.status) && (
+                      <Button
+                        size="sm"
+                        onClick={() => confirmMutation.mutate(selectedAppointment.id)}
+                        disabled={confirmMutation.isPending}
+                        className="bg-green-600 hover:bg-green-700 text-white rounded-full"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                        Confirm
+                      </Button>
+                    )}
+
+                    {/* Check In - for confirmed */}
+                    {['confirmed', 'booked'].includes(selectedAppointment.status) && (
+                      <Button
+                        size="sm"
+                        onClick={() => checkInMutation.mutate(selectedAppointment.id)}
+                        disabled={checkInMutation.isPending}
+                        className="bg-purple-600 hover:bg-purple-700 text-white rounded-full"
+                      >
+                        <LogIn className="w-4 h-4 mr-1.5" />
+                        Check In
+                      </Button>
+                    )}
+
+                    {/* Complete - for checked_in */}
+                    {selectedAppointment.status === 'checked_in' && (
+                      <Button
+                        size="sm"
+                        onClick={() => completeMutation.mutate(selectedAppointment.id)}
+                        disabled={completeMutation.isPending}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
+                      >
+                        <ClipboardCheck className="w-4 h-4 mr-1.5" />
+                        Complete
+                      </Button>
+                    )}
+
+                    {/* No Show - for booked/confirmed/checked_in */}
+                    {['booked', 'confirmed', 'checked_in'].includes(selectedAppointment.status) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => noShowMutation.mutate(selectedAppointment.id)}
+                        disabled={noShowMutation.isPending}
+                        className="rounded-full border-border"
+                      >
+                        <UserX className="w-4 h-4 mr-1.5" />
+                        No Show
+                      </Button>
+                    )}
+
+                    {/* Cancel - for non-completed/cancelled */}
+                    {!['completed', 'cancelled', 'no_show'].includes(selectedAppointment.status) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => cancelMutation.mutate({ id: selectedAppointment.id })}
+                        disabled={cancelMutation.isPending}
+                        className="rounded-full border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+                      >
+                        <Ban className="w-4 h-4 mr-1.5" />
+                        Cancel
+                      </Button>
+                    )}
+
+                    {/* Delete - always available */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this appointment?')) {
+                          deleteMutation.mutate(selectedAppointment.id);
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="rounded-full border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1.5" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -218,7 +807,7 @@ export default function AppointmentsPage() {
 function AppointmentsList({ appointments, onSelect }: { appointments: any[]; onSelect: (apt: any) => void }) {
   return (
     <Card className="border-border shadow-sm overflow-hidden">
-      <div className="bg-muted/50 px-6 py-3 border-b border-border">
+      <div className="bg-background px-6 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
           {appointments.length} Appointments Found
         </h3>

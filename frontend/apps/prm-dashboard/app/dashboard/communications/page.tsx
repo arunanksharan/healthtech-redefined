@@ -222,10 +222,10 @@ export default function CommunicationsPage() {
 
     const getChannelColor = (channel: string) => {
         switch (channel) {
-            case 'whatsapp': return 'bg-green-100 text-green-700 border-green-200';
-            case 'sms': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'email': return 'bg-purple-100 text-purple-700 border-purple-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'whatsapp': return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
+            case 'sms': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+            case 'email': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+            default: return 'bg-muted text-muted-foreground border-border';
         }
     };
 
@@ -234,17 +234,17 @@ export default function CommunicationsPage() {
             case 'delivered': return <CheckCircle2 className="w-4 h-4 text-green-600" />;
             case 'failed': return <XCircle className="w-4 h-4 text-red-600" />;
             case 'pending': return <Clock className="w-4 h-4 text-yellow-600" />;
-            default: return <Clock className="w-4 h-4 text-gray-400" />;
+            default: return <Clock className="w-4 h-4 text-muted-foreground" />;
         }
     };
 
     return (
         <div className="flex flex-col h-[calc(100vh-theme(spacing.16))]">
             {/* Sticky Glassmorphic Header */}
-            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white/80 backdrop-blur-md border-b border-gray-200/50 supports-[backdrop-filter]:bg-white/60">
+            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Communications</h1>
-                    <p className="text-sm text-gray-500 mt-1">Manage patient conversations and alerts</p>
+                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Communications</h1>
+                    <p className="text-sm text-muted-foreground mt-1">Manage patient conversations and alerts</p>
                 </div>
                 <div className="flex gap-3">
                     <Button
@@ -260,68 +260,68 @@ export default function CommunicationsPage() {
             <div className="flex-1 p-6 overflow-hidden flex flex-col gap-6">
                 {/* Magic Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#eff6ff">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">Total Messages</CardTitle>
-                            <MessageSquare className="w-4 h-4 text-blue-600" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Messages</CardTitle>
+                            <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-                            <p className="text-xs text-gray-500 mt-1">Across all channels</p>
+                            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+                            <p className="text-xs text-muted-foreground mt-1">Across all channels</p>
                         </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#f0fdf4">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">WhatsApp</CardTitle>
-                            <MessageCircle className="w-4 h-4 text-green-600" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">WhatsApp</CardTitle>
+                            <MessageCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{stats.whatsapp}</div>
+                            <div className="text-2xl font-bold text-foreground">{stats.whatsapp}</div>
                             <div className="flex items-center gap-1 mt-1">
                                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                                <p className="text-xs text-gray-500">Active channel</p>
+                                <p className="text-xs text-muted-foreground">Active channel</p>
                             </div>
                         </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#eff6ff">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">SMS Sent</CardTitle>
-                            <Smartphone className="w-4 h-4 text-blue-600" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">SMS Sent</CardTitle>
+                            <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{stats.sms}</div>
-                            <p className="text-xs text-gray-500 mt-1">High open rate</p>
+                            <div className="text-2xl font-bold text-foreground">{stats.sms}</div>
+                            <p className="text-xs text-muted-foreground mt-1">High open rate</p>
                         </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#faf5ff">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--primary) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">Emails</CardTitle>
-                            <Mail className="w-4 h-4 text-purple-600" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Emails</CardTitle>
+                            <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{stats.email}</div>
-                            <p className="text-xs text-gray-500 mt-1">{stats.delivered} Delivered</p>
+                            <div className="text-2xl font-bold text-foreground">{stats.email}</div>
+                            <p className="text-xs text-muted-foreground mt-1">{stats.delivered} Delivered</p>
                         </CardContent>
                     </MagicCard>
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex">
+                <div className="flex-1 bg-card border border-border rounded-xl shadow-sm overflow-hidden flex">
                     <ResizablePanelGroup direction="horizontal">
                         {/* Thread List - Sidebar */}
                         <ResizablePanel defaultSize={35} minSize={25} maxSize={45}>
-                            <div className="h-full flex flex-col bg-gray-50/50">
-                                <div className="p-4 border-b border-gray-200 bg-white">
+                            <div className="h-full flex flex-col bg-muted/30">
+                                <div className="p-4 border-b border-border bg-card">
                                     <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                         <Input
                                             placeholder="Search..."
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                                            className="pl-9 bg-muted/50 border-border focus:bg-background transition-all"
                                         />
                                     </div>
                                     <div className="flex gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar">
@@ -334,21 +334,21 @@ export default function CommunicationsPage() {
                                         </Badge>
                                         <Badge
                                             variant={channelFilter === 'whatsapp' ? 'default' : 'outline'}
-                                            className="cursor-pointer whitespace-nowrap hover:bg-green-50 hover:text-green-700 hover:border-green-200"
+                                            className="cursor-pointer whitespace-nowrap hover:bg-green-50 hover:text-green-700 hover:border-green-200 dark:hover:bg-green-900/30 dark:hover:text-green-300 dark:hover:border-green-800"
                                             onClick={() => setChannelFilter('whatsapp')}
                                         >
                                             WhatsApp
                                         </Badge>
                                         <Badge
                                             variant={channelFilter === 'sms' ? 'default' : 'outline'}
-                                            className="cursor-pointer whitespace-nowrap hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"
+                                            className="cursor-pointer whitespace-nowrap hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:hover:bg-blue-900/30 dark:hover:text-blue-300 dark:hover:border-blue-800"
                                             onClick={() => setChannelFilter('sms')}
                                         >
                                             SMS
                                         </Badge>
                                         <Badge
                                             variant={channelFilter === 'email' ? 'default' : 'outline'}
-                                            className="cursor-pointer whitespace-nowrap hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"
+                                            className="cursor-pointer whitespace-nowrap hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 dark:hover:border-purple-800"
                                             onClick={() => setChannelFilter('email')}
                                         >
                                             Email
@@ -358,9 +358,9 @@ export default function CommunicationsPage() {
 
                                 <ScrollArea className="flex-1">
                                     {isLoading ? (
-                                        <div className="p-8 text-center text-gray-500">Loading conversations...</div>
+                                        <div className="p-8 text-center text-muted-foreground">Loading conversations...</div>
                                     ) : filteredCommunications.length === 0 ? (
-                                        <div className="p-8 text-center text-gray-500">No messages found.</div>
+                                        <div className="p-8 text-center text-muted-foreground">No messages found.</div>
                                     ) : (
                                         <div className="flex flex-col">
                                             {filteredCommunications.map((comm) => (
@@ -368,26 +368,26 @@ export default function CommunicationsPage() {
                                                     key={comm.id}
                                                     onClick={() => setSelectedId(comm.id)}
                                                     className={cn(
-                                                        "w-full text-left p-4 border-b border-gray-100 hover:bg-white transition-all focus:outline-none group relative",
-                                                        selectedId === comm.id ? "bg-white shadow-[inset_3px_0_0_0_#2563eb]" : "bg-transparent"
+                                                        "w-full text-left p-4 border-b border-border hover:bg-muted/50 transition-all focus:outline-none group relative",
+                                                        selectedId === comm.id ? "bg-card shadow-[inset_3px_0_0_0_#2563eb]" : "bg-transparent"
                                                     )}
                                                 >
                                                     <div className="flex justify-between items-start mb-1">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="font-semibold text-gray-900 truncate max-w-[140px]">
+                                                            <span className="font-semibold text-foreground truncate max-w-[140px]">
                                                                 {comm.patient?.name || 'Unknown'}
                                                             </span>
                                                             {selectedId === comm.id && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />}
                                                         </div>
-                                                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                                                             {formatSmartDate(comm.sent_at || comm.created_at)}
                                                         </span>
                                                     </div>
-                                                    <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed group-hover:text-gray-700">
+                                                    <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed group-hover:text-foreground">
                                                         {comm.message || comm.body || 'No content'}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-3">
-                                                        <Badge variant="secondary" className={cn("text-[10px] h-5 px-1.5 font-normal bg-white border border-gray-200", getChannelColor(comm.channel))}>
+                                                        <Badge variant="secondary" className={cn("text-[10px] h-5 px-1.5 font-normal border border-border", getChannelColor(comm.channel))}>
                                                             {getChannelIcon(comm.channel)}
                                                             <span className="ml-1 capitalize">{comm.channel}</span>
                                                         </Badge>
@@ -408,18 +408,18 @@ export default function CommunicationsPage() {
                         {/* Message Detail - Main View */}
                         <ResizablePanel defaultSize={65}>
                             {selectedComm ? (
-                                <div className="h-full flex flex-col bg-white">
+                                <div className="h-full flex flex-col bg-card">
                                     {/* Message Header */}
-                                    <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur z-10">
+                                    <div className="p-6 border-b border-border flex items-center justify-between sticky top-0 bg-card/95 backdrop-blur z-10">
                                         <div className="flex items-center gap-4">
-                                            <Avatar className="w-12 h-12 border border-gray-100 shadow-sm">
-                                                <AvatarFallback className="bg-blue-50 text-blue-700 text-lg font-medium">
+                                            <Avatar className="w-12 h-12 border border-border shadow-sm">
+                                                <AvatarFallback className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-lg font-medium">
                                                     {getInitials(selectedComm.patient?.name)}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <h2 className="text-lg font-bold text-gray-900">{selectedComm.patient?.name}</h2>
-                                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                <h2 className="text-lg font-bold text-foreground">{selectedComm.patient?.name}</h2>
+                                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                     <span>Patient ID: #{selectedComm.patient_id?.slice(0, 8)}</span>
                                                     <span>•</span>
                                                     <span className="capitalize">{selectedComm.channel} Thread</span>
@@ -427,12 +427,12 @@ export default function CommunicationsPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600">
+                                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                                                 <Phone className="w-4 h-4" />
                                             </Button>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600">
+                                                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                                                         <MoreVertical className="w-4 h-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -440,7 +440,7 @@ export default function CommunicationsPage() {
                                                     <DropdownMenuItem>View Patient Profile</DropdownMenuItem>
                                                     <DropdownMenuItem>Mark as Unread</DropdownMenuItem>
                                                     <DropdownMenuItem
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20"
                                                         onClick={() => {
                                                             if (confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
                                                                 deleteMutation.mutate(selectedComm.id);
@@ -455,11 +455,11 @@ export default function CommunicationsPage() {
                                     </div>
 
                                     {/* Message Content Area */}
-                                    <ScrollArea className="flex-1 p-6 bg-gradient-to-b from-gray-50/50 to-white">
+                                    <ScrollArea className="flex-1 p-6 bg-gradient-to-b from-muted/30 to-card">
                                         {/* Template / Subject Info */}
                                         {(selectedComm.subject || selectedComm.template_id) && (
                                             <div className="mb-6 flex justify-center">
-                                                <div className="bg-gray-100/80 text-gray-500 text-xs px-3 py-1 rounded-full border border-gray-200">
+                                                <div className="bg-muted text-muted-foreground text-xs px-3 py-1 rounded-full border border-border">
                                                     {selectedComm.subject ? `Subject: ${selectedComm.subject}` : `Template: ${selectedComm.template_id}`}
                                                 </div>
                                             </div>
@@ -473,7 +473,7 @@ export default function CommunicationsPage() {
                                                         {selectedComm.message || selectedComm.body}
                                                     </p>
                                                 </div>
-                                                <div className="flex items-center justify-end gap-1.5 mt-2 text-xs text-gray-400">
+                                                <div className="flex items-center justify-end gap-1.5 mt-2 text-xs text-muted-foreground">
                                                     <span>{formatSmartDate(selectedComm.sent_at || selectedComm.created_at)}</span>
                                                     <span>•</span>
                                                     <span className="capitalize flex items-center gap-1">
@@ -486,7 +486,7 @@ export default function CommunicationsPage() {
                                     </ScrollArea>
 
                                     {/* Reply Input */}
-                                    <div className="p-4 border-t border-gray-100 bg-white">
+                                    <div className="p-4 border-t border-border bg-card">
                                         <div className="flex flex-col gap-2">
                                             <div className="flex gap-2 items-end">
                                                 <div className="flex-1">
@@ -525,7 +525,7 @@ export default function CommunicationsPage() {
                                                         </p>
                                                     )}
                                                 </div>
-                                                <p className="text-[10px] text-gray-400">
+                                                <p className="text-[10px] text-muted-foreground">
                                                     Press Enter to send
                                                 </p>
                                             </div>
@@ -533,11 +533,11 @@ export default function CommunicationsPage() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50/30">
-                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                        <MessageSquare className="w-8 h-8 text-gray-300" />
+                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
+                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                                        <MessageSquare className="w-8 h-8 text-muted-foreground" />
                                     </div>
-                                    <p className="font-medium text-gray-600">No conversation selected</p>
+                                    <p className="font-medium text-muted-foreground">No conversation selected</p>
                                     <p className="text-sm mt-1">Select a message from the list to view details</p>
                                 </div>
                             )}

@@ -165,6 +165,15 @@ export interface TicketListResponse {
     has_previous: boolean;
 }
 
+export interface TicketStats {
+    total: number;
+    open: number;
+    in_progress: number;
+    resolved: number;
+    closed: number;
+    urgent: number;
+}
+
 export interface CommunicationStats {
     total: number;
     by_channel: Record<string, number>;
@@ -231,4 +240,18 @@ export interface Patient360Response {
     recent_communications: number;
     last_visit_date: string | null;
     next_appointment_date: string | null;
+}
+
+export interface AppointmentStats {
+    total: number;
+    today: number;
+    upcoming: number;
+    requested: number;
+    pending_confirm: number;
+    booked: number;
+    confirmed: number;
+    checked_in: number;
+    completed: number;
+    cancelled: number;
+    no_show: number;
 }

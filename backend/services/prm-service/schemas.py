@@ -580,6 +580,16 @@ class TicketListResponse(BaseModel):
     has_previous: bool
 
 
+class TicketStats(BaseModel):
+    """Response for ticket statistics"""
+    total: int
+    open: int
+    in_progress: int
+    resolved: int
+    closed: int
+    urgent: int
+
+
 # ==================== Template Schemas ====================
 
 class CommunicationTemplate(BaseModel):

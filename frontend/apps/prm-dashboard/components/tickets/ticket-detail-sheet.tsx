@@ -72,7 +72,7 @@ export function TicketDetailSheet({ ticketId, open, onOpenChange }: TicketDetail
             case 'urgent': return { color: 'text-red-600 bg-red-50 border-red-200', icon: AlertTriangle, label: 'Urgent', badgeColor: 'bg-red-500/20 text-red-100 border-red-400/30' };
             case 'high': return { color: 'text-orange-600 bg-orange-50 border-orange-200', icon: TrendingUp, label: 'High', badgeColor: 'bg-orange-500/20 text-orange-100 border-orange-400/30' };
             case 'medium': return { color: 'text-yellow-600 bg-yellow-50 border-yellow-200', icon: AlertCircle, label: 'Medium', badgeColor: 'bg-yellow-500/20 text-yellow-100 border-yellow-400/30' };
-            default: return { color: 'text-gray-600 bg-gray-50 border-gray-200', icon: CheckCircle2, label: 'Low', badgeColor: 'bg-blue-500/20 text-blue-100 border-blue-400/30' };
+            default: return { color: 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700', icon: CheckCircle2, label: 'Low', badgeColor: 'bg-blue-500/20 text-blue-100 border-blue-400/30' };
         }
     };
 

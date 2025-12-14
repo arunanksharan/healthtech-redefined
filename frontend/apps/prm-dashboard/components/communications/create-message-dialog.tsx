@@ -187,7 +187,7 @@ export function CreateMessageDialog({
             case 'whatsapp': return <MessageCircle className="w-4 h-4 text-green-500" />;
             case 'sms': return <Smartphone className="w-4 h-4 text-blue-500" />;
             case 'email': return <Mail className="w-4 h-4 text-purple-500" />;
-            default: return <MessageSquare className="w-4 h-4 text-gray-500" />;
+            default: return <MessageSquare className="w-4 h-4 text-muted-foreground" />;
         }
     };
 
@@ -206,7 +206,7 @@ export function CreateMessageDialog({
                     </DialogHeader>
                 </div>
 
-                <div className="p-6 bg-white dark:bg-zinc-950">
+                <div className="p-6 bg-background">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
@@ -217,8 +217,8 @@ export function CreateMessageDialog({
                                     name="patient_id"
                                     render={({ field }) => (
                                         <FormItem className="col-span-2 md:col-span-1">
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                                <User className="w-4 h-4 text-gray-500" />
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                                <User className="w-4 h-4 text-muted-foreground" />
                                                 Patient
                                             </FormLabel>
                                             <Select
@@ -227,7 +227,7 @@ export function CreateMessageDialog({
                                                 disabled={isLoadingPatients}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
+                                                    <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
                                                         <SelectValue placeholder={isLoadingPatients ? "Loading..." : "Select patient"} />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -238,7 +238,7 @@ export function CreateMessageDialog({
                                                         </SelectItem>
                                                     ))}
                                                     {(!patientsData?.items || patientsData.items.length === 0) && (
-                                                        <div className="px-2 py-2 text-sm text-gray-500 text-center">
+                                                        <div className="px-2 py-2 text-sm text-muted-foreground text-center">
                                                             No patients found
                                                         </div>
                                                     )}
@@ -255,7 +255,7 @@ export function CreateMessageDialog({
                                     name="channel"
                                     render={({ field }) => (
                                         <FormItem className="col-span-2 md:col-span-1">
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
                                                 {getChannelIcon(field.value)}
                                                 Channel
                                             </FormLabel>
@@ -264,7 +264,7 @@ export function CreateMessageDialog({
                                                 defaultValue={field.value}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
+                                                    <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
                                                         <SelectValue placeholder="Select channel" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -286,15 +286,15 @@ export function CreateMessageDialog({
                                 name="recipient"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                            <Smartphone className="w-4 h-4 text-gray-500" />
+                                        <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                            <Smartphone className="w-4 h-4 text-muted-foreground" />
                                             Recipient {watchChannel === 'email' ? 'Email' : 'Number'}
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 placeholder={watchChannel === 'email' ? "name@example.com" : "+1234567890"}
                                                 {...field}
-                                                className="h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-100 bg-gray-50/50"
+                                                className="h-10 border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -309,15 +309,15 @@ export function CreateMessageDialog({
                                     name="subject"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                                <FileText className="w-4 h-4 text-gray-500" />
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                                <FileText className="w-4 h-4 text-muted-foreground" />
                                                 Subject
                                             </FormLabel>
                                             <FormControl>
                                                 <Input
                                                     placeholder="Message subject"
                                                     {...field}
-                                                    className="h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-100 bg-gray-50/50"
+                                                    className="h-10 border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -332,7 +332,7 @@ export function CreateMessageDialog({
                                 name="template_id"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
+                                        <FormLabel className="text-foreground font-semibold flex items-center gap-2">
                                             <Sparkles className="w-4 h-4 text-amber-500" />
                                             Use Template (Optional)
                                         </FormLabel>
@@ -341,7 +341,7 @@ export function CreateMessageDialog({
                                             defaultValue={field.value}
                                         >
                                             <FormControl>
-                                                <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
+                                                <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
                                                     <SelectValue placeholder="Select a template" />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -363,15 +363,15 @@ export function CreateMessageDialog({
                                 name="message"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                            <FileText className="w-4 h-4 text-gray-500" />
+                                        <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                            <FileText className="w-4 h-4 text-muted-foreground" />
                                             Message
                                         </FormLabel>
                                         <FormControl>
                                             <Textarea
                                                 placeholder="Type your message here..."
                                                 {...field}
-                                                className="resize-none min-h-[120px] border-gray-200 focus:border-blue-500 focus:ring-blue-100 bg-gray-50/50 font-sans"
+                                                className="resize-none min-h-[120px] border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background font-sans"
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -379,12 +379,12 @@ export function CreateMessageDialog({
                                 )}
                             />
 
-                            <DialogFooter className="pt-4 border-t border-gray-100">
+                            <DialogFooter className="pt-4 border-t border-border">
                                 <Button
                                     variant="outline"
                                     type="button"
                                     onClick={() => onOpenChange(false)}
-                                    className="border-gray-200 hover:bg-gray-100 hover:text-gray-900"
+                                    className="border-border hover:bg-muted hover:text-foreground"
                                 >
                                     Cancel
                                 </Button>

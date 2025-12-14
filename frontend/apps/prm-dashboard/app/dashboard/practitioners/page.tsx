@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Plus, User, Phone, Mail, Edit, MoreVertical, Stethoscope, Users, Activity, TrendingUp, GraduationCap, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Plus, User, Phone, Mail, Edit, MoreVertical, Stethoscope, Users, Activity, TrendingUp, GraduationCap, CheckCircle, XCircle, BadgeCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { practitionersAPI, Practitioner, PractitionerCreate } from '@/lib/api/practitioners';
 import {
@@ -400,113 +400,193 @@ export default function PractitionersPage() {
 
             {/* Add Practitioner Dialog */}
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle>Add New Practitioner</DialogTitle>
-                        <DialogDescription>
-                            Add a new healthcare provider to your organization
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleAddSubmit}>
-                        <div className="grid gap-4 py-4">
+                <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-2xl border-gray-200">
+                    {/* Header with gradient */}
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white/20 rounded-xl">
+                                <Plus className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-lg font-semibold text-white">Add New Practitioner</DialogTitle>
+                                <DialogDescription className="text-blue-100 text-sm mt-0.5">
+                                    Add a new healthcare provider to your organization
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleAddSubmit} className="px-6 py-5">
+                        <div className="space-y-5">
+                            {/* Name Row */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="first_name">First Name *</Label>
+                                    <Label htmlFor="first_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                        First Name <span className="text-red-500">*</span>
+                                    </Label>
                                     <Input
                                         id="first_name"
                                         value={addForm.first_name}
                                         onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
+                                        className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         placeholder="John"
                                         required
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="last_name">Last Name *</Label>
+                                    <Label htmlFor="last_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Last Name <span className="text-red-500">*</span>
+                                    </Label>
                                     <Input
                                         id="last_name"
                                         value={addForm.last_name}
                                         onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
+                                        className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         placeholder="Smith"
                                         required
                                     />
                                 </div>
                             </div>
+
+                            {/* Speciality and Qualification Row */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="speciality">Speciality</Label>
+                                    <Label htmlFor="speciality" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Speciality
+                                    </Label>
                                     <Input
                                         id="speciality"
                                         value={addForm.speciality}
                                         onChange={(e) => setAddForm({ ...addForm, speciality: e.target.value })}
+                                        className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         placeholder="Cardiology"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="qualification">Qualification</Label>
+                                    <Label htmlFor="qualification" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Qualification
+                                    </Label>
                                     <Input
                                         id="qualification"
                                         value={addForm.qualification}
                                         onChange={(e) => setAddForm({ ...addForm, qualification: e.target.value })}
+                                        className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         placeholder="MD, FACC"
                                     />
                                 </div>
                             </div>
+
+                            {/* Phone and Email Row */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="phone">Phone</Label>
+                                    <Label htmlFor="phone" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Phone
+                                    </Label>
                                     <Input
                                         id="phone"
                                         value={addForm.phone_primary}
                                         onChange={(e) => setAddForm({ ...addForm, phone_primary: e.target.value })}
+                                        className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         placeholder="+1 234 567 8900"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email">Email</Label>
+                                    <Label htmlFor="email" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Email
+                                    </Label>
                                     <Input
                                         id="email"
                                         type="email"
                                         value={addForm.email_primary}
                                         onChange={(e) => setAddForm({ ...addForm, email_primary: e.target.value })}
+                                        className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         placeholder="john.smith@hospital.com"
                                     />
                                 </div>
                             </div>
+
+                            {/* License Number */}
                             <div className="space-y-2">
-                                <Label htmlFor="license">License Number</Label>
+                                <Label htmlFor="license" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                    <BadgeCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                                    License Number
+                                </Label>
                                 <Input
                                     id="license"
                                     value={addForm.license_number}
                                     onChange={(e) => setAddForm({ ...addForm, license_number: e.target.value })}
+                                    className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                     placeholder="MED-12345"
                                 />
                             </div>
                         </div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-border">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsAddOpen(false)}
+                                className="rounded-full px-5 border-border hover:bg-muted"
+                            >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={createMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-                                {createMutation.isPending ? 'Creating...' : 'Create Practitioner'}
+                            <Button
+                                type="submit"
+                                disabled={createMutation.isPending}
+                                className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
+                            >
+                                {createMutation.isPending ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Create Practitioner
+                                    </>
+                                )}
                             </Button>
-                        </DialogFooter>
+                        </div>
                     </form>
                 </DialogContent>
             </Dialog>
 
             {/* Edit Practitioner Dialog */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle>Edit Practitioner</DialogTitle>
-                        <DialogDescription>Update practitioner information</DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-2xl border-gray-200">
+                    {/* Header with gradient */}
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white/20 rounded-xl">
+                                <Edit className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-lg font-semibold text-white">Edit Practitioner</DialogTitle>
+                                <DialogDescription className="text-blue-100 text-sm mt-0.5">
+                                    Update practitioner information
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </div>
+
                     {selectedPractitioner && (
-                        <form onSubmit={handleEditSubmit}>
-                            <div className="grid gap-4 py-4">
+                        <form onSubmit={handleEditSubmit} className="px-6 py-5">
+                            <div className="space-y-5">
+                                {/* Name Row */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="edit_first_name">First Name *</Label>
+                                        <Label htmlFor="edit_first_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                            First Name <span className="text-red-500">*</span>
+                                        </Label>
                                         <Input
                                             id="edit_first_name"
                                             value={selectedPractitioner.first_name}
@@ -516,11 +596,15 @@ export default function PractitionersPage() {
                                                     first_name: e.target.value,
                                                 })
                                             }
+                                            className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                             required
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="edit_last_name">Last Name *</Label>
+                                        <Label htmlFor="edit_last_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                            Last Name <span className="text-red-500">*</span>
+                                        </Label>
                                         <Input
                                             id="edit_last_name"
                                             value={selectedPractitioner.last_name}
@@ -530,13 +614,19 @@ export default function PractitionersPage() {
                                                     last_name: e.target.value,
                                                 })
                                             }
+                                            className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                             required
                                         />
                                     </div>
                                 </div>
+
+                                {/* Speciality and Qualification Row */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="edit_speciality">Speciality</Label>
+                                        <Label htmlFor="edit_speciality" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                                            Speciality
+                                        </Label>
                                         <Input
                                             id="edit_speciality"
                                             value={selectedPractitioner.speciality || ''}
@@ -546,10 +636,14 @@ export default function PractitionersPage() {
                                                     speciality: e.target.value,
                                                 })
                                             }
+                                            className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="edit_qualification">Qualification</Label>
+                                        <Label htmlFor="edit_qualification" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                                            Qualification
+                                        </Label>
                                         <Input
                                             id="edit_qualification"
                                             value={selectedPractitioner.qualification || ''}
@@ -559,12 +653,18 @@ export default function PractitionersPage() {
                                                     qualification: e.target.value,
                                                 })
                                             }
+                                            className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         />
                                     </div>
                                 </div>
+
+                                {/* Phone and Email Row */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="edit_phone">Phone</Label>
+                                        <Label htmlFor="edit_phone" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                                            Phone
+                                        </Label>
                                         <Input
                                             id="edit_phone"
                                             value={selectedPractitioner.phone_primary || ''}
@@ -574,10 +674,14 @@ export default function PractitionersPage() {
                                                     phone_primary: e.target.value,
                                                 })
                                             }
+                                            className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="edit_email">Email</Label>
+                                        <Label htmlFor="edit_email" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                                            Email
+                                        </Label>
                                         <Input
                                             id="edit_email"
                                             type="email"
@@ -588,11 +692,17 @@ export default function PractitionersPage() {
                                                     email_primary: e.target.value,
                                                 })
                                             }
+                                            className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                         />
                                     </div>
                                 </div>
+
+                                {/* License Number */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="edit_license">License Number</Label>
+                                    <Label htmlFor="edit_license" className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <BadgeCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                                        License Number
+                                    </Label>
                                     <Input
                                         id="edit_license"
                                         value={selectedPractitioner.license_number || ''}
@@ -602,17 +712,39 @@ export default function PractitionersPage() {
                                                 license_number: e.target.value,
                                             })
                                         }
+                                        className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                                     />
                                 </div>
                             </div>
-                            <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+
+                            {/* Footer */}
+                            <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-border">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsEditOpen(false)}
+                                    className="rounded-full px-5 border-border hover:bg-muted"
+                                >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-                                    {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                                <Button
+                                    type="submit"
+                                    disabled={updateMutation.isPending}
+                                    className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
+                                >
+                                    {updateMutation.isPending ? (
+                                        <>
+                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-4 h-4 mr-2" />
+                                            Save Changes
+                                        </>
+                                    )}
                                 </Button>
-                            </DialogFooter>
+                            </div>
                         </form>
                     )}
                 </DialogContent>

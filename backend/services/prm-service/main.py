@@ -42,7 +42,7 @@ from schemas import (
     JourneyInstanceStageUpdate, AdvanceStageRequest,
     CommunicationCreate, CommunicationUpdate, CommunicationResponse,
     CommunicationListResponse, SendCommunicationRequest,
-    TicketCreate, TicketUpdate, TicketResponse, TicketListResponse,
+    TicketCreate, TicketUpdate, TicketResponse, TicketListResponse, TicketStats,
     TicketCommentCreate, TicketCommentResponse, TicketWithComments,
     TemplateRenderRequest, TemplateRenderResponse,
     JourneyStatus, StageStatus, CommunicationStatus, TicketStatus
@@ -84,6 +84,9 @@ app.include_router(patients_router, prefix="/api/v1/prm", tags=["Patients"])
 
 from modules.practitioners.router import router as practitioners_router
 app.include_router(practitioners_router, prefix="/api/v1/prm", tags=["Practitioners"])
+
+from modules.appointments.router import router as appointments_router
+app.include_router(appointments_router, prefix="/api/v1/prm", tags=["Appointments"])
 
 # ==================== Health Check ====================
 
@@ -1221,6 +1224,39 @@ async def create_ticket(
             detail="Failed to create ticket"
         )
 
+
+
+@app.get(
+    "/api/v1/prm/tickets/stats",
+    response_model=TicketStats,
+    tags=["Tickets"]
+)
+async def get_ticket_stats(
+    db: Session = Depends(get_db)
+):
+    """Get ticket statistics"""
+    try:
+        total = db.query(Ticket).count()
+        open_count = db.query(Ticket).filter(Ticket.status == 'open').count()
+        in_progress = db.query(Ticket).filter(Ticket.status == 'in_progress').count()
+        resolved = db.query(Ticket).filter(Ticket.status == 'resolved').count()
+        closed = db.query(Ticket).filter(Ticket.status == 'closed').count()
+        urgent = db.query(Ticket).filter(Ticket.priority == 'urgent').count()
+        
+        return TicketStats(
+            total=total,
+            open=open_count,
+            in_progress=in_progress,
+            resolved=resolved,
+            closed=closed,
+            urgent=urgent
+        )
+    except Exception as e:
+        logger.error(f"Error getting ticket stats: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get ticket stats"
+        )
 
 
 @app.get(

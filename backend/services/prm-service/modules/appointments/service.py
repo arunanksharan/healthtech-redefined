@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, time
 import re
 import json
 
-from shared.database.models import Appointment, Patient, Practitioner, Location, PractitionerSchedule
+from shared.database.models import Appointment, Patient, Practitioner, Location, ProviderSchedule
 from shared.events.publisher import publish_event
 from shared.events import EventType
 
@@ -202,8 +202,8 @@ class AppointmentService:
         slots = []
 
         # Get practitioner's weekly schedule
-        schedules = self.db.query(PractitionerSchedule).filter(
-            PractitionerSchedule.practitioner_id == practitioner.id
+        schedules = self.db.query(ProviderSchedule).filter(
+            ProviderSchedule.practitioner_id == practitioner.id
         ).all()
 
         if not schedules:
@@ -233,22 +233,16 @@ class AppointmentService:
     def _generate_day_slots(
         self,
         date: datetime.date,
-        schedule: PractitionerSchedule,
+        schedule: ProviderSchedule,
         practitioner: Practitioner,
         location: Location
     ) -> List[AppointmentSlot]:
         """Generate slots for a specific day based on schedule"""
         slots = []
 
-        # Convert schedule times to datetime
-        start_time = datetime.combine(
-            date,
-            time(hour=schedule.start_minute // 60, minute=schedule.start_minute % 60)
-        )
-        end_time = datetime.combine(
-            date,
-            time(hour=schedule.end_minute // 60, minute=schedule.end_minute % 60)
-        )
+        # Convert schedule times to datetime (ProviderSchedule uses Time objects)
+        start_time = datetime.combine(date, schedule.start_time)
+        end_time = datetime.combine(date, schedule.end_time)
 
         # Generate slots at regular intervals
         current_slot = start_time

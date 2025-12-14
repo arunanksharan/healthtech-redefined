@@ -35,6 +35,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
 import { TicketDetailSheet } from '@/components/tickets/ticket-detail-sheet';
@@ -62,6 +67,17 @@ export default function TicketsPage() {
       if (error) throw new Error(error.message);
       return data;
     },
+  });
+
+  // Fetch ticket stats
+  const { data: statsData } = useQuery({
+    queryKey: ['tickets-stats'],
+    queryFn: async () => {
+      const [data, error] = await ticketsAPI.getStats();
+      if (error) return null;
+      return data;
+    },
+    refetchInterval: 30000,
   });
 
   const resolveMutation = useMutation({
@@ -99,29 +115,29 @@ export default function TicketsPage() {
   );
 
   const stats = {
-    total: tickets.length,
-    open: tickets.filter(t => t.status === 'open').length,
-    inProgress: tickets.filter(t => t.status === 'in_progress').length,
-    resolved: tickets.filter(t => t.status === 'resolved').length,
-    urgent: tickets.filter(t => t.priority === 'urgent').length,
+    total: statsData?.total || 0,
+    open: statsData?.open || 0,
+    inProgress: statsData?.in_progress || 0,
+    resolved: statsData?.resolved || 0,
+    urgent: statsData?.urgent || 0,
   };
 
   const getPriorityInfo = (priority: string) => {
     switch (priority) {
-      case 'urgent': return { color: 'text-red-600 bg-red-50 border-red-200', icon: AlertTriangle, label: 'Urgent' };
-      case 'high': return { color: 'text-orange-600 bg-orange-50 border-orange-200', icon: TrendingUp, label: 'High' };
-      case 'medium': return { color: 'text-yellow-600 bg-yellow-50 border-yellow-200', icon: AlertCircle, label: 'Medium' };
-      default: return { color: 'text-gray-600 bg-gray-50 border-gray-200', icon: CheckCircle2, label: 'Low' };
+      case 'urgent': return { color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800', icon: AlertTriangle, label: 'Urgent' };
+      case 'high': return { color: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', icon: TrendingUp, label: 'High' };
+      case 'medium': return { color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800', icon: AlertCircle, label: 'Medium' };
+      default: return { color: 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700', icon: CheckCircle2, label: 'Low' };
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'open': return 'bg-blue-100 text-blue-700';
-      case 'in_progress': return 'bg-amber-100 text-amber-700';
-      case 'resolved': return 'bg-green-100 text-green-700';
-      case 'closed': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-gray-100 text-gray-600';
+      case 'open': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+      case 'in_progress': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300';
+      case 'resolved': return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
+      case 'closed': return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+      default: return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
     }
   };
 
@@ -130,8 +146,8 @@ export default function TicketsPage() {
       {/* Sticky Header */}
       <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Support Tickets</h1>
-          <p className="text-sm text-gray-500 mt-1">Track and resolve patient inquiries</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Support Tickets</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track and resolve patient inquiries</p>
         </div>
         <Button
           onClick={() => setIsCreateDialogOpen(true)}
@@ -145,49 +161,57 @@ export default function TicketsPage() {
       <div className="p-6 space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#eff6ff">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Total Tickets</span>
-              <Ticket className="w-4 h-4 text-blue-600" />
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.total} />
-            </div>
+          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Tickets</CardTitle>
+              <Ticket className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                <NumberTicker value={stats.total} />
+              </div>
+            </CardContent>
           </MagicCard>
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#fef2f2">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Urgent</span>
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.urgent} />
-            </div>
-            <div className="mt-1 text-xs text-red-600 font-medium">Needs attention</div>
+          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--destructive) / 0.15)">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Urgent</CardTitle>
+              <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                <NumberTicker value={stats.urgent} />
+              </div>
+              <div className="mt-1 text-xs text-red-600 dark:text-red-400 font-medium">Needs attention</div>
+            </CardContent>
           </MagicCard>
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#f0fdf4">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Resolved</span>
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.resolved} />
-            </div>
+          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Resolved</CardTitle>
+              <CheckCircle2 className="w-4 h-4 text-green-500 dark:text-green-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                <NumberTicker value={stats.resolved} />
+              </div>
+            </CardContent>
           </MagicCard>
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#fffbeb">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">In Progress</span>
-              <Clock className="w-4 h-4 text-amber-500" />
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.inProgress} />
-            </div>
+          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--warning) / 0.15)">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">In Progress</CardTitle>
+              <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                <NumberTicker value={stats.inProgress} />
+              </div>
+            </CardContent>
           </MagicCard>
         </div>
 
         {/* Filters */}
         <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by title, ID or patient..."
               value={searchQuery}
@@ -249,7 +273,7 @@ export default function TicketsPage() {
                       </h3>
 
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-1 mb-2">{ticket.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{ticket.description}</p>
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">

@@ -55,11 +55,23 @@ apiClient.interceptors.response.use(
     // Success - return data directly
     return response;
   },
-  (error: AxiosError<{ detail?: string; message?: string }>) => {
+  (error: AxiosError<{ detail?: string | any[]; message?: string }>) => {
     // Handle different error status codes
     if (error.response) {
       const status = error.response.status;
-      const message = error.response.data?.detail || error.response.data?.message || 'An error occurred';
+
+      // Extract error message, handling FastAPI validation error format
+      let message = 'An error occurred';
+      const detail = error.response.data?.detail;
+
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        // FastAPI validation errors are arrays of {loc, msg, type}
+        message = detail.map(err => err.msg || JSON.stringify(err)).join(', ');
+      } else if (error.response.data?.message) {
+        message = error.response.data.message;
+      }
 
       switch (status) {
         case 401:
@@ -141,10 +153,25 @@ export async function apiCall<T>(
     const response = await promise;
     return [response.data, null];
   } catch (error: any) {
+    // Extract error message, handling FastAPI validation error format
+    let message = 'An error occurred';
+    const detail = error.response?.data?.detail;
+
+    if (typeof detail === 'string') {
+      message = detail;
+    } else if (Array.isArray(detail) && detail.length > 0) {
+      // FastAPI validation errors are arrays of {loc, msg, type}
+      message = detail.map((err: any) => err.msg || JSON.stringify(err)).join(', ');
+    } else if (error.response?.data?.message) {
+      message = error.response.data.message;
+    } else if (error.message) {
+      message = error.message;
+    }
+
     const apiError: APIError = {
       code: error.response?.data?.code || 'UNKNOWN_ERROR',
-      message: error.response?.data?.message || error.message,
-      details: error.response?.data?.details,
+      message,
+      details: error.response?.data?.details || detail,
     };
     return [null, apiError];
   }

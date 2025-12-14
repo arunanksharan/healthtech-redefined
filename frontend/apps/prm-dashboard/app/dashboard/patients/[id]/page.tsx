@@ -94,34 +94,34 @@ function getStatusColor(status: string): string {
     case "scheduled":
     case "active":
     case "open":
-      return "bg-blue-50 text-blue-700 border-blue-200";
+      return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900";
     case "confirmed":
-      return "bg-green-50 text-green-700 border-green-200";
+      return "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900";
     case "completed":
     case "resolved":
-      return "bg-gray-50 text-gray-700 border-gray-200";
+      return "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-800";
     case "cancelled":
     case "closed":
-      return "bg-red-50 text-red-700 border-red-200";
+      return "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900";
     case "in_progress":
-      return "bg-amber-50 text-amber-700 border-amber-200";
+      return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-900";
     default:
-      return "bg-gray-50 text-gray-600 border-gray-200";
+      return "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-800";
   }
 }
 
 function getPriorityColor(priority: string): string {
   switch (priority?.toLowerCase()) {
     case "urgent":
-      return "bg-red-100 text-red-700";
+      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
     case "high":
-      return "bg-orange-100 text-orange-700";
+      return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
     case "medium":
-      return "bg-yellow-100 text-yellow-700";
+      return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
     case "low":
-      return "bg-green-100 text-green-700";
+      return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400";
   }
 }
 
@@ -340,23 +340,23 @@ export default function PatientDetailPage({
       </div>
 
       {/* Patient Header */}
-      <Card className="border-gray-200">
+      <Card className="border-border">
         <CardContent className="p-6">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Patient Info */}
             <div className="flex items-start gap-4 flex-1">
-              <Avatar className="h-16 w-16 border-2 border-gray-200">
-                <AvatarFallback className="text-lg font-semibold bg-blue-50 text-blue-600">
+              <Avatar className="h-16 w-16 border-2 border-border">
+                <AvatarFallback className="text-lg font-semibold bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-400">
                   {getInitials(patient.first_name, patient.last_name)}
                 </AvatarFallback>
               </Avatar>
 
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
-                <p className="text-gray-500">
+                <h1 className="text-2xl font-bold text-foreground">{fullName}</h1>
+                <p className="text-muted-foreground">
                   {formatDate(patient.date_of_birth, "MMM d, yyyy")} ({age} years) • {patient.gender}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   MRN: {patient.mrn || "N/A"}
                 </p>
 
@@ -381,22 +381,22 @@ export default function PatientDetailPage({
             {/* Quick Info */}
             <div className="flex flex-wrap gap-3 lg:flex-col lg:w-60">
               {patient360.next_appointment_date && (
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50/50 border border-blue-100">
-                  <Calendar className="h-4 w-4 text-blue-600 mt-0.5" />
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50/50 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800">
+                  <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
                   <div className="text-sm">
-                    <p className="text-gray-500">Next Appointment</p>
-                    <p className="font-medium text-blue-700">
+                    <p className="text-muted-foreground">Next Appointment</p>
+                    <p className="font-medium text-blue-700 dark:text-blue-400">
                       {formatDate(patient360.next_appointment_date, "MMM d, yyyy 'at' h:mm a")}
                     </p>
                   </div>
                 </div>
               )}
               {patient360.last_visit_date && (
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  <Calendar className="h-4 w-4 text-gray-500 mt-0.5" />
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+                  <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div className="text-sm">
-                    <p className="text-gray-500">Last Visit</p>
-                    <p className="font-medium">
+                    <p className="text-muted-foreground">Last Visit</p>
+                    <p className="font-medium text-foreground">
                       {formatDate(patient360.last_visit_date, "MMM d, yyyy")}
                     </p>
                   </div>
@@ -409,17 +409,17 @@ export default function PatientDetailPage({
 
       {/* Duplicate Alert - Shows when potential duplicates found */}
       {duplicates && duplicates.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-amber-800">
+                <h3 className="font-semibold text-amber-800 dark:text-amber-500">
                   Potential Duplicate Records ({duplicates.length})
                 </h3>
-                <p className="text-sm text-amber-700 mt-1">
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                   We found patients with similar information. Review and merge if needed.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -427,17 +427,17 @@ export default function PatientDetailPage({
                     <Link
                       key={dup.patient_id}
                       href={`/dashboard/patients/${dup.patient_id}`}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-amber-200 text-sm hover:bg-amber-100 transition-colors"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-background rounded-lg border border-amber-200 dark:border-amber-800 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
                     >
-                      <Copy className="h-3.5 w-3.5 text-amber-600" />
+                      <Copy className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500" />
                       <span className="font-medium">{dup.first_name} {dup.last_name}</span>
-                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
+                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
                         {Math.round(dup.match_score * 100)}% match
                       </Badge>
                     </Link>
                   ))}
                   {duplicates.length > 3 && (
-                    <span className="text-sm text-amber-600">
+                    <span className="text-sm text-amber-600 dark:text-amber-500">
                       +{duplicates.length - 3} more
                     </span>
                   )}
@@ -450,47 +450,47 @@ export default function PatientDetailPage({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MagicCard className="bg-white border border-gray-200" gradientColor="#eff6ff">
+        <MagicCard className="bg-card border border-border" gradientColor="hsl(var(--primary) / 0.1)">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Appointments</CardTitle>
-            <Calendar className="w-4 h-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Appointments</CardTitle>
+            <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{patient360.total_appointments}</div>
-            <p className="text-xs text-blue-600 mt-1">{patient360.upcoming_appointments} upcoming</p>
+            <div className="text-2xl font-bold text-foreground">{patient360.total_appointments}</div>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{patient360.upcoming_appointments} upcoming</p>
           </CardContent>
         </MagicCard>
 
-        <MagicCard className="bg-white border border-gray-200" gradientColor="#f0fdf4">
+        <MagicCard className="bg-card border border-border" gradientColor="hsl(var(--success) / 0.1)">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Active Journeys</CardTitle>
-            <Activity className="w-4 h-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Journeys</CardTitle>
+            <Activity className="w-4 h-4 text-green-600 dark:text-green-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{patient360.active_journeys}</div>
-            <p className="text-xs text-gray-500 mt-1">Care pathways</p>
+            <div className="text-2xl font-bold text-foreground">{patient360.active_journeys}</div>
+            <p className="text-xs text-muted-foreground mt-1">Care pathways</p>
           </CardContent>
         </MagicCard>
 
-        <MagicCard className="bg-white border border-gray-200" gradientColor="#fef3c7">
+        <MagicCard className="bg-card border border-border" gradientColor="hsl(var(--warning) / 0.1)">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Open Tickets</CardTitle>
-            <Ticket className="w-4 h-4 text-amber-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Open Tickets</CardTitle>
+            <Ticket className="w-4 h-4 text-amber-600 dark:text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{patient360.open_tickets}</div>
-            <p className="text-xs text-gray-500 mt-1">Support requests</p>
+            <div className="text-2xl font-bold text-foreground">{patient360.open_tickets}</div>
+            <p className="text-xs text-muted-foreground mt-1">Support requests</p>
           </CardContent>
         </MagicCard>
 
-        <MagicCard className="bg-white border border-gray-200" gradientColor="#fae8ff">
+        <MagicCard className="bg-card border border-border" gradientColor="hsl(var(--destructive) / 0.1)">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Communications</CardTitle>
-            <MessageSquare className="w-4 h-4 text-purple-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Communications</CardTitle>
+            <MessageSquare className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{patient360.recent_communications}</div>
-            <p className="text-xs text-gray-500 mt-1">Messages</p>
+            <div className="text-2xl font-bold text-foreground">{patient360.recent_communications}</div>
+            <p className="text-xs text-muted-foreground mt-1">Messages</p>
           </CardContent>
         </MagicCard>
       </div>
@@ -529,10 +529,10 @@ export default function PatientDetailPage({
                 ) : (
                   <div className="space-y-3">
                     {patient360.appointments.slice(0, 5).map((apt) => (
-                      <div key={apt.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+                      <div key={apt.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border">
                         <div>
                           <p className="text-sm font-medium">{apt.appointment_type || "Appointment"}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted-foreground">
                             {apt.scheduled_at ? formatDate(apt.scheduled_at, "MMM d, yyyy 'at' h:mm a") : "Not scheduled"}
                           </p>
                         </div>
@@ -558,7 +558,7 @@ export default function PatientDetailPage({
                 ) : (
                   <div className="space-y-3">
                     {patient360.tickets.slice(0, 5).map((ticket) => (
-                      <div key={ticket.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+                      <div key={ticket.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{ticket.title}</p>
                           <Badge className={`${getPriorityColor(ticket.priority)} text-xs mt-1`}>
@@ -589,7 +589,7 @@ export default function PatientDetailPage({
                     {patient360.journeys.slice(0, 5).map((journey) => (
                       <div
                         key={journey.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all"
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border cursor-pointer hover:bg-muted/80 transition-all"
                         onClick={() => {
                           setSelectedInstanceId(journey.id);
                           setIsInstanceSheetOpen(true);
@@ -597,7 +597,7 @@ export default function PatientDetailPage({
                       >
                         <div>
                           <p className="text-sm font-medium">Journey #{journey.id.slice(0, 8)}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted-foreground">
                             Stage: {journey.current_stage_name || "Initial"}
                           </p>
                         </div>
@@ -623,14 +623,14 @@ export default function PatientDetailPage({
                 ) : (
                   <div className="space-y-3">
                     {patient360.communications.slice(0, 5).map((comm) => (
-                      <div key={comm.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+                      <div key={comm.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${comm.direction === "outbound" ? "bg-blue-100" : "bg-green-100"}`}>
-                            <Send className={`h-3 w-3 ${comm.direction === "outbound" ? "text-blue-600" : "text-green-600 rotate-180"}`} />
+                          <div className={`p-2 rounded-lg ${comm.direction === "outbound" ? "bg-blue-100 dark:bg-blue-900/30" : "bg-green-100 dark:bg-green-900/30"}`}>
+                            <Send className={`h-3 w-3 ${comm.direction === "outbound" ? "text-blue-600 dark:text-blue-400" : "text-green-600 dark:text-green-400 rotate-180"}`} />
                           </div>
                           <div>
                             <p className="text-sm font-medium capitalize">{comm.channel}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               {comm.sent_at ? formatDate(comm.sent_at, "MMM d, h:mm a") : "Pending"}
                             </p>
                           </div>
@@ -659,14 +659,14 @@ export default function PatientDetailPage({
               ) : (
                 <div className="space-y-3">
                   {patient360.appointments.map((apt) => (
-                    <div key={apt.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                    <div key={apt.id} className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-lg bg-blue-50">
-                          <Calendar className="h-5 w-5 text-blue-600" />
+                        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                          <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
                           <p className="font-medium">{apt.appointment_type || "Appointment"}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted-foreground">
                             {apt.scheduled_at ? formatDate(apt.scheduled_at, "EEEE, MMM d, yyyy 'at' h:mm a") : "Not scheduled"}
                           </p>
                         </div>
@@ -706,31 +706,31 @@ export default function PatientDetailPage({
                   {patient360.journeys.map((journey) => (
                     <div
                       key={journey.id}
-                      className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-blue-50/50 hover:border-blue-200 transition-all cursor-pointer group"
+                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-all cursor-pointer group"
                       onClick={() => {
                         setSelectedInstanceId(journey.id);
                         setIsInstanceSheetOpen(true);
                       }}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors">
-                          <Activity className="h-5 w-5 text-blue-600" />
+                        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
+                          <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
                           <p className="font-medium flex items-center gap-2">
                             Journey #{journey.id.slice(0, 8)}
-                            <span className="text-gray-400 font-normal text-xs">• Created {formatDate(journey.start_date || new Date().toISOString())}</span>
+                            <span className="text-muted-foreground font-normal text-xs">• Created {formatDate(journey.start_date || new Date().toISOString())}</span>
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-sm text-gray-500">
-                              Current Stage: <span className="text-gray-900 font-medium">{journey.current_stage_name || "Initial Stage"}</span>
+                            <p className="text-sm text-muted-foreground">
+                              Current Stage: <span className="text-foreground font-medium">{journey.current_stage_name || "Initial Stage"}</span>
                             </p>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <Badge className={getStatusColor(journey.status)}>{journey.status}</Badge>
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
                       </div>
                     </div>
                   ))}
@@ -752,14 +752,14 @@ export default function PatientDetailPage({
               ) : (
                 <div className="space-y-3">
                   {patient360.communications.map((comm) => (
-                    <div key={comm.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                    <div key={comm.id} className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-lg ${comm.direction === "outbound" ? "bg-blue-50" : "bg-green-50"}`}>
-                          <Send className={`h-5 w-5 ${comm.direction === "outbound" ? "text-blue-600" : "text-green-600 rotate-180"}`} />
+                        <div className={`p-3 rounded-lg ${comm.direction === "outbound" ? "bg-blue-50 dark:bg-blue-900/20" : "bg-green-50 dark:bg-green-900/20"}`}>
+                          <Send className={`h-5 w-5 ${comm.direction === "outbound" ? "text-blue-600 dark:text-blue-400" : "text-green-600 dark:text-green-400 rotate-180"}`} />
                         </div>
                         <div>
                           <p className="font-medium capitalize">{comm.channel} - {comm.message_type || "Message"}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted-foreground">
                             {comm.sent_at ? formatDate(comm.sent_at, "EEEE, MMM d, yyyy 'at' h:mm a") : "Pending"}
                           </p>
                         </div>
@@ -792,14 +792,14 @@ export default function PatientDetailPage({
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {media.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                    <div key={file.id} className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-lg ${file.mime_type?.startsWith('image/') ? 'bg-purple-50' : 'bg-blue-50'
+                        <div className={`p-3 rounded-lg ${file.mime_type?.startsWith('image/') ? 'bg-purple-50 dark:bg-purple-900/20' : 'bg-blue-50 dark:bg-blue-900/20'
                           }`}>
                           {file.mime_type?.startsWith('image/') ? (
-                            <Image className="h-5 w-5 text-purple-600" />
+                            <Image className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                           ) : (
-                            <FileText className="h-5 w-5 text-blue-600" />
+                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -854,21 +854,21 @@ export default function PatientDetailPage({
               {/* Name Row */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="first_name" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-gray-400" />
+                  <Label htmlFor="first_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                     First Name
                   </Label>
                   <Input
                     id="first_name"
                     value={editForm.first_name}
                     onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                    className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+                    className="h-11 rounded-xl border-input focus:border-blue-300 focus:ring-blue-100 bg-background"
                     placeholder="John"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last_name" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-gray-400" />
+                  <Label htmlFor="last_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                     Last Name
                   </Label>
                   <Input
@@ -883,8 +883,8 @@ export default function PatientDetailPage({
 
               {/* Phone */}
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Phone className="h-3.5 w-3.5 text-gray-400" />
+                <Label htmlFor="phone" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                   Phone Number
                 </Label>
                 <Input
@@ -898,8 +898,8 @@ export default function PatientDetailPage({
 
               {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Mail className="h-3.5 w-3.5 text-gray-400" />
+                <Label htmlFor="email" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                   Email Address
                 </Label>
                 <Input
@@ -919,7 +919,7 @@ export default function PatientDetailPage({
                 type="button"
                 variant="outline"
                 onClick={() => setIsEditOpen(false)}
-                className="rounded-full px-5 border-gray-200 hover:bg-gray-50"
+                className="rounded-full px-5 border-border hover:bg-muted"
               >
                 Cancel
               </Button>
@@ -961,18 +961,18 @@ export default function PatientDetailPage({
           </div>
 
           <div className="px-6 py-5">
-            <AlertDialogDescription className="text-gray-600 leading-relaxed">
-              You are about to deactivate the record for <span className="font-semibold text-gray-900">{fullName}</span>.
+            <AlertDialogDescription className="text-muted-foreground leading-relaxed">
+              You are about to deactivate the record for <span className="font-semibold text-foreground">{fullName}</span>.
             </AlertDialogDescription>
 
-            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 dark:bg-amber-900/10 dark:border-amber-900 rounded-xl">
               <div className="flex items-start gap-3">
-                <div className="p-1.5 bg-amber-100 rounded-lg">
-                  <Activity className="h-4 w-4 text-amber-600" />
+                <div className="p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                  <Activity className="h-4 w-4 text-amber-600 dark:text-amber-500" />
                 </div>
                 <div className="text-sm">
-                  <p className="font-medium text-amber-800">What happens next?</p>
-                  <ul className="mt-1.5 text-amber-700 space-y-1">
+                  <p className="font-medium text-amber-800 dark:text-amber-500">What happens next?</p>
+                  <ul className="mt-1.5 text-amber-700 dark:text-amber-400 space-y-1">
                     <li>• Patient won't appear in active lists</li>
                     <li>• Data is retained for compliance</li>
                     <li>• You can reactivate anytime</li>
@@ -982,8 +982,8 @@ export default function PatientDetailPage({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
-            <AlertDialogCancel className="rounded-full px-5 border-gray-200 hover:bg-white">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-muted/20 border-t border-border">
+            <AlertDialogCancel className="rounded-full px-5 border-border hover:bg-muted">
               Keep Active
             </AlertDialogCancel>
             <AlertDialogAction

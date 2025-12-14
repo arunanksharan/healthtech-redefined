@@ -33,6 +33,11 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 
 import { CreateJourneyDialog } from '@/components/journeys/create-journey-dialog';
 import { JourneyDetailsSheet } from '@/components/journeys/journey-details-sheet';
@@ -71,21 +76,21 @@ export default function JourneysPage() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'active': return 'bg-green-100 text-green-700 border-green-200';
-            case 'completed': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'paused': return 'bg-amber-100 text-amber-700 border-amber-200';
-            case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'active': return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
+            case 'completed': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+            case 'paused': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+            case 'cancelled': return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
+            default: return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
         }
     };
 
     const getJourneyTypeColor = (type: string) => {
         switch (type) {
-            case 'post_surgery': return 'bg-purple-50 text-purple-700 border-purple-200';
-            case 'chronic_disease': return 'bg-rose-50 text-rose-700 border-rose-200';
-            case 'wellness': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-            case 'pregnancy': return 'bg-pink-50 text-pink-700 border-pink-200';
-            default: return 'bg-gray-50 text-gray-700 border-gray-200';
+            case 'post_surgery': return 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+            case 'chronic_disease': return 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+            case 'wellness': return 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+            case 'pregnancy': return 'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800';
+            default: return 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
         }
     };
 
@@ -117,51 +122,59 @@ export default function JourneysPage() {
             <div className="p-6 space-y-6">
                 {/* Magic Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#eff6ff">
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-sm font-medium text-muted-foreground">Total Journeys</span>
-                            <Route className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <div className="text-2xl font-bold text-foreground">
-                            <NumberTicker value={stats.total} />
-                        </div>
-                        <div className="flex items-center mt-1 text-xs text-blue-600">
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            <span>Active tracking</span>
-                        </div>
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Journeys</CardTitle>
+                            <Route className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-foreground">
+                                <NumberTicker value={stats.total} />
+                            </div>
+                            <div className="flex items-center mt-1 text-xs text-blue-600 dark:text-blue-400">
+                                <TrendingUp className="w-3 h-3 mr-1" />
+                                <span>Active tracking</span>
+                            </div>
+                        </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#f0fdf4">
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-sm font-medium text-muted-foreground">Active</span>
-                            <Activity className="w-4 h-4 text-green-600" />
-                        </div>
-                        <div className="text-2xl font-bold text-foreground">
-                            <NumberTicker value={stats.active} />
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">Currently progressing</div>
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+                            <Activity className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-foreground">
+                                <NumberTicker value={stats.active} />
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">Currently progressing</div>
+                        </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#f0f9ff">
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-sm font-medium text-muted-foreground">Completed</span>
-                            <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                        </div>
-                        <div className="text-2xl font-bold text-foreground">
-                            <NumberTicker value={stats.completed} />
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">Successful outcomes</div>
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+                            <CheckCircle2 className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-foreground">
+                                <NumberTicker value={stats.completed} />
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">Successful outcomes</div>
+                        </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#fffbeb">
-                        <div className="flex justify-between items-start mb-2">
-                            <span className="text-sm font-medium text-muted-foreground">Paused</span>
-                            <Pause className="w-4 h-4 text-amber-500" />
-                        </div>
-                        <div className="text-2xl font-bold text-foreground">
-                            <NumberTicker value={stats.paused} />
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">Requires attention</div>
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--warning) / 0.15)">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Paused</CardTitle>
+                            <Pause className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-foreground">
+                                <NumberTicker value={stats.paused} />
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">Requires attention</div>
+                        </CardContent>
                     </MagicCard>
                 </div>
 
@@ -231,7 +244,7 @@ export default function JourneysPage() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between">
                                             <div>
-                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 transition-colors">
+                                                <h3 className="text-lg font-semibold text-foreground group-hover:text-blue-600 transition-colors">
                                                     {journey.name}
                                                 </h3>
                                                 <div className="flex items-center gap-4 mt-1">
@@ -247,7 +260,7 @@ export default function JourneysPage() {
                                             </div>
 
                                             {/* Status Badge */}
-                                            <Badge variant="secondary" className={cn("capitalize px-2.5 py-0.5", journey.is_default ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-700 border-gray-200')}>
+                                            <Badge variant="secondary" className={cn("capitalize px-2.5 py-0.5", journey.is_default ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700')}>
                                                 {journey.is_default ? 'Default' : journey.journey_type}
                                             </Badge>
                                         </div>

@@ -281,15 +281,15 @@ export default function PatientsPage() {
                           <Avatar className="h-9 w-9 border border-border">
                             <AvatarImage src={patient.avatar_url} />
                             <AvatarFallback className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold">
-                              {(patient.name || patient.legal_name || 'P')
+                              {(patient.name || patient.legal_name || `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'P')
                                 .split(' ')
-                                .map((n) => n[0])
+                                .map((n: any) => n[0])
                                 .join('')
                                 .toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium text-foreground">{patient.name || patient.legal_name || 'Unknown'}</div>
+                            <div className="font-medium text-foreground">{patient.name || patient.legal_name || `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'Unknown'}</div>
                             <div className="text-xs text-muted-foreground">
                               {patient.gender || 'Not specified'}
                             </div>
@@ -298,16 +298,16 @@ export default function PatientsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          {(patient.phone || patient.primary_phone) && (
+                          {patient.phone_primary && (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <Phone className="w-3 h-3 text-muted-foreground/60" />
-                              {patient.phone || patient.primary_phone}
+                              {patient.phone_primary}
                             </div>
                           )}
-                          {patient.email && (
+                          {patient.email_primary && (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <Mail className="w-3 h-3 text-muted-foreground/60" />
-                              {patient.email}
+                              {patient.email_primary}
                             </div>
                           )}
                         </div>
@@ -341,19 +341,11 @@ export default function PatientsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Link href={`/dashboard/patients/${patient.id}`}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">
-                            <Edit className="w-4 h-4" />
+                        <Link href={`/dashboard/patients/${patient.id}`}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                            <Eye className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -387,29 +379,29 @@ export default function PatientsPage() {
               {/* Name Row */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="add_first_name" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-gray-400" />
+                  <Label htmlFor="add_first_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                     First Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="add_first_name"
                     value={addForm.first_name}
                     onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
-                    className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+                    className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                     placeholder="John"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="add_last_name" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-gray-400" />
+                  <Label htmlFor="add_last_name" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                     Last Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="add_last_name"
                     value={addForm.last_name}
                     onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
-                    className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+                    className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                     placeholder="Doe"
                     required
                   />
@@ -419,8 +411,8 @@ export default function PatientsPage() {
               {/* DOB and Gender Row */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="add_dob" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                  <Label htmlFor="add_dob" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                     Date of Birth <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -428,47 +420,47 @@ export default function PatientsPage() {
                     type="date"
                     value={addForm.date_of_birth}
                     onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })}
-                    className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+                    className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="add_gender" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5 text-gray-400" />
+                  <Label htmlFor="add_gender" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
                     Gender
                   </Label>
                   <select
                     id="add_gender"
                     value={addForm.gender}
                     onChange={(e) => setAddForm({ ...addForm, gender: e.target.value })}
-                    className="h-11 w-full rounded-xl border border-gray-200 px-3 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-100 bg-gray-50/50 outline-none"
+                    className="h-11 w-full rounded-xl border border-border px-3 text-sm text-foreground focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 bg-background outline-none"
                   >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    <option value="male" className="bg-background text-foreground">Male</option>
+                    <option value="female" className="bg-background text-foreground">Female</option>
+                    <option value="other" className="bg-background text-foreground">Other</option>
                   </select>
                 </div>
               </div>
 
               {/* Phone */}
               <div className="space-y-2">
-                <Label htmlFor="add_phone" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Phone className="h-3.5 w-3.5 text-gray-400" />
+                <Label htmlFor="add_phone" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                   Phone Number
                 </Label>
                 <Input
                   id="add_phone"
                   value={addForm.phone_primary}
                   onChange={(e) => setAddForm({ ...addForm, phone_primary: e.target.value })}
-                  className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+                  className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
 
               {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="add_email" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Mail className="h-3.5 w-3.5 text-gray-400" />
+                <Label htmlFor="add_email" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                   Email Address
                 </Label>
                 <Input
@@ -476,19 +468,19 @@ export default function PatientsPage() {
                   type="email"
                   value={addForm.email_primary}
                   onChange={(e) => setAddForm({ ...addForm, email_primary: e.target.value })}
-                  className="h-11 rounded-xl border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+                  className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background"
                   placeholder="john.doe@email.com"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-gray-100">
+            <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-border">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsAddOpen(false)}
-                className="rounded-full px-5 border-gray-200 hover:bg-gray-50"
+                className="rounded-full px-5 border-border hover:bg-muted"
               >
                 Cancel
               </Button>

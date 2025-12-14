@@ -73,22 +73,22 @@ export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDe
 
     const getJourneyTypeColor = (type?: string) => {
         // Return a clean glassmorphic style for the header
-        return 'bg-white/90 backdrop-blur-sm border-0 font-medium px-3';
+        return 'bg-background/90 backdrop-blur-sm border-0 font-medium px-3';
     };
 
     const getJourneyTypeText = (type?: string) => {
         switch (type) {
-            case 'post_surgery': return 'text-purple-700';
-            case 'chronic_disease': return 'text-rose-700';
-            case 'wellness': return 'text-emerald-700';
-            case 'pregnancy': return 'text-pink-700';
-            default: return 'text-gray-700';
+            case 'post_surgery': return 'text-purple-700 dark:text-purple-300';
+            case 'chronic_disease': return 'text-rose-700 dark:text-rose-300';
+            case 'wellness': return 'text-emerald-700 dark:text-emerald-300';
+            case 'pregnancy': return 'text-pink-700 dark:text-pink-300';
+            default: return 'text-muted-foreground';
         }
     };
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="sm:max-w-xl w-full p-0 overflow-hidden bg-white dark:bg-zinc-950 border-l border-border shadow-2xl">
+            <SheetContent className="sm:max-w-xl w-full p-0 overflow-hidden bg-background border-l border-border shadow-2xl">
                 <SheetHeader className="sr-only">
                     <SheetTitle>Journey Details</SheetTitle>
                     <SheetDescription>Details and stages of the selected journey template</SheetDescription>
@@ -207,7 +207,7 @@ export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDe
                         </ScrollArea>
 
                         {/* Footer (Actions) */}
-                        <div className="p-6 border-t border-border bg-gray-50/50 dark:bg-zinc-900/50 shrink-0">
+                        <div className="p-6 border-t border-border bg-muted/30 shrink-0">
                             {!isAddingStage ? (
                                 <Button
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
@@ -217,7 +217,7 @@ export function JourneyDetailsSheet({ journeyId, open, onOpenChange }: JourneyDe
                                     Add New Stage
                                 </Button>
                             ) : (
-                                <div className="space-y-4 bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
+                                <div className="space-y-4 bg-card p-4 rounded-xl border border-border shadow-sm">
                                     <h4 className="font-semibold text-sm">New Stage Details</h4>
                                     <Input
                                         placeholder="Stage Title (e.g. Initial Consultation)"

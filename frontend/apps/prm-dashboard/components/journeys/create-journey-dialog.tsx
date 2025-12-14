@@ -101,7 +101,7 @@ export function CreateJourneyDialog({
             case 'procedure': return <Zap className="w-4 h-4 text-amber-500" />;
             case 'chronic_care': return <Heart className="w-4 h-4 text-red-500" />;
             case 'wellness': return <Calendar className="w-4 h-4 text-green-500" />;
-            default: return <Briefcase className="w-4 h-4 text-gray-500" />;
+            default: return <Briefcase className="w-4 h-4 text-muted-foreground" />;
         }
     };
 
@@ -120,7 +120,7 @@ export function CreateJourneyDialog({
                     </DialogHeader>
                 </div>
 
-                <div className="p-6 bg-white dark:bg-zinc-950">
+                <div className="p-6 bg-background">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -130,7 +130,7 @@ export function CreateJourneyDialog({
                                     name="name"
                                     render={({ field }) => (
                                         <FormItem className="col-span-2">
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
                                                 <FileText className="w-4 h-4 text-blue-600" />
                                                 Journey Name
                                             </FormLabel>
@@ -138,7 +138,7 @@ export function CreateJourneyDialog({
                                                 <Input
                                                     placeholder="e.g. Post-Surgery Recovery Program"
                                                     {...field}
-                                                    className="h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-100 bg-gray-50/50"
+                                                    className="h-10 border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -152,7 +152,7 @@ export function CreateJourneyDialog({
                                     name="journey_type"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
                                                 {getTypeIcon(field.value)}
                                                 Journey Type
                                             </FormLabel>
@@ -161,7 +161,7 @@ export function CreateJourneyDialog({
                                                 defaultValue={field.value}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger className="h-10 border-gray-200 bg-gray-50/50 focus:ring-blue-100">
+                                                    <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
                                                         <SelectValue placeholder="Select type" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -183,12 +183,12 @@ export function CreateJourneyDialog({
                                     control={form.control}
                                     name="is_default"
                                     render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-xl border border-gray-200 p-3 shadow-sm bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all cursor-pointer">
+                                        <FormItem className="flex flex-row items-center justify-between rounded-xl border border-border p-3 shadow-sm bg-background hover:bg-muted/50 hover:border-blue-500/50 transition-all cursor-pointer">
                                             <div className="space-y-0.5">
-                                                <FormLabel className="text-sm font-semibold text-gray-700 cursor-pointer">
+                                                <FormLabel className="text-sm font-semibold text-foreground cursor-pointer">
                                                     Auto-Apply
                                                 </FormLabel>
-                                                <FormDescription className="text-xs text-gray-500">
+                                                <FormDescription className="text-xs text-muted-foreground">
                                                     Make default for type
                                                 </FormDescription>
                                             </div>
@@ -209,15 +209,15 @@ export function CreateJourneyDialog({
                                     name="description"
                                     render={({ field }) => (
                                         <FormItem className="col-span-2">
-                                            <FormLabel className="text-gray-700 font-semibold flex items-center gap-2">
-                                                <Briefcase className="w-4 h-4 text-gray-500" />
+                                            <FormLabel className="text-foreground font-semibold flex items-center gap-2">
+                                                <Briefcase className="w-4 h-4 text-muted-foreground" />
                                                 Description
                                             </FormLabel>
                                             <FormControl>
                                                 <Textarea
                                                     placeholder="Describe the clinical goals and protocols for this journey..."
                                                     {...field}
-                                                    className="resize-none min-h-[100px] border-gray-200 focus:border-blue-500 focus:ring-blue-100 bg-gray-50/50"
+                                                    className="resize-none min-h-[100px] border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -226,12 +226,12 @@ export function CreateJourneyDialog({
                                 />
                             </div>
 
-                            <DialogFooter className="pt-4 border-t border-gray-100">
+                            <DialogFooter className="pt-4 border-t border-border">
                                 <Button
                                     variant="outline"
                                     type="button"
                                     onClick={() => onOpenChange(false)}
-                                    className="border-gray-200 hover:bg-gray-100 hover:text-gray-900"
+                                    className="border-border hover:bg-muted hover:text-foreground"
                                 >
                                     Cancel
                                 </Button>

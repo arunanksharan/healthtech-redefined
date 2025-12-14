@@ -76,6 +76,24 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: ticketStats } = useQuery({
+    queryKey: ['tickets-stats'],
+    queryFn: async () => {
+      const [data] = await ticketsAPI.getStats();
+      return data;
+    },
+  });
+
+  // Fetch appointment stats from backend
+  const { data: appointmentStats } = useQuery({
+    queryKey: ['appointment-stats'],
+    queryFn: async () => {
+      const [data] = await appointmentsAPI.getStats();
+      return data;
+    },
+    refetchInterval: 30000,
+  });
+
   // Real journey instance stats from backend
   const { data: journeyInstanceStats } = useQuery({
     queryKey: ['journey-instance-stats'],
@@ -101,17 +119,18 @@ export default function DashboardPage() {
   });
 
   // Calculate stats
+  // Stats object using backend data where available
   const stats = {
-    todaysAppointments: todaysAppointments.length,
-    activeJourneys: journeyInstanceStats?.active ?? journeys.filter(j => j.status === 'active').length,
-    messagesSent: communications.length,
-    pendingTickets: tickets.filter(t => t.status === 'open' || t.status === 'in_progress').length,
-    totalPatients: patients.length,
-    completedAppointments: appointments.filter(a => a.status === 'completed').length,
-    confirmedAppointments: appointments.filter(a => a.status === 'confirmed').length,
-    cancelledAppointments: appointments.filter(a => a.status === 'cancelled').length,
+    todaysAppointments: appointmentStats?.today ?? 0,
+    activeJourneys: journeyInstanceStats?.active ?? 0,
+    messagesSent: communicationsData?.total ?? 0,
+    pendingTickets: (ticketStats?.open ?? 0) + (ticketStats?.in_progress ?? 0),
+    totalPatients: patients.length, // Should ideally be stats too but low priority
+    completedAppointments: appointmentStats?.completed ?? 0,
+    confirmedAppointments: appointmentStats?.confirmed ?? 0, // Maps to backend 'booked' + 'confirmed' if needed, but we separated them.
+    cancelledAppointments: (appointmentStats?.cancelled ?? 0) + (appointmentStats?.no_show ?? 0),
     // New journey stats from backend
-    totalJourneys: journeyInstanceStats?.total ?? journeys.length,
+    totalJourneys: journeyInstanceStats?.total ?? journeysData?.total ?? 0,
     completedJourneys: journeyInstanceStats?.completed ?? 0,
     cancelledJourneys: journeyInstanceStats?.cancelled ?? 0,
   };
@@ -183,7 +202,7 @@ export default function DashboardPage() {
                 <div
                   className="h-full bg-green-500 transition-all duration-500"
                   style={{
-                    width: `${appointments.length ? (stats.confirmedAppointments / appointments.length) * 100 : 0}%`,
+                    width: `${appointmentStats?.total ? (stats.confirmedAppointments / appointmentStats.total) * 100 : 0}%`,
                   }}
                 />
               </div>
@@ -201,7 +220,7 @@ export default function DashboardPage() {
                 <div
                   className="h-full bg-blue-500 transition-all duration-500"
                   style={{
-                    width: `${appointments.length ? (stats.completedAppointments / appointments.length) * 100 : 0}%`,
+                    width: `${appointmentStats?.total ? (stats.completedAppointments / appointmentStats.total) * 100 : 0}%`,
                   }}
                 />
               </div>
@@ -219,7 +238,7 @@ export default function DashboardPage() {
                 <div
                   className="h-full bg-red-500 transition-all duration-500"
                   style={{
-                    width: `${appointments.length ? (stats.cancelledAppointments / appointments.length) * 100 : 0}%`,
+                    width: `${appointmentStats?.total ? (stats.cancelledAppointments / appointmentStats.total) * 100 : 0}%`,
                   }}
                 />
               </div>

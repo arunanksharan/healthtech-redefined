@@ -15,7 +15,10 @@ from .schemas import (
     TicketCreate,
     TicketUpdate,
     TicketResponse,
-    TicketListResponse
+    TicketResponse,
+    TicketListResponse,
+    TicketStats,
+    TicketStats
 )
 from .service import TicketService
 
@@ -61,6 +64,16 @@ async def list_tickets(
         page=page,
         page_size=page_size
     )
+
+
+
+@router.get("/stats", response_model=TicketStats)
+async def get_ticket_stats(
+    db: Session = Depends(get_db)
+):
+    """Get ticket statistics"""
+    service = TicketService(db)
+    return await service.get_stats()
 
 
 @router.get("/{ticket_id}", response_model=TicketResponse)
