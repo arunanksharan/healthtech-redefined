@@ -546,3 +546,124 @@ async def cancel_appointment(
     return AppointmentResponse.from_orm(appointment)
 
 
+@router.put("/{appointment_id}/cancel", response_model=AppointmentResponse)
+async def cancel_appointment_put(
+    appointment_id: UUID,
+    notify_patient: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel appointment (PUT variant)
+
+    Alternative method for cancellation to support different client implementations.
+    Functionally identical to POST /appointments/{id}/cancel.
+    """
+    service = AppointmentService(db)
+    appointment = await service.cancel_appointment(
+        appointment_id,
+        notify_patient=notify_patient
+    )
+
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    return AppointmentResponse.from_orm(appointment)
+
+
+# ==================== Conflict Checking ====================
+
+@router.get("/conflicts")
+async def check_appointment_conflicts(
+    practitioner_id: UUID = Query(..., description="Practitioner ID"),
+    start_time: datetime = Query(..., description="Proposed start time"),
+    end_time: datetime = Query(..., description="Proposed end time"),
+    exclude_appointment_id: Optional[UUID] = Query(None, description="Exclude this appointment (for rescheduling)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Check for scheduling conflicts
+
+    Pre-flight check to verify a practitioner is available for a time slot
+    before creating or updating an appointment.
+
+    Returns:
+    - has_conflict: boolean indicating if there's a scheduling conflict
+    - conflicting_appointments: list of overlapping appointments if any
+    """
+    # Find overlapping appointments for the practitioner
+    query = db.query(Appointment).join(
+        TimeSlot, Appointment.time_slot_id == TimeSlot.id
+    ).filter(
+        Appointment.practitioner_id == practitioner_id,
+        Appointment.status.in_(["booked", "confirmed", "scheduled", "checked_in"]),
+        # Check for overlap: existing slot overlaps with proposed time
+        TimeSlot.start_datetime < end_time,
+        TimeSlot.end_datetime > start_time
+    )
+
+    # Exclude current appointment when rescheduling
+    if exclude_appointment_id:
+        query = query.filter(Appointment.id != exclude_appointment_id)
+
+    conflicting = query.all()
+
+    conflicts = []
+    for apt in conflicting:
+        time_slot = db.query(TimeSlot).filter(TimeSlot.id == apt.time_slot_id).first()
+        conflicts.append({
+            "appointment_id": str(apt.id),
+            "patient_id": str(apt.patient_id),
+            "status": apt.status,
+            "start_time": time_slot.start_datetime.isoformat() if time_slot else None,
+            "end_time": time_slot.end_datetime.isoformat() if time_slot else None
+        })
+
+    return {
+        "has_conflict": len(conflicts) > 0,
+        "conflict_count": len(conflicts),
+        "conflicting_appointments": conflicts
+    }
+
+
+# ==================== Delete Appointment ====================
+
+@router.delete("/{appointment_id}", status_code=204)
+async def delete_appointment(
+    appointment_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an appointment
+
+    Permanently removes an appointment from the system.
+    Use cancel endpoint for soft-delete (keeps record with cancelled status).
+
+    Note: This is a hard delete - use with caution.
+    Consider using cancel endpoint for most use cases.
+    """
+    appointment = db.query(Appointment).filter(
+        Appointment.id == appointment_id
+    ).first()
+
+    if not appointment:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found"
+        )
+
+    # Free up the time slot if applicable
+    if appointment.time_slot_id:
+        time_slot = db.query(TimeSlot).filter(
+            TimeSlot.id == appointment.time_slot_id
+        ).first()
+        if time_slot and time_slot.booked_count > 0:
+            time_slot.booked_count -= 1
+            if time_slot.status == "full":
+                time_slot.status = "available"
+
+    db.delete(appointment)
+    db.commit()
+
+    logger.info(f"Deleted appointment: {appointment_id}")
+
+    return None
