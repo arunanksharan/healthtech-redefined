@@ -78,6 +78,48 @@ class RedisManager:
             return
         await self.redis.expire(key, seconds)
 
+    async def hgetall(self, name: str) -> dict:
+        """Get all hash field values"""
+        if not self.redis:
+            return {}
+        return await self.redis.hgetall(name)
+
+    async def hdel(self, name: str, *keys: str):
+        """Delete hash fields"""
+        if not self.redis:
+            return
+        await self.redis.hdel(name, *keys)
+
+    async def rpush(self, key: str, *values: str):
+        """Append values to list"""
+        if not self.redis:
+            return
+        await self.redis.rpush(key, *values)
+
+    async def lrange(self, key: str, start: int, end: int) -> list:
+        """Get range of list elements"""
+        if not self.redis:
+            return []
+        return await self.redis.lrange(key, start, end)
+
+    async def lrem(self, key: str, count: int, value: str):
+        """Remove elements from list"""
+        if not self.redis:
+            return
+        await self.redis.lrem(key, count, value)
+
+    async def llen(self, key: str) -> int:
+        """Get list length"""
+        if not self.redis:
+            return 0
+        return await self.redis.llen(key)
+
+    async def ltrim(self, key: str, start: int, end: int):
+        """Trim list to specified range"""
+        if not self.redis:
+            return
+        await self.redis.ltrim(key, start, end)
+
 
 # Global Redis manager instance
 redis_manager = RedisManager()

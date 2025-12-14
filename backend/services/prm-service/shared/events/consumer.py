@@ -5,8 +5,17 @@ Subscribe to events and process them
 import json
 import os
 from typing import Callable, Dict, List, Optional
-from confluent_kafka import Consumer, KafkaError, KafkaException
 from loguru import logger
+
+# Optional Kafka support
+try:
+    from confluent_kafka import Consumer, KafkaError, KafkaException
+    KAFKA_AVAILABLE = True
+except ImportError:
+    Consumer = None  # type: ignore
+    KafkaError = None  # type: ignore
+    KafkaException = Exception  # type: ignore
+    KAFKA_AVAILABLE = False
 
 from .types import Event, EventType
 

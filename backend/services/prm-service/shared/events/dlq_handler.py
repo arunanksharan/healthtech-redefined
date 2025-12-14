@@ -8,8 +8,15 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from confluent_kafka import Producer
 from loguru import logger
+
+# Optional Kafka support
+try:
+    from confluent_kafka import Producer
+    KAFKA_AVAILABLE = True
+except ImportError:
+    Producer = None  # type: ignore
+    KAFKA_AVAILABLE = False
 
 from .types import Event, EventType
 

@@ -13,7 +13,7 @@ import json
 
 from shared.database.models import Appointment, Patient, Practitioner, Location, PractitionerSchedule
 from shared.events.publisher import publish_event
-from shared.events.schemas import EventType
+from shared.events import EventType
 
 from core.twilio_client import twilio_client
 from modules.conversations.state_service import ConversationStateService
