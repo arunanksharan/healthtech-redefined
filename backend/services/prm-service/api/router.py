@@ -19,6 +19,7 @@ from modules.n8n_integration.router import router as n8n_router
 from modules.media.router import router as media_router
 from modules.patients.router import router as patients_router
 from modules.notifications.router import router as notifications_router
+from modules.practitioners.router import router as practitioners_router
 
 # Phase 4 Modules (Final Features)
 from modules.vector.router import router as vector_router
@@ -95,6 +96,7 @@ api_router.include_router(n8n_router)
 api_router.include_router(media_router)
 api_router.include_router(patients_router)
 api_router.include_router(notifications_router)
+api_router.include_router(practitioners_router)
 
 # ==================== Phase 4 Modules ====================
 api_router.include_router(vector_router)
