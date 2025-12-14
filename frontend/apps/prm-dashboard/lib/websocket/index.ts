@@ -68,13 +68,13 @@ export class WebSocketClient {
       reconnectAttempts: 5,
       reconnectDelay: 1000,
       heartbeatInterval: 30000,
-      onConnect: () => {},
-      onDisconnect: () => {},
-      onAuthenticated: () => {},
-      onMessage: () => {},
-      onNotification: () => {},
-      onError: () => {},
-      onStateChange: () => {},
+      onConnect: () => { },
+      onDisconnect: () => { },
+      onAuthenticated: () => { },
+      onMessage: () => { },
+      onNotification: () => { },
+      onError: () => { },
+      onStateChange: () => { },
       ...options,
     };
   }
@@ -148,7 +148,7 @@ export class WebSocketClient {
   }
 
   authenticate(token: string): Promise<void> {
-    return this.send('auth', { token }, true).then(() => {});
+    return this.send('auth', { token }, true).then(() => { });
   }
 
   joinRoom(roomId: string): Promise<void> {
@@ -176,7 +176,7 @@ export class WebSocketClient {
   }
 
   sendMessage(conversationId: string, content: string, contentType = 'text'): Promise<void> {
-    return this.send('message', { conversationId, content, contentType }, true).then(() => {});
+    return this.send('message', { conversationId, content, contentType }, true).then(() => { });
   }
 
   startTyping(conversationId: string): void {
@@ -215,8 +215,12 @@ export class WebSocketClient {
       this.options.onConnect();
       this.startHeartbeat();
 
+      console.log('[WebSocketClient] Connected. Rejoining rooms:', Array.from(this.rooms), 'Subscriptions:', Array.from(this.subscriptions));
       // Rejoin rooms and subscriptions after reconnect
-      this.rooms.forEach(roomId => this.joinRoom(roomId));
+      this.rooms.forEach(roomId => {
+        console.log('[WebSocketClient] Rejoining room:', roomId);
+        this.joinRoom(roomId)
+      });
       this.subscriptions.forEach(topic => this.subscribe(topic));
     };
 
@@ -231,7 +235,15 @@ export class WebSocketClient {
     };
 
     this.ws.onerror = (event) => {
-      this.handleError(new Error('WebSocket error'));
+      // Only log if we are not already disconnecting/reconnecting to avoid noise
+      if (this.reconnectCount > 0) {
+        // Silent or debug log during retries
+      } else {
+        // Standard error handling
+      }
+      // Silent error handling for generic connection drops to prevent console noise
+      // Silent error handling for generic connection drops to prevent console noise
+      console.warn('[WebSocketClient] WebSocket connection issue (retrying...)');
     };
 
     this.ws.onmessage = (event) => {

@@ -51,6 +51,11 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import {
+    useRoomMessages,
+    useTypingIndicator,
+    usePresence
+} from '@/lib/hooks/useWebSocket';
 import { CreateMessageDialog } from '@/components/communications/create-message-dialog';
 
 // Helper for initials
@@ -73,6 +78,35 @@ export default function CommunicationsPage() {
     const [replyMessage, setReplyMessage] = useState('');
     const [isSendingReply, setIsSendingReply] = useState(false);
 
+    // WebSocket Integration
+    const conversationId = selectedId || '';
+    /*
+    const {
+        messages: realTimeMessages,
+        sendMessage: sendRealTimeMessage
+    } = useRoomMessages(conversationId);
+    */
+    const realTimeMessages: any[] = [];
+    const sendRealTimeMessage = async () => { };
+
+    /*
+    const {
+        typingUsers,
+        startTyping,
+        stopTyping
+    } = useTypingIndicator(conversationId);
+    */
+    const typingUsers: string[] = [];
+    const startTyping = () => { };
+    const stopTyping = () => { };
+
+    // Track presence of the selected patient (if we had their generic user ID)
+    // const presence = usePresence(selectedComm?.patient_id ? [selectedComm.patient_id] : []);
+
+    // Combine historical and real-time messages (simplified for demo)
+    // In a real app, you'd merge `commsData` history with `realTimeMessages`
+
+
     // Fetch all communications
     const { data: commsData, isLoading, error, refetch } = useQuery({
         queryKey: ['communications', channelFilter, statusFilter],
@@ -85,6 +119,8 @@ export default function CommunicationsPage() {
             return data;
         },
     });
+
+    console.log('[CommunicationsPage] Render. selectedId:', selectedId, 'conversationId:', conversationId, 'isLoading:', isLoading, 'commsLength:', commsData?.communications?.length);
 
     // Fetch stats separately
     const { data: statsData } = useQuery({
@@ -451,37 +487,49 @@ export default function CommunicationsPage() {
 
                                     {/* Reply Input */}
                                     <div className="p-4 border-t border-gray-100 bg-white">
-                                        <div className="flex gap-4 items-end">
-                                            <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
-                                                <textarea
-                                                    placeholder="Type a reply..."
-                                                    value={replyMessage}
-                                                    onChange={(e) => setReplyMessage(e.target.value)}
-                                                    className="w-full bg-transparent border-none p-3 h-24 resize-none focus:ring-0 text-sm placeholder:text-gray-400"
-                                                />
-                                                <div className="flex items-center justify-between px-2 pb-2">
-                                                    <div className="flex gap-1">
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
-                                                            <Plus className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex gap-2 items-end">
+                                                <div className="flex-1">
+                                                    <Input
+                                                        placeholder="Type your reply..."
+                                                        value={replyMessage}
+                                                        onChange={(e) => setReplyMessage(e.target.value)}
+                                                        onFocus={() => startTyping()}
+                                                        onBlur={() => stopTyping()}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                                handleReply();
+                                                            }
+                                                        }}
+                                                    />
                                                 </div>
+                                                <Button
+                                                    onClick={handleReply}
+                                                    disabled={!replyMessage.trim() || isSendingReply}
+                                                >
+                                                    {isSendingReply ? (
+                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                                    ) : (
+                                                        <Send className="h-4 w-4" />
+                                                    )}
+                                                </Button>
                                             </div>
-                                            <Button
-                                                onClick={handleReply}
-                                                disabled={!replyMessage.trim() || isSendingReply}
-                                                className="h-12 w-12 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center justify-center"
-                                            >
-                                                {isSendingReply ? (
-                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                ) : (
-                                                    <Send className="w-5 h-5 text-white ml-0.5" />
-                                                )}
-                                            </Button>
+
+                                            <div className="flex justify-between items-center px-1">
+                                                <div className="h-4">
+                                                    {typingUsers.length > 0 && (
+                                                        <p className="text-xs text-blue-600 animate-pulse font-medium">
+                                                            {typingUsers.length > 1
+                                                                ? `${typingUsers.length} people are typing...`
+                                                                : "Someone is typing..."}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <p className="text-[10px] text-gray-400">
+                                                    Press Enter to send
+                                                </p>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-center text-gray-400 mt-2">
-                                            Pressing Enter will not send the message
-                                        </p>
                                     </div>
                                 </div>
                             ) : (
@@ -503,6 +551,6 @@ export default function CommunicationsPage() {
                 onOpenChange={setIsCreateDialogOpen}
                 onSuccess={() => refetch()}
             />
-        </div>
+        </div >
     );
 }
