@@ -2,8 +2,16 @@
 Twilio client for WhatsApp messaging
 """
 from typing import Optional
-from twilio.rest import Client
 from loguru import logger
+
+# Optional Twilio support
+try:
+    from twilio.rest import Client
+    TWILIO_AVAILABLE = True
+except ImportError:
+    Client = None  # type: ignore
+    TWILIO_AVAILABLE = False
+    logger.warning("twilio package not installed, WhatsApp messaging disabled")
 
 from .config import settings
 
@@ -18,6 +26,10 @@ class TwilioClientWrapper:
 
     def _initialize(self):
         """Initialize Twilio client"""
+        if not TWILIO_AVAILABLE:
+            logger.warning("Twilio library not available")
+            return
+
         if settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN:
             try:
                 self.client = Client(

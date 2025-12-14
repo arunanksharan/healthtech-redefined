@@ -17,8 +17,18 @@ from typing import Dict, List, Optional, Any
 from enum import Enum
 import logging
 
-from confluent_kafka.admin import AdminClient, NewTopic, ConfigResource, ResourceType
-from confluent_kafka import KafkaException
+# Optional Kafka support
+try:
+    from confluent_kafka.admin import AdminClient, NewTopic, ConfigResource, ResourceType
+    from confluent_kafka import KafkaException
+    KAFKA_AVAILABLE = True
+except ImportError:
+    AdminClient = None  # type: ignore
+    NewTopic = None  # type: ignore
+    ConfigResource = None  # type: ignore
+    ResourceType = None  # type: ignore
+    KafkaException = Exception  # type: ignore
+    KAFKA_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 

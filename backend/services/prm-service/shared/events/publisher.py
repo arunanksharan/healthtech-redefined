@@ -4,11 +4,19 @@ Event publisher using Kafka with database fallback
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 from uuid import UUID
 
-from confluent_kafka import Producer
 from loguru import logger
+
+# Optional Kafka support - graceful fallback if not installed
+try:
+    from confluent_kafka import Producer
+    KAFKA_AVAILABLE = True
+except ImportError:
+    Producer = None  # type: ignore
+    KAFKA_AVAILABLE = False
+    logger.warning("confluent_kafka not installed, Kafka publishing disabled")
 
 from .types import Event, EventType
 
@@ -35,6 +43,10 @@ class EventPublisher:
         """Initialize Kafka producer"""
         if not self.enabled:
             logger.info("Kafka publishing disabled, using database fallback only")
+            return
+
+        if not KAFKA_AVAILABLE:
+            logger.warning("Kafka library not available, using database fallback only")
             return
 
         try:
