@@ -99,7 +99,7 @@ export default function InboxPage() {
     return (
         // FIX 1: Main container set to fixed height with flex-col. 
         // Uses h-[calc(100vh-6rem)] to account for navbar/margins.
-        <div className="flex flex-col h-[calc(100vh-6rem)] overflow-hidden border border-gray-200 rounded-xl shadow-sm bg-white">
+        <div className="flex flex-col h-[calc(100vh-6rem)] overflow-hidden border border-border rounded-xl shadow-sm bg-background">
 
             <ResizablePanelGroup direction="horizontal" className="h-full">
 
@@ -108,15 +108,15 @@ export default function InboxPage() {
                     defaultSize={40}
                     minSize={30}
                     maxSize={50}
-                    className="bg-white border-r border-gray-200 flex flex-col h-full"
+                    className="bg-background border-r border-border flex flex-col h-full"
                 >
                     {/* FIX 2: Sticky Header. 
               Removed 'sticky' class. Because this is a flex column, this div will naturally stay at the top.
               'shrink-0' ensures it doesn't get squashed. */}
-                    <div className="p-4 border-b border-gray-200 bg-white shrink-0 z-10">
+                    <div className="p-4 border-b border-border bg-background shrink-0 z-10">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
-                                <h1 className="text-xl font-bold text-gray-900">Inbox</h1>
+                                <h1 className="text-xl font-bold text-foreground">Inbox</h1>
                                 {unreadCount > 0 && (
                                     <Badge variant="default" className="bg-blue-600 hover:bg-blue-700">
                                         {unreadCount} unread
@@ -137,13 +137,13 @@ export default function InboxPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                                     <RefreshCw className="h-4 w-4" />
                                 </Button>
                                 <Button
                                     variant={isMultiSelectMode ? "secondary" : "ghost"}
                                     size="icon"
-                                    className={cn("h-8 w-8", isMultiSelectMode ? "text-blue-600 bg-blue-50" : "text-gray-500")}
+                                    className={cn("h-8 w-8", isMultiSelectMode ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20" : "text-muted-foreground")}
                                     onClick={toggleMultiSelect}
                                 >
                                     <CheckSquare className="h-4 w-4" />
@@ -151,7 +151,7 @@ export default function InboxPage() {
                                 <Button
                                     variant={isFilterPanelOpen ? "secondary" : "ghost"}
                                     size="icon"
-                                    className={cn("h-8 w-8", isFilterPanelOpen ? "text-blue-600 bg-blue-50" : "text-gray-500")}
+                                    className={cn("h-8 w-8", isFilterPanelOpen ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20" : "text-muted-foreground")}
                                     onClick={toggleFilterPanel}
                                 >
                                     <Filter className="h-4 w-4" />
@@ -167,13 +167,13 @@ export default function InboxPage() {
 
                         {/* Multi-select toolbar */}
                         {isMultiSelectMode && selectedIds.size > 0 && (
-                            <div className="flex items-center justify-between mt-3 p-2 bg-blue-50/50 rounded-lg border border-blue-100">
-                                <span className="text-sm font-medium text-blue-900">{selectedIds.size} selected</span>
+                            <div className="flex items-center justify-between mt-3 p-2 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">{selectedIds.size} selected</span>
                                 <div className="flex items-center gap-1">
-                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAction("mark_read")} className="h-7 text-blue-700 hover:bg-blue-100/50">Read</Button>
-                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAction("mark_resolved")} className="h-7 text-blue-700 hover:bg-blue-100/50">Resolve</Button>
-                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAction("archive")} className="h-7 text-blue-700 hover:bg-blue-100/50">Archive</Button>
-                                    <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-gray-500 hover:bg-gray-100">Cancel</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAction("mark_read")} className="h-7 text-blue-700 dark:text-blue-300 hover:bg-blue-100/50 dark:hover:bg-blue-800/50">Read</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAction("mark_resolved")} className="h-7 text-blue-700 dark:text-blue-300 hover:bg-blue-100/50 dark:hover:bg-blue-800/50">Resolve</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAction("archive")} className="h-7 text-blue-700 dark:text-blue-300 hover:bg-blue-100/50 dark:hover:bg-blue-800/50">Archive</Button>
+                                    <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-muted-foreground hover:bg-muted">Cancel</Button>
                                 </div>
                             </div>
                         )}
@@ -190,14 +190,14 @@ export default function InboxPage() {
                                 ))
                             ) : filteredItems.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                                        <InboxIcon className="h-8 w-8 text-gray-300" />
+                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                                        <InboxIcon className="h-8 w-8 text-muted-foreground/50" />
                                     </div>
-                                    <h3 className="text-lg font-medium text-gray-900 mb-1">All caught up!</h3>
-                                    <p className="text-sm text-gray-500 mb-4 max-w-xs mx-auto">
+                                    <h3 className="text-lg font-medium text-foreground mb-1">All caught up!</h3>
+                                    <p className="text-sm text-muted-foreground mb-4 max-w-xs mx-auto">
                                         No items match your current filters. Check back later for new messages.
                                     </p>
-                                    <Button variant="outline" onClick={resetFilters} className="border-gray-200 text-gray-600">
+                                    <Button variant="outline" onClick={resetFilters} className="border-border text-muted-foreground">
                                         Clear Filters
                                     </Button>
                                 </div>
@@ -237,12 +237,12 @@ export default function InboxPage() {
                             />
                         </ScrollArea>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center bg-gray-50/50 text-center p-8">
-                            <div className="w-24 h-24 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mb-6">
-                                <InboxIcon className="h-10 w-10 text-gray-300" />
+                        <div className="h-full flex flex-col items-center justify-center bg-muted/30 text-center p-8">
+                            <div className="w-24 h-24 bg-background rounded-2xl shadow-sm border border-border flex items-center justify-center mb-6">
+                                <InboxIcon className="h-10 w-10 text-muted-foreground/50" />
                             </div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-2">Select a conversation</h2>
-                            <p className="text-gray-500 max-w-sm">
+                            <h2 className="text-xl font-semibold text-foreground mb-2">Select a conversation</h2>
+                            <p className="text-muted-foreground max-w-sm">
                                 Choose an item from the list to view details, patient context, and suggested actions.
                             </p>
                         </div>

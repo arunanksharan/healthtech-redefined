@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { Bot, Calendar, MessageSquare, Shield } from "lucide-react";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { cn } from "@/lib/utils";
@@ -8,8 +9,37 @@ import { WordRotate } from "@/components/ui/word-rotate";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import { MagicCard } from "@/components/ui/magic-card";
+import {
+  AITypingAnimation,
+  CalendarAnimation,
+  ChatBubblesAnimation,
+  SecurityAnimation
+} from "@/components/ui/bento-animations";
 
 export default function HomePage() {
+  const previousTheme = useRef<string | null>(null);
+
+  // Force light mode on homepage
+  useEffect(() => {
+    const root = window.document.documentElement;
+
+    // Save current theme
+    previousTheme.current = root.classList.contains("dark") ? "dark" : "light";
+
+    // Force light mode
+    root.classList.remove("dark");
+    root.classList.add("light");
+
+    // Restore previous theme when leaving
+    return () => {
+      const savedTheme = localStorage.getItem("prm-ui-theme");
+      if (savedTheme === "dark") {
+        root.classList.remove("light");
+        root.classList.add("dark");
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white text-gray-900 overflow-hidden relative selection:bg-blue-100">
       <DotPattern
@@ -29,7 +59,7 @@ export default function HomePage() {
       <div className="absolute -bottom-8 left-20 w-72 h-72 bg-teal-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
 
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-32 relative z-10">
+      <div className="container mx-auto px-4 py-16 md:py-32 relative z-10">
         <div className="text-center max-w-5xl mx-auto space-y-8">
           <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 px-4 py-2 rounded-full text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-default">
             <span className="relative flex h-2 w-2">
@@ -76,7 +106,7 @@ export default function HomePage() {
             <BentoCard
               name="AI-First Interface"
               description="Talk to specialized agents using natural language. No clicking through menus."
-              background={<div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-indigo-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
+              background={<AITypingAnimation />}
               Icon={Bot}
               className="md:col-span-2 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard"
@@ -85,7 +115,7 @@ export default function HomePage() {
             <BentoCard
               name="Smart Scheduling"
               description="Book appointments, reschedule, and send reminders with a single command."
-              background={<div className="absolute inset-0 bg-gradient-to-br from-purple-100 to-pink-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
+              background={<CalendarAnimation />}
               Icon={Calendar}
               className="md:col-span-1 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard/appointments"
@@ -94,7 +124,7 @@ export default function HomePage() {
             <BentoCard
               name="Unified Comms"
               description="WhatsApp, SMS, Email - all managed through one AI assistant."
-              background={<div className="absolute inset-0 bg-gradient-to-br from-green-100 to-emerald-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
+              background={<ChatBubblesAnimation />}
               Icon={MessageSquare}
               className="md:col-span-1 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard/communications"
@@ -103,7 +133,7 @@ export default function HomePage() {
             <BentoCard
               name="Secure & Compliant"
               description="Enterprise-grade security with HIPAA compliance built-in."
-              background={<div className="absolute inset-0 bg-gradient-to-br from-red-100 to-orange-100/50 opacity-100 transition-opacity group-hover:opacity-60" />}
+              background={<SecurityAnimation />}
               Icon={Shield}
               className="md:col-span-2 bg-white border border-gray-200 shadow-md hover:shadow-xl transition-all"
               href="/dashboard/settings"
@@ -113,8 +143,8 @@ export default function HomePage() {
         </div>
 
         {/* Live Stats */}
-        <div className="mt-32 max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[200px]">
+        <div className="mt-16 md:mt-32 max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:h-[200px]">
             <MagicCard
               className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 shadow-md"
               gradientColor="#D1D5DB" // gray-300 for visible border gradient

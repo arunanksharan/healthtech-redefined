@@ -388,23 +388,23 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {communications.slice(0, 5).map((comm) => (
-              <div
-                key={comm.id}
-                className="flex items-start gap-3 py-3 border-b border-border/50 last:border-0"
-              >
+              <div key={comm.id} className="flex items-start gap-3 py-3 border-b border-border/50 last:border-0">
                 <div className="w-2 h-2 mt-2 rounded-full bg-blue-600" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-foreground truncate">
                     {comm.channel === 'email' && comm.subject ? comm.subject : comm.message?.substring(0, 50) || 'No message'}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs bg-muted/50 text-foreground border-border">
                       {comm.channel}
                     </Badge>
                     <span className="text-xs text-muted-foreground">{formatSmartDate(comm.sent_at || comm.created_at)}</span>
                   </div>
                 </div>
-                <Badge variant={comm.status === 'delivered' ? 'success' : comm.status === 'failed' ? 'destructive' : 'default'}>
+                <Badge
+                  variant={comm.status === 'delivered' ? 'success' : comm.status === 'failed' ? 'destructive' : 'secondary'}
+                  className={comm.status === 'delivered' ? '' : comm.status === 'failed' ? '' : 'bg-muted text-foreground'}
+                >
                   {comm.status}
                 </Badge>
               </div>

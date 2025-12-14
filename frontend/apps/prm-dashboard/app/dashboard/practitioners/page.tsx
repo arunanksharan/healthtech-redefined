@@ -184,70 +184,70 @@ export default function PractitionersPage() {
             <div className="p-6 space-y-6">
                 {/* Magic Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#eff6ff">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">Total Practitioners</CardTitle>
-                            <Users className="w-4 h-4 text-blue-600" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Practitioners</CardTitle>
+                            <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{totalCount}</div>
-                            <p className="text-xs text-gray-500 mt-1">Healthcare providers</p>
+                            <div className="text-2xl font-bold text-foreground">{totalCount}</div>
+                            <p className="text-xs text-muted-foreground mt-1">Healthcare providers</p>
                         </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#f0fdf4">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">Active</CardTitle>
-                            <Activity className="w-4 h-4 text-green-600" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+                            <Activity className="w-4 h-4 text-green-600 dark:text-green-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{activeCount}</div>
-                            <p className="text-xs text-green-600 mt-1 font-medium">
+                            <div className="text-2xl font-bold text-foreground">{activeCount}</div>
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
                                 {totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0}% of total
                             </p>
                         </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#fef2f2">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--destructive) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">Inactive</CardTitle>
-                            <TrendingUp className="w-4 h-4 text-red-500" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
+                            <TrendingUp className="w-4 h-4 text-red-500 dark:text-red-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{inactiveCount}</div>
-                            <p className="text-xs text-gray-500 mt-1">Not currently active</p>
+                            <div className="text-2xl font-bold text-foreground">{inactiveCount}</div>
+                            <p className="text-xs text-muted-foreground mt-1">Not currently active</p>
                         </CardContent>
                     </MagicCard>
 
-                    <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#faf5ff">
+                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--channel-voice) / 0.15)">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-gray-500">Specialities</CardTitle>
-                            <Stethoscope className="w-4 h-4 text-purple-600" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Specialities</CardTitle>
+                            <Stethoscope className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">{uniqueSpecialities}</div>
-                            <p className="text-xs text-purple-600 mt-1 font-medium">Different specialties</p>
+                            <div className="text-2xl font-bold text-foreground">{uniqueSpecialities}</div>
+                            <p className="text-xs text-purple-600 dark:text-purple-400 mt-1 font-medium">Different specialties</p>
                         </CardContent>
                     </MagicCard>
                 </div>
 
                 {/* Search & Filters Bar */}
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                             placeholder="Search by name or speciality..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                            className="pl-10 border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+                            className="pl-10 border-border focus:border-blue-300 dark:focus:border-blue-600 focus:ring-blue-100 dark:focus:ring-blue-900/30 bg-muted/50"
                         />
                     </div>
                     <div className="flex items-center gap-3">
                         <select
                             value={specialityFilter}
                             onChange={(e) => setSpecialityFilter(e.target.value)}
-                            className="h-10 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-gray-50/50"
+                            className="h-10 px-4 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 bg-muted/50"
                         >
                             <option value="all">All Specialities</option>
                             {specialities?.map((spec) => (
@@ -256,91 +256,91 @@ export default function PractitionersPage() {
                                 </option>
                             ))}
                         </select>
-                        <Button onClick={handleSearch} variant="outline" className="h-10 border-gray-200 hover:bg-gray-50 text-gray-700">
+                        <Button onClick={handleSearch} variant="outline" className="h-10 border-border hover:bg-accent text-muted-foreground">
                             Search
                         </Button>
                     </div>
                 </div>
 
                 {/* Practitioners Table */}
-                <Card className="border-gray-200 shadow-sm overflow-hidden">
+                <Card className="border-border shadow-sm overflow-hidden">
                     <CardContent className="p-0">
                         {isLoading ? (
                             <div className="flex flex-col items-center justify-center py-20">
                                 <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-                                <p className="text-gray-500 text-sm">Loading practitioners...</p>
+                                <p className="text-muted-foreground text-sm">Loading practitioners...</p>
                             </div>
                         ) : error ? (
-                            <div className="text-center py-12 text-red-600 bg-red-50">
+                            <div className="text-center py-12 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20">
                                 Error loading practitioners: {(error as Error).message}
                             </div>
                         ) : practitioners.length === 0 ? (
-                            <div className="text-center py-20 text-gray-500">
-                                <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Stethoscope className="w-8 h-8 text-gray-400" />
+                            <div className="text-center py-20 text-muted-foreground">
+                                <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Stethoscope className="w-8 h-8 text-muted-foreground/50" />
                                 </div>
-                                <p className="text-lg font-medium text-gray-900">No practitioners found</p>
+                                <p className="text-lg font-medium text-foreground">No practitioners found</p>
                                 <p className="text-sm mt-1">Try adjusting your search or add a new practitioner.</p>
                             </div>
                         ) : (
                             <Table>
-                                <TableHeader className="bg-gray-50/50">
+                                <TableHeader className="bg-muted/50">
                                     <TableRow className="hover:bg-transparent">
-                                        <TableHead className="font-semibold text-gray-600">Practitioner</TableHead>
-                                        <TableHead className="font-semibold text-gray-600">Speciality</TableHead>
-                                        <TableHead className="font-semibold text-gray-600">License</TableHead>
-                                        <TableHead className="font-semibold text-gray-600">Contact</TableHead>
-                                        <TableHead className="font-semibold text-gray-600">Status</TableHead>
-                                        <TableHead className="text-right font-semibold text-gray-600">Actions</TableHead>
+                                        <TableHead className="font-semibold text-muted-foreground">Practitioner</TableHead>
+                                        <TableHead className="font-semibold text-muted-foreground">Speciality</TableHead>
+                                        <TableHead className="font-semibold text-muted-foreground">License</TableHead>
+                                        <TableHead className="font-semibold text-muted-foreground">Contact</TableHead>
+                                        <TableHead className="font-semibold text-muted-foreground">Status</TableHead>
+                                        <TableHead className="text-right font-semibold text-muted-foreground">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {practitioners.map((practitioner) => (
-                                        <TableRow key={practitioner.id} className="hover:bg-blue-50/30 transition-colors group">
+                                        <TableRow key={practitioner.id} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors group">
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
-                                                    <Avatar className="h-9 w-9 border border-gray-100">
-                                                        <AvatarFallback className="bg-blue-50 text-blue-600 text-xs font-bold">
+                                                    <Avatar className="h-9 w-9 border border-border">
+                                                        <AvatarFallback className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold">
                                                             {practitioner.first_name?.[0]}
                                                             {practitioner.last_name?.[0]}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>
-                                                        <div className="font-medium text-gray-900">
+                                                        <div className="font-medium text-foreground">
                                                             Dr. {practitioner.first_name} {practitioner.last_name}
                                                         </div>
-                                                        <div className="text-xs text-gray-500">
+                                                        <div className="text-xs text-muted-foreground">
                                                             {practitioner.qualification || 'No qualification'}
                                                         </div>
                                                     </div>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 font-medium">
+                                                <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 font-medium">
                                                     {practitioner.speciality || 'General'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <span className="text-sm text-gray-600">
+                                                <span className="text-sm text-muted-foreground">
                                                     {practitioner.license_number || '—'}
                                                 </span>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="space-y-1">
                                                     {practitioner.phone_primary && (
-                                                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                                                            <Phone className="w-3.5 h-3.5 text-gray-400" />
+                                                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                                            <Phone className="w-3.5 h-3.5 text-muted-foreground/60" />
                                                             {practitioner.phone_primary}
                                                         </div>
                                                     )}
                                                     {practitioner.email_primary && (
-                                                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                                                            <Mail className="w-3.5 h-3.5 text-gray-400" />
+                                                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                                            <Mail className="w-3.5 h-3.5 text-muted-foreground/60" />
                                                             {practitioner.email_primary}
                                                         </div>
                                                     )}
                                                     {!practitioner.phone_primary && !practitioner.email_primary && (
-                                                        <span className="text-gray-400">—</span>
+                                                        <span className="text-muted-foreground/50">—</span>
                                                     )}
                                                 </div>
                                             </TableCell>
@@ -349,8 +349,8 @@ export default function PractitionersPage() {
                                                     variant="outline"
                                                     className={
                                                         practitioner.is_active
-                                                            ? 'bg-green-50 text-green-700 border-green-200'
-                                                            : 'bg-gray-100 text-gray-600 border-gray-200'
+                                                            ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
+                                                            : 'bg-muted text-muted-foreground border-border'
                                                     }
                                                 >
                                                     {practitioner.is_active ? 'Active' : 'Inactive'}
