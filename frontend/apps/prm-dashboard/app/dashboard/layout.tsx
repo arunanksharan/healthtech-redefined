@@ -5,6 +5,8 @@ import { AppShell } from "@/components/layout";
 import { AIChat } from "@/components/ai";
 import { CommandBar } from "@/components/copilot";
 import { useCopilotStore } from "@/lib/store/copilot-store";
+import { WebSocketProvider } from "@/components/providers/websocket-provider";
+
 
 export default function DashboardLayout({
   children,
@@ -63,25 +65,27 @@ export default function DashboardLayout({
 
   return (
     <>
-      <AppShell
-        onCommandBarOpen={handleCommandBarOpen}
-        contextPanelOpen={aiPanelOpen}
-        contextPanelOverlay={true}
-        contextPanelWidth="2xl"
-        contextPanelTitle="AI Assistant"
-        contextPanelSubtitle="Ask me anything"
-        onContextPanelClose={() => handleAiPanelToggle(false)}
-        contextPanelContent={
-          <AIChat
-            userId={userId}
-            orgId={orgId}
-            sessionId={sessionId}
-            permissions={permissions}
-          />
-        }
-      >
-        {children}
-      </AppShell>
+      <WebSocketProvider>
+        <AppShell
+          onCommandBarOpen={handleCommandBarOpen}
+          contextPanelOpen={aiPanelOpen}
+          contextPanelOverlay={true}
+          contextPanelWidth="2xl"
+          contextPanelTitle="AI Assistant"
+          contextPanelSubtitle="Ask me anything"
+          onContextPanelClose={() => setAiPanelOpen(false)}
+          contextPanelContent={
+            <AIChat
+              userId={userId}
+              orgId={orgId}
+              sessionId={sessionId}
+              permissions={permissions}
+            />
+          }
+        >
+          {children}
+        </AppShell>
+      </WebSocketProvider>
 
       {/* Floating AI Trigger Button */}
       {!aiPanelOpen && (
