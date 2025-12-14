@@ -105,19 +105,24 @@ const useBadgeCounts = () => {
 interface SidebarProps {
   className?: string;
   onCollapsedChange?: (collapsed: boolean) => void;
+  forceCollapsed?: boolean;
 }
 
-export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
+export function Sidebar({ className, onCollapsedChange, forceCollapsed }: SidebarProps) {
   const pathname = usePathname();
   const badges = useBadgeCounts();
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
+  // Use forceCollapsed if provided, otherwise use internal state
+  const collapsed = forceCollapsed !== undefined ? forceCollapsed : internalCollapsed;
+
   const toggleCollapsed = useCallback(() => {
-    setCollapsed((prev) => {
+    setInternalCollapsed((prev) => {
       const newValue = !prev;
-      onCollapsedChange?.(newValue);
+      // Schedule the callback for after the state update
+      setTimeout(() => onCollapsedChange?.(newValue), 0);
       return newValue;
     });
   }, [onCollapsedChange]);
@@ -146,13 +151,13 @@ export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "h-full bg-muted/40 border-r border-border flex flex-col transition-all duration-300 ease-in-out backdrop-blur-sm supports-[backdrop-filter]:bg-muted/40 relative",
+        "h-full bg-background border-r border-border flex flex-col transition-all duration-300 ease-in-out relative",
         collapsed ? "w-sidebar-collapsed" : "w-sidebar",
         className
       )}
     >
       {/* Logo */}
-      <div className="h-topbar flex items-center px-4 border-b border-border bg-background/50 backdrop-blur-sm">
+      <div className="h-topbar flex items-center px-4 border-b border-border bg-background">
         <Link href="/" target="_self" className="flex items-center gap-3 group">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow transition-all">
             <Hospital className="w-5 h-5 text-white" />
@@ -165,19 +170,6 @@ export function Sidebar({ className, onCollapsedChange }: SidebarProps) {
           )}
         </Link>
       </div>
-
-      {/* Toggle Button - Floating on the separator */}
-      <button
-        onClick={toggleCollapsed}
-        className="absolute -right-3 top-6 z-50 p-1 bg-background border border-border rounded-full shadow-sm text-muted-foreground hover:text-blue-600 hover:border-blue-200 transition-colors"
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? (
-          <ChevronsRight className="w-3 h-3" />
-        ) : (
-          <ChevronsLeft className="w-3 h-3" />
-        )}
-      </button>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 scrollbar-hide">

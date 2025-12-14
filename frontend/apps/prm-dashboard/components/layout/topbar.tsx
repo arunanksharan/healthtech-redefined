@@ -147,12 +147,12 @@ export function TopBar({
     >
       {/* Left Section - Menu button and Breadcrumbs */}
       <div className="flex items-center gap-4">
-        {/* Mobile Menu Button */}
+        {/* Menu Button - Toggle Sidebar */}
         {showMenuButton && (
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-md hover:bg-accent transition-colors"
-            aria-label="Open menu"
+            className="p-2 rounded-md hover:bg-accent transition-colors"
+            aria-label="Toggle sidebar"
           >
             <Menu className="w-5 h-5 text-muted-foreground" />
           </button>

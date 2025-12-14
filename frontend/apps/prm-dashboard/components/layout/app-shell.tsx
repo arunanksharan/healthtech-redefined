@@ -60,10 +60,25 @@ export function AppShell({
   onCommandBarOpen,
 }: AppShellProps) {
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useSidebarState();
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Track if we're on desktop
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+    return () => window.removeEventListener("resize", checkDesktop);
+  }, []);
 
   const handleMenuClick = useCallback(() => {
-    setMobileOpen((prev) => !prev);
-  }, [setMobileOpen]);
+    if (isDesktop) {
+      // On desktop, toggle collapsed state
+      setCollapsed((prev) => !prev);
+    } else {
+      // On mobile, toggle overlay sidebar
+      setMobileOpen((prev) => !prev);
+    }
+  }, [isDesktop, setCollapsed, setMobileOpen]);
 
   const handleCloseMobileMenu = useCallback(() => {
     setMobileOpen(false);
@@ -71,30 +86,36 @@ export function AppShell({
 
   return (
     <div className={cn("min-h-screen bg-background", className)}>
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Always visible on lg+ */}
       <div className="hidden lg:block fixed inset-y-0 left-0 z-40">
-        <Sidebar onCollapsedChange={setCollapsed} />
+        <Sidebar forceCollapsed={collapsed} onCollapsedChange={setCollapsed} />
       </div>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile/Tablet Sidebar - Collapsed by default, expanded when mobileOpen */}
+      <div className="lg:hidden fixed inset-y-0 left-0 z-40">
+        <Sidebar
+          onCollapsedChange={setCollapsed}
+          forceCollapsed={!mobileOpen}
+        />
+      </div>
+
+      {/* Mobile Overlay - Only shown when sidebar is expanded */}
       {mobileOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-            onClick={handleCloseMobileMenu}
-          />
-          <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
-            <Sidebar onCollapsedChange={setCollapsed} />
-          </div>
-        </>
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={handleCloseMobileMenu}
+        />
       )}
 
       {/* Main Content Area */}
       <div
         className={cn(
           "flex flex-col min-h-screen transition-all duration-200",
+          // Desktop: adjust for sidebar state
           "lg:pl-sidebar",
-          collapsed && "lg:pl-sidebar-collapsed"
+          collapsed && "lg:pl-sidebar-collapsed",
+          // Mobile: always account for collapsed sidebar width
+          "pl-sidebar-collapsed lg:pl-sidebar"
         )}
       >
         {/* Top Bar */}

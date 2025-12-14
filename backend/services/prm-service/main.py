@@ -82,6 +82,9 @@ app.include_router(websocket_router)
 from modules.patients.router import router as patients_router
 app.include_router(patients_router, prefix="/api/v1/prm", tags=["Patients"])
 
+from modules.practitioners.router import router as practitioners_router
+app.include_router(practitioners_router, prefix="/api/v1/prm", tags=["Practitioners"])
+
 # ==================== Health Check ====================
 
 @app.get("/health", tags=["Health"])
