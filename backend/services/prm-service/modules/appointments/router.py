@@ -625,3 +625,45 @@ async def check_appointment_conflicts(
     }
 
 
+# ==================== Delete Appointment ====================
+
+@router.delete("/{appointment_id}", status_code=204)
+async def delete_appointment(
+    appointment_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an appointment
+
+    Permanently removes an appointment from the system.
+    Use cancel endpoint for soft-delete (keeps record with cancelled status).
+
+    Note: This is a hard delete - use with caution.
+    Consider using cancel endpoint for most use cases.
+    """
+    appointment = db.query(Appointment).filter(
+        Appointment.id == appointment_id
+    ).first()
+
+    if not appointment:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found"
+        )
+
+    # Free up the time slot if applicable
+    if appointment.time_slot_id:
+        time_slot = db.query(TimeSlot).filter(
+            TimeSlot.id == appointment.time_slot_id
+        ).first()
+        if time_slot and time_slot.booked_count > 0:
+            time_slot.booked_count -= 1
+            if time_slot.status == "full":
+                time_slot.status = "available"
+
+    db.delete(appointment)
+    db.commit()
+
+    logger.info(f"Deleted appointment: {appointment_id}")
+
+    return None

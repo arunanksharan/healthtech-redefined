@@ -2,8 +2,9 @@
 Practitioners Router
 API endpoints for practitioner/provider management
 """
+from datetime import datetime
 from typing import Optional, List
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
@@ -13,6 +14,8 @@ from shared.database.connection import get_db
 from shared.database.models import Practitioner
 
 from .schemas import (
+    PractitionerCreate,
+    PractitionerUpdate,
     PractitionerResponse,
     PractitionerSimpleResponse,
     PractitionerListResponse
@@ -171,3 +174,116 @@ async def get_practitioner(
         )
 
     return PractitionerResponse.model_validate(practitioner)
+
+
+# ==================== Create Practitioner ====================
+
+@router.post("", response_model=PractitionerResponse, status_code=status.HTTP_201_CREATED)
+async def create_practitioner(
+    practitioner_data: PractitionerCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new practitioner
+
+    Creates a healthcare provider record with credentials and contact info.
+    """
+    # Create new practitioner
+    practitioner = Practitioner(
+        id=uuid4(),
+        tenant_id=practitioner_data.tenant_id,
+        first_name=practitioner_data.first_name,
+        last_name=practitioner_data.last_name,
+        middle_name=practitioner_data.middle_name,
+        gender=practitioner_data.gender,
+        qualification=practitioner_data.qualification,
+        speciality=practitioner_data.speciality,
+        sub_speciality=practitioner_data.sub_speciality,
+        license_number=practitioner_data.license_number,
+        registration_number=practitioner_data.registration_number,
+        phone_primary=practitioner_data.phone_primary,
+        email_primary=practitioner_data.email_primary,
+        is_active=practitioner_data.is_active,
+        meta_data=practitioner_data.meta_data,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+    db.add(practitioner)
+    db.commit()
+    db.refresh(practitioner)
+
+    logger.info(f"Created practitioner: {practitioner.id} - {practitioner.first_name} {practitioner.last_name}")
+
+    return PractitionerResponse.model_validate(practitioner)
+
+
+# ==================== Update Practitioner ====================
+
+@router.patch("/{practitioner_id}", response_model=PractitionerResponse)
+async def update_practitioner(
+    practitioner_id: UUID,
+    update_data: PractitionerUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update a practitioner
+
+    Partial update - only provided fields will be modified.
+    """
+    practitioner = db.query(Practitioner).filter(
+        Practitioner.id == practitioner_id
+    ).first()
+
+    if not practitioner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Practitioner not found"
+        )
+
+    # Update only provided fields
+    update_dict = update_data.model_dump(exclude_unset=True, exclude_none=True)
+
+    for field, value in update_dict.items():
+        if hasattr(practitioner, field):
+            setattr(practitioner, field, value)
+
+    practitioner.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(practitioner)
+
+    logger.info(f"Updated practitioner: {practitioner_id}")
+
+    return PractitionerResponse.model_validate(practitioner)
+
+
+# ==================== Delete Practitioner ====================
+
+@router.delete("/{practitioner_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_practitioner(
+    practitioner_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a practitioner
+
+    Permanently removes a practitioner from the system.
+    Consider setting is_active=false for soft delete instead.
+    """
+    practitioner = db.query(Practitioner).filter(
+        Practitioner.id == practitioner_id
+    ).first()
+
+    if not practitioner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Practitioner not found"
+        )
+
+    db.delete(practitioner)
+    db.commit()
+
+    logger.info(f"Deleted practitioner: {practitioner_id}")
+
+    return None

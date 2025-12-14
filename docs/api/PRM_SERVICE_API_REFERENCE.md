@@ -13,13 +13,14 @@
 1. [Overview](#overview)
 2. [Authentication](#authentication)
 3. [Patients API](#patients-api)
-4. [Appointments API](#appointments-api)
-5. [Journeys API](#journeys-api)
-6. [Journey Instances API](#journey-instances-api)
-7. [Communications API](#communications-api)
-8. [Tickets API](#tickets-api)
-9. [Analytics API](#analytics-api)
-10. [Error Handling](#error-handling)
+4. [Practitioners API](#practitioners-api)
+5. [Appointments API](#appointments-api)
+6. [Journeys API](#journeys-api)
+7. [Journey Instances API](#journey-instances-api)
+8. [Communications API](#communications-api)
+9. [Tickets API](#tickets-api)
+10. [Analytics API](#analytics-api)
+11. [Error Handling](#error-handling)
 
 ---
 
@@ -201,6 +202,135 @@ Soft delete - sets patient to inactive status.
 
 ---
 
+## Practitioners API
+
+Base path: `/api/v1/prm/practitioners`
+
+### List Practitioners
+
+```http
+GET /practitioners
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | int | 1 | Page number |
+| `page_size` | int | 20 | Items per page (max 100) |
+| `tenant_id` | UUID | - | Filter by tenant |
+| `speciality` | string | - | Filter by speciality |
+| `is_active` | bool | - | Filter by active status |
+| `search` | string | - | Search by name |
+
+**Response:** `PractitionerListResponse`
+
+### List Practitioners (Simple)
+
+```http
+GET /practitioners/simple
+```
+
+Optimized endpoint for dropdowns - returns minimal data.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tenant_id` | UUID | - | Filter by tenant |
+| `speciality` | string | - | Filter by speciality |
+| `active_only` | bool | true | Only active practitioners |
+
+**Response:** `List[PractitionerSimpleResponse]`
+
+```json
+[
+  {
+    "id": "uuid",
+    "name": "Dr. John Smith",
+    "speciality": "Cardiology",
+    "is_active": true
+  }
+]
+```
+
+### List Specialities
+
+```http
+GET /practitioners/specialities
+```
+
+Returns unique speciality values for filtering.
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `tenant_id` | UUID | Filter by tenant |
+
+**Response:** `List[string]`
+
+### Get Practitioner
+
+```http
+GET /practitioners/{practitioner_id}
+```
+
+**Response:** `PractitionerResponse`
+
+### Create Practitioner
+
+```http
+POST /practitioners
+```
+
+**Request Body:** `PractitionerCreate`
+
+```json
+{
+  "tenant_id": "uuid",
+  "first_name": "John",
+  "last_name": "Smith",
+  "middle_name": "A",
+  "gender": "male",
+  "qualification": "MD, FACC",
+  "speciality": "Cardiology",
+  "sub_speciality": "Interventional Cardiology",
+  "license_number": "MD123456",
+  "registration_number": "REG789",
+  "phone_primary": "+1234567890",
+  "email_primary": "dr.smith@clinic.com",
+  "is_active": true,
+  "meta_data": {}
+}
+```
+
+**Response:** `PractitionerResponse` (201 Created)
+
+### Update Practitioner
+
+```http
+PATCH /practitioners/{practitioner_id}
+```
+
+Partial update - only provided fields are modified.
+
+**Request Body:** `PractitionerUpdate`
+
+**Response:** `PractitionerResponse`
+
+### Delete Practitioner
+
+```http
+DELETE /practitioners/{practitioner_id}
+```
+
+Permanently removes a practitioner. Consider setting `is_active=false` for soft delete.
+
+**Response:** 204 No Content
+
+---
+
 ## Appointments API
 
 Base path: `/api/v1/prm/appointments`
@@ -352,6 +482,51 @@ POST /appointments/{appointment_id}/cancel
 | `notify_patient` | bool | true | Send cancellation notification |
 
 **Response:** `AppointmentResponse`
+
+### Delete Appointment
+
+```http
+DELETE /appointments/{appointment_id}
+```
+
+Permanently removes an appointment. Consider using cancel endpoint for soft delete.
+
+**Response:** 204 No Content
+
+### Check Appointment Conflicts
+
+```http
+GET /appointments/conflicts
+```
+
+Pre-flight check for scheduling conflicts before creating/updating appointments.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `practitioner_id` | UUID | Yes | Practitioner to check |
+| `start_time` | datetime | Yes | Proposed start time |
+| `end_time` | datetime | Yes | Proposed end time |
+| `exclude_appointment_id` | UUID | No | Exclude this appointment (for rescheduling) |
+
+**Response:**
+
+```json
+{
+  "has_conflict": true,
+  "conflict_count": 1,
+  "conflicting_appointments": [
+    {
+      "appointment_id": "uuid",
+      "patient_id": "uuid",
+      "status": "booked",
+      "start_time": "2024-02-01T14:00:00Z",
+      "end_time": "2024-02-01T14:30:00Z"
+    }
+  ]
+}
+```
 
 ### Conversational Booking Endpoints
 
@@ -655,6 +830,85 @@ Common uses:
 **Request Body:** `CommunicationUpdate`
 
 **Response:** `CommunicationResponse`
+
+### Delete Communication
+
+```http
+DELETE /communications/{communication_id}
+```
+
+Permanently removes a communication record.
+
+**Response:** 204 No Content
+
+### Mark Communication as Read
+
+```http
+PATCH /communications/{communication_id}/read
+```
+
+Convenience endpoint to mark a message as read.
+
+**Response:** `CommunicationResponse` with `status="read"` and `read_at` set
+
+### List Communication Templates
+
+```http
+GET /communications/templates
+```
+
+Returns predefined message templates for quick replies and automation.
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `tenant_id` | UUID | Filter by tenant |
+| `channel` | string | Filter by channel (whatsapp, sms, email) |
+| `category` | string | Filter by category (appointment, instructions, billing, etc.) |
+
+**Response:**
+
+```json
+{
+  "templates": [
+    {
+      "id": "apt_reminder",
+      "name": "Appointment Reminder",
+      "channel": "whatsapp",
+      "category": "appointment",
+      "subject": "Appointment Reminder",
+      "body": "Hi {{patient_name}}, this is a reminder for your appointment on {{appointment_date}}...",
+      "variables": ["patient_name", "appointment_date", "appointment_time", "practitioner_name"]
+    }
+  ],
+  "total": 9,
+  "channels": ["whatsapp", "sms", "email"],
+  "categories": ["appointment", "instructions", "follow_up", "results", "pharmacy", "billing", "general"]
+}
+```
+
+### Search Communications
+
+```http
+GET /communications/search
+```
+
+Server-side full-text search across message content.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Search query (min 2 chars) |
+| `patient_id` | UUID | No | Filter by patient |
+| `channel` | string | No | Filter by channel |
+| `date_from` | datetime | No | Filter from date |
+| `date_to` | datetime | No | Filter to date |
+| `page` | int | No | Page number (default 1) |
+| `page_size` | int | No | Items per page (default 20, max 100) |
+
+**Response:** `CommunicationListResponse`
 
 ---
 

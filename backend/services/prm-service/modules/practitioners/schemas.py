@@ -8,6 +8,41 @@ from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 
 
+class PractitionerCreate(BaseModel):
+    """Schema for creating a practitioner"""
+    tenant_id: UUID
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    middle_name: Optional[str] = Field(None, max_length=100)
+    gender: Optional[str] = Field(None, max_length=20)
+    qualification: Optional[str] = Field(None, max_length=200)
+    speciality: Optional[str] = Field(None, max_length=100)
+    sub_speciality: Optional[str] = Field(None, max_length=100)
+    license_number: Optional[str] = Field(None, max_length=50)
+    registration_number: Optional[str] = Field(None, max_length=50)
+    phone_primary: Optional[str] = Field(None, max_length=20)
+    email_primary: Optional[str] = Field(None, max_length=255)
+    is_active: bool = True
+    meta_data: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PractitionerUpdate(BaseModel):
+    """Schema for updating a practitioner"""
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    middle_name: Optional[str] = Field(None, max_length=100)
+    gender: Optional[str] = Field(None, max_length=20)
+    qualification: Optional[str] = Field(None, max_length=200)
+    speciality: Optional[str] = Field(None, max_length=100)
+    sub_speciality: Optional[str] = Field(None, max_length=100)
+    license_number: Optional[str] = Field(None, max_length=50)
+    registration_number: Optional[str] = Field(None, max_length=50)
+    phone_primary: Optional[str] = Field(None, max_length=20)
+    email_primary: Optional[str] = Field(None, max_length=255)
+    is_active: Optional[bool] = None
+    meta_data: Optional[Dict[str, Any]] = None
+
+
 class PractitionerResponse(BaseModel):
     """Practitioner response schema"""
     model_config = ConfigDict(from_attributes=True)

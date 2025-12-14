@@ -383,3 +383,34 @@ async def update_communication(
     logger.info(f"Updated communication: {communication_id}")
 
     return CommunicationResponse.model_validate(communication)
+
+
+# ==================== Delete Communication ====================
+
+@router.delete("/{communication_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_communication(
+    communication_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a communication
+
+    Permanently removes a communication record from the system.
+    Note: For audit purposes, consider archiving instead of deleting.
+    """
+    communication = db.query(Communication).filter(
+        Communication.id == communication_id
+    ).first()
+
+    if not communication:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Communication not found"
+        )
+
+    db.delete(communication)
+    db.commit()
+
+    logger.info(f"Deleted communication: {communication_id}")
+
+    return None
