@@ -78,6 +78,7 @@ export default function AppointmentsPage() {
     appointment_time: '09:00',
     appointment_type: 'consultation',
     reason_text: '',
+    source_channel: 'web',
   });
   const queryClient = useQueryClient();
 
@@ -144,6 +145,7 @@ export default function AppointmentsPage() {
         appointment_time: '09:00',
         appointment_type: 'consultation',
         reason_text: '',
+        source_channel: 'web',
       });
       toast.success('Appointment created successfully!');
     },
@@ -587,6 +589,29 @@ export default function AppointmentsPage() {
                   rows={3}
                   className="rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background resize-none"
                 />
+              </div>
+
+              {/* Booking Source */}
+              <div className="space-y-2">
+                <Label htmlFor="source" className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                  Booking Source
+                </Label>
+                <Select
+                  value={appointmentForm.source_channel}
+                  onValueChange={(value) => setAppointmentForm({ ...appointmentForm, source_channel: value })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-border focus:border-blue-400 focus:ring-blue-400/20 bg-background">
+                    <SelectValue placeholder="Select source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="web">Web Portal</SelectItem>
+                    <SelectItem value="phone">Phone Call</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="voice_agent">Voice Agent</SelectItem>
+                    <SelectItem value="walk_in">Walk-in</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
