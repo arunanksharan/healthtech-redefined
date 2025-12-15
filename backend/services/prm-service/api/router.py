@@ -38,6 +38,15 @@ from modules.auth.router import router as auth_router
 # FHIR Module (Standards-based API)
 from modules.fhir.router import router as fhir_router
 
+# FHIR Resource Modules (Core Clinical Data)
+from modules.organizations.router import router as organizations_router
+from modules.locations.router import router as locations_router
+from modules.encounters.router import router as encounters_router
+from modules.observations.router import router as observations_router
+from modules.conditions.router import router as conditions_router
+from modules.medications.router import router as medications_router
+from modules.diagnostic_reports.router import router as diagnostic_reports_router
+
 # Clinical Workflows Module (EPIC-006)
 from modules.clinical_workflows.router import router as clinical_workflows_router
 
@@ -115,6 +124,17 @@ api_router.include_router(auth_router)
 # ==================== FHIR Module ====================
 # Note: FHIR router has its own /fhir prefix, so it appears at /api/v1/prm/fhir
 api_router.include_router(fhir_router)
+
+# ==================== FHIR Resource Modules ====================
+# Core clinical data: organizations, locations, encounters, observations,
+# conditions, medications, and diagnostic reports
+api_router.include_router(organizations_router)
+api_router.include_router(locations_router)
+api_router.include_router(encounters_router)
+api_router.include_router(observations_router)
+api_router.include_router(conditions_router)
+api_router.include_router(medications_router)
+api_router.include_router(diagnostic_reports_router)
 
 # ==================== Clinical Workflows Module (EPIC-006) ====================
 # Clinical workflows: prescriptions, lab orders, imaging, referrals, documentation,
