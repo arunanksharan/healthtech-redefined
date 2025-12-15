@@ -107,23 +107,25 @@ export function CreateJourneyDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-0 shadow-2xl">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                            <Layout className="w-5 h-5 text-blue-100" />
-                            Create New Journey
-                        </DialogTitle>
-                        <DialogDescription className="text-blue-100/90 text-sm">
-                            Design a new care pathway to automate patient tracking and engagement.
-                        </DialogDescription>
-                    </DialogHeader>
+            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-2xl border-gray-200">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/20 rounded-xl">
+                            <Layout className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-lg font-semibold text-white">Create New Journey</DialogTitle>
+                            <DialogDescription className="text-blue-100 text-sm mt-0.5">
+                                Design a new care pathway to automate patient tracking and engagement.
+                            </DialogDescription>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="p-6 bg-background">
+                <div className="px-6 py-5 bg-background">
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Name Input */}
                                 <FormField
                                     control={form.control}
@@ -138,7 +140,7 @@ export function CreateJourneyDialog({
                                                 <Input
                                                     placeholder="e.g. Post-Surgery Recovery Program"
                                                     {...field}
-                                                    className="h-10 border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
+                                                    className="h-11 rounded-xl border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -161,7 +163,7 @@ export function CreateJourneyDialog({
                                                 defaultValue={field.value}
                                             >
                                                 <FormControl>
-                                                    <SelectTrigger className="h-10 border-border bg-background focus:ring-blue-400/20">
+                                                    <SelectTrigger className="h-11 rounded-xl border-border bg-background focus:ring-blue-400/20">
                                                         <SelectValue placeholder="Select type" />
                                                     </SelectTrigger>
                                                 </FormControl>
@@ -183,13 +185,13 @@ export function CreateJourneyDialog({
                                     control={form.control}
                                     name="is_default"
                                     render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-xl border border-border p-3 shadow-sm bg-background hover:bg-muted/50 hover:border-blue-500/50 transition-all cursor-pointer">
+                                        <FormItem className="flex flex-row items-center justify-between rounded-xl border border-border p-3 shadow-sm bg-background hover:bg-muted/50 hover:border-blue-500/50 transition-all cursor-pointer h-11">
                                             <div className="space-y-0.5">
                                                 <FormLabel className="text-sm font-semibold text-foreground cursor-pointer">
                                                     Auto-Apply
                                                 </FormLabel>
-                                                <FormDescription className="text-xs text-muted-foreground">
-                                                    Make default for type
+                                                <FormDescription className="text-xs text-muted-foreground hidden">
+                                                    Make default
                                                 </FormDescription>
                                             </div>
                                             <FormControl>
@@ -217,7 +219,7 @@ export function CreateJourneyDialog({
                                                 <Textarea
                                                     placeholder="Describe the clinical goals and protocols for this journey..."
                                                     {...field}
-                                                    className="resize-none min-h-[100px] border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
+                                                    className="resize-none min-h-[100px] rounded-xl border-border focus:border-blue-500 focus:ring-blue-400/20 bg-background"
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -226,19 +228,19 @@ export function CreateJourneyDialog({
                                 />
                             </div>
 
-                            <DialogFooter className="pt-4 border-t border-border">
+                            <DialogFooter className="pt-5 border-t border-border mt-6 flex items-center justify-end gap-3">
                                 <Button
                                     variant="outline"
                                     type="button"
                                     onClick={() => onOpenChange(false)}
-                                    className="border-border hover:bg-muted hover:text-foreground"
+                                    className="rounded-full px-5 border-border hover:bg-muted hover:text-foreground"
                                 >
                                     Cancel
                                 </Button>
                                 <Button
                                     type="submit"
                                     disabled={loading}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
+                                    className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
                                 >
                                     {loading ? (
                                         <>
