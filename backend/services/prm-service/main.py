@@ -88,6 +88,24 @@ app.include_router(practitioners_router, prefix="/api/v1/prm", tags=["Practition
 from modules.appointments.router import router as appointments_router
 app.include_router(appointments_router, prefix="/api/v1/prm", tags=["Appointments"])
 
+# Import new module routers
+from modules.organizations.router import router as organizations_router
+from modules.locations.router import router as locations_router
+from modules.encounters.router import router as encounters_router
+from modules.observations.router import router as observations_router
+from modules.conditions.router import router as conditions_router
+from modules.medications.router import router as medications_router
+from modules.diagnostic_reports.router import router as diagnostic_reports_router
+
+# Include New Domain Routers
+app.include_router(organizations_router, prefix="/api/v1/prm/organizations", tags=["Organizations"])
+app.include_router(locations_router, prefix="/api/v1/prm/locations", tags=["Locations"])
+app.include_router(encounters_router, prefix="/api/v1/prm/encounters", tags=["Encounters"])
+app.include_router(observations_router, prefix="/api/v1/prm/observations", tags=["Observations"])
+app.include_router(conditions_router, prefix="/api/v1/prm/conditions", tags=["Conditions"])
+app.include_router(medications_router, prefix="/api/v1/prm/medications", tags=["Medications"])
+app.include_router(diagnostic_reports_router, prefix="/api/v1/prm/diagnostic-reports", tags=["Diagnostic Reports"])
+
 # ==================== Health Check ====================
 
 @app.get("/health", tags=["Health"])

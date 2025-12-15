@@ -86,7 +86,7 @@ def _build_fhir_diagnostic_report(data: ReportCreate, fhir_id: str) -> dict:
 
 def _parse_report_response(resource: FHIRResource) -> ReportResponse:
     """Parse FHIRResource into ReportResponse"""
-    data = resource.resource_data
+    data = resource.resource
 
     # Extract code
     code_data = data.get("code", {}).get("coding", [{}])[0]
@@ -172,7 +172,7 @@ def _parse_report_response(resource: FHIRResource) -> ReportResponse:
 
     return ReportResponse(
         id=resource.id,
-        fhir_id=resource.fhir_id,
+        fhir_id=resource.resource_id,
         tenant_id=resource.tenant_id,
         resource_type=RESOURCE_TYPE,
         patient_id=patient_id,
@@ -188,7 +188,7 @@ def _parse_report_response(resource: FHIRResource) -> ReportResponse:
         presented_form_url=presented_form_url,
         note=note,
         created_at=resource.created_at,
-        updated_at=resource.last_updated
+        updated_at=resource.updated_at
     )
 
 
@@ -209,8 +209,7 @@ async def list_diagnostic_reports(
     Status: registered, partial, preliminary, final, amended
     """
     query = db.query(FHIRResource).filter(
-        FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        FHIRResource.resource_type == RESOURCE_TYPE
     )
 
     if tenant_id:
@@ -218,22 +217,22 @@ async def list_diagnostic_reports(
 
     if patient_id:
         query = query.filter(
-            FHIRResource.resource_data["subject"]["reference"].astext == f"Patient/{patient_id}"
+            FHIRResource.resource["subject"]["reference"].astext == f"Patient/{patient_id}"
         )
 
     if category:
         query = query.filter(
-            FHIRResource.resource_data["category"][0]["coding"][0]["code"].astext == category
+            FHIRResource.resource["category"][0]["coding"][0]["code"].astext == category
         )
 
     if status:
         query = query.filter(
-            FHIRResource.resource_data["status"].astext == status
+            FHIRResource.resource["status"].astext == status
         )
 
     total = query.count()
     offset = (page - 1) * page_size
-    reports = query.order_by(FHIRResource.last_updated.desc()).offset(offset).limit(page_size).all()
+    reports = query.order_by(FHIRResource.updated_at.desc()).offset(offset).limit(page_size).all()
 
     return ReportListResponse(
         items=[_parse_report_response(rep) for rep in reports],
@@ -258,17 +257,20 @@ async def create_diagnostic_report(
         id=uuid4(),
         tenant_id=report_data.tenant_id,
         resource_type=RESOURCE_TYPE,
-        fhir_id=fhir_id,
-        version_id=1,
-        resource_data=resource_data,
-        search_tokens={
-            "patient": [str(report_data.patient_id)],
-            "category": [report_data.category],
-            "status": [report_data.status],
-            "code": [report_data.code.code]
+        resource_id=fhir_id,
+        version=1,
+        is_current=True,
+        resource=resource_data,
+        meta_data={
+            "search_tokens": {
+                "patient": [str(report_data.patient_id)],
+                "category": [report_data.category],
+                "status": [report_data.status],
+                "code": [report_data.code.code]
+            }
         },
         created_at=datetime.utcnow(),
-        last_updated=datetime.utcnow()
+        updated_at=datetime.utcnow()
     )
 
     db.add(report)
@@ -287,8 +289,7 @@ async def get_diagnostic_report(
     """Get diagnostic report by ID"""
     report = db.query(FHIRResource).filter(
         FHIRResource.id == report_id,
-        FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        FHIRResource.resource_type == RESOURCE_TYPE
     ).first()
 
     if not report:

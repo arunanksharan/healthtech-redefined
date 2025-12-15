@@ -86,8 +86,16 @@ def _build_fhir_observation(data: ObservationCreate, fhir_id: str) -> dict:
 
 def _parse_observation_response(resource: FHIRResource) -> ObservationResponse:
     """Parse FHIRResource into ObservationResponse"""
-    data = resource.resource_data
-
+    data = resource.resource
+    # Note: resource.resource instead of resource.resource_data if using models.py definition?
+    # models.py says 'resource = Column(JSONB, nullable=False)'
+    # fhir_models.py said 'resource_data = Column(JSONB...)'
+    # Let's check models.py again for exact column name for json data.
+    
+    # In Step 12121:
+    # 597:     resource = Column(JSONB, nullable=False)
+    # So the column is named 'resource'.
+    
     # Extract code
     code_data = data.get("code", {}).get("coding", [{}])[0]
     code = ObservationCode(
@@ -146,7 +154,7 @@ def _parse_observation_response(resource: FHIRResource) -> ObservationResponse:
 
     return ObservationResponse(
         id=resource.id,
-        fhir_id=resource.fhir_id,
+        fhir_id=resource.resource_id,
         tenant_id=resource.tenant_id,
         resource_type=RESOURCE_TYPE,
         patient_id=patient_id,
@@ -158,7 +166,7 @@ def _parse_observation_response(resource: FHIRResource) -> ObservationResponse:
         interpretation=interpretation,
         note=note,
         created_at=resource.created_at,
-        updated_at=resource.last_updated
+        updated_at=resource.updated_at
     )
 
 
@@ -179,7 +187,7 @@ async def list_observations(
     """
     query = db.query(FHIRResource).filter(
         FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        # FHIRResource.deleted is not present in models.py
     )
 
     if tenant_id:
@@ -187,22 +195,22 @@ async def list_observations(
 
     if patient_id:
         query = query.filter(
-            FHIRResource.resource_data["subject"]["reference"].astext == f"Patient/{patient_id}"
+            FHIRResource.resource["subject"]["reference"].astext == f"Patient/{patient_id}"
         )
 
     if category:
         query = query.filter(
-            FHIRResource.resource_data["category"][0]["coding"][0]["code"].astext == category
+            FHIRResource.resource["category"][0]["coding"][0]["code"].astext == category
         )
 
     if code:
         query = query.filter(
-            FHIRResource.resource_data["code"]["coding"][0]["code"].astext == code
+            FHIRResource.resource["code"]["coding"][0]["code"].astext == code
         )
 
     total = query.count()
     offset = (page - 1) * page_size
-    observations = query.order_by(FHIRResource.last_updated.desc()).offset(offset).limit(page_size).all()
+    observations = query.order_by(FHIRResource.updated_at.desc()).offset(offset).limit(page_size).all()
 
     return ObservationListResponse(
         items=[_parse_observation_response(obs) for obs in observations],
@@ -227,16 +235,17 @@ async def create_observation(
         id=uuid4(),
         tenant_id=obs_data.tenant_id,
         resource_type=RESOURCE_TYPE,
-        fhir_id=fhir_id,
-        version_id=1,
-        resource_data=resource_data,
-        search_tokens={
-            "patient": [str(obs_data.patient_id)],
-            "category": [obs_data.category],
-            "code": [obs_data.code.code]
-        },
-        created_at=datetime.utcnow(),
-        last_updated=datetime.utcnow()
+        resource_id=fhir_id,
+        version=1,
+        is_current=True,
+        resource=resource_data,
+        meta_data={
+            "search_tokens": {
+                "patient": [str(obs_data.patient_id)],
+                "category": [obs_data.category],
+                "code": [obs_data.code.code]
+            }
+        }
     )
 
     db.add(observation)
@@ -256,7 +265,6 @@ async def get_observation(
     observation = db.query(FHIRResource).filter(
         FHIRResource.id == observation_id,
         FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
     ).first()
 
     if not observation:

@@ -90,7 +90,7 @@ def _build_fhir_medication_request(data: MedicationCreate, fhir_id: str) -> dict
 
 def _parse_medication_response(resource: FHIRResource) -> MedicationResponse:
     """Parse FHIRResource into MedicationResponse"""
-    data = resource.resource_data
+    data = resource.resource
 
     # Extract medication code
     med_data = data.get("medicationCodeableConcept", {}).get("coding", [{}])[0]
@@ -171,7 +171,7 @@ def _parse_medication_response(resource: FHIRResource) -> MedicationResponse:
 
     return MedicationResponse(
         id=resource.id,
-        fhir_id=resource.fhir_id,
+        fhir_id=resource.resource_id,
         tenant_id=resource.tenant_id,
         resource_type=RESOURCE_TYPE,
         patient_id=patient_id,
@@ -187,7 +187,7 @@ def _parse_medication_response(resource: FHIRResource) -> MedicationResponse:
         authored_on=authored_on,
         note=note,
         created_at=resource.created_at,
-        updated_at=resource.last_updated
+        updated_at=resource.updated_at
     )
 
 
@@ -206,8 +206,7 @@ async def list_medications(
     Status: active, on-hold, cancelled, completed, stopped
     """
     query = db.query(FHIRResource).filter(
-        FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        FHIRResource.resource_type == RESOURCE_TYPE
     )
 
     if tenant_id:
@@ -215,17 +214,17 @@ async def list_medications(
 
     if patient_id:
         query = query.filter(
-            FHIRResource.resource_data["subject"]["reference"].astext == f"Patient/{patient_id}"
+            FHIRResource.resource["subject"]["reference"].astext == f"Patient/{patient_id}"
         )
 
     if status:
         query = query.filter(
-            FHIRResource.resource_data["status"].astext == status
+            FHIRResource.resource["status"].astext == status
         )
 
     total = query.count()
     offset = (page - 1) * page_size
-    medications = query.order_by(FHIRResource.last_updated.desc()).offset(offset).limit(page_size).all()
+    medications = query.order_by(FHIRResource.updated_at.desc()).offset(offset).limit(page_size).all()
 
     return MedicationListResponse(
         items=[_parse_medication_response(med) for med in medications],
@@ -250,16 +249,19 @@ async def create_medication(
         id=uuid4(),
         tenant_id=med_data.tenant_id,
         resource_type=RESOURCE_TYPE,
-        fhir_id=fhir_id,
-        version_id=1,
-        resource_data=resource_data,
-        search_tokens={
-            "patient": [str(med_data.patient_id)],
-            "status": [med_data.status],
-            "medication": [med_data.medication.code]
+        resource_id=fhir_id,
+        version=1,
+        is_current=True,
+        resource=resource_data,
+        meta_data={
+            "search_tokens": {
+                "patient": [str(med_data.patient_id)],
+                "status": [med_data.status],
+                "medication": [med_data.medication.code]
+            }
         },
         created_at=datetime.utcnow(),
-        last_updated=datetime.utcnow()
+        updated_at=datetime.utcnow()
     )
 
     db.add(medication)
@@ -278,8 +280,7 @@ async def get_medication(
     """Get medication prescription by ID"""
     medication = db.query(FHIRResource).filter(
         FHIRResource.id == medication_id,
-        FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        FHIRResource.resource_type == RESOURCE_TYPE
     ).first()
 
     if not medication:

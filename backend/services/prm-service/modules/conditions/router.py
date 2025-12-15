@@ -88,7 +88,7 @@ def _build_fhir_condition(data: ConditionCreate, fhir_id: str) -> dict:
 
 def _parse_condition_response(resource: FHIRResource) -> ConditionResponse:
     """Parse FHIRResource into ConditionResponse"""
-    data = resource.resource_data
+    data = resource.resource
 
     # Extract code
     code_data = data.get("code", {}).get("coding", [{}])[0]
@@ -159,7 +159,7 @@ def _parse_condition_response(resource: FHIRResource) -> ConditionResponse:
 
     return ConditionResponse(
         id=resource.id,
-        fhir_id=resource.fhir_id,
+        fhir_id=resource.resource_id,
         tenant_id=resource.tenant_id,
         resource_type=RESOURCE_TYPE,
         patient_id=patient_id,
@@ -173,7 +173,7 @@ def _parse_condition_response(resource: FHIRResource) -> ConditionResponse:
         abatement_datetime=abatement,
         note=note,
         created_at=resource.created_at,
-        updated_at=resource.last_updated
+        updated_at=resource.updated_at
     )
 
 
@@ -195,7 +195,7 @@ async def list_conditions(
     """
     query = db.query(FHIRResource).filter(
         FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        # FHIRResource.deleted == False
     )
 
     if tenant_id:
@@ -203,22 +203,22 @@ async def list_conditions(
 
     if patient_id:
         query = query.filter(
-            FHIRResource.resource_data["subject"]["reference"].astext == f"Patient/{patient_id}"
+            FHIRResource.resource["subject"]["reference"].astext == f"Patient/{patient_id}"
         )
 
     if clinical_status:
         query = query.filter(
-            FHIRResource.resource_data["clinicalStatus"]["coding"][0]["code"].astext == clinical_status
+            FHIRResource.resource["clinicalStatus"]["coding"][0]["code"].astext == clinical_status
         )
 
     if category:
         query = query.filter(
-            FHIRResource.resource_data["category"][0]["coding"][0]["code"].astext == category
+            FHIRResource.resource["category"][0]["coding"][0]["code"].astext == category
         )
 
     total = query.count()
     offset = (page - 1) * page_size
-    conditions = query.order_by(FHIRResource.last_updated.desc()).offset(offset).limit(page_size).all()
+    conditions = query.order_by(FHIRResource.updated_at.desc()).offset(offset).limit(page_size).all()
 
     return ConditionListResponse(
         items=[_parse_condition_response(cond) for cond in conditions],
@@ -243,16 +243,18 @@ async def create_condition(
         id=uuid4(),
         tenant_id=cond_data.tenant_id,
         resource_type=RESOURCE_TYPE,
-        fhir_id=fhir_id,
-        version_id=1,
-        resource_data=resource_data,
-        search_tokens={
-            "patient": [str(cond_data.patient_id)],
-            "clinical-status": [cond_data.clinical_status],
-            "code": [cond_data.code.code]
+        resource_id=fhir_id,
+        version=1,
+        is_current=True,
+        resource=resource_data,
+        meta_data={
+            "search_tokens": {
+                "patient": [str(cond_data.patient_id)],
+                "clinical-status": [cond_data.clinical_status],
+                "code": [cond_data.code.code]
+            }
         },
-        created_at=datetime.utcnow(),
-        last_updated=datetime.utcnow()
+        # created_at... default
     )
 
     db.add(condition)
@@ -272,7 +274,7 @@ async def get_condition(
     condition = db.query(FHIRResource).filter(
         FHIRResource.id == condition_id,
         FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        # FHIRResource.deleted == False
     ).first()
 
     if not condition:
@@ -291,14 +293,14 @@ async def update_condition(
     condition = db.query(FHIRResource).filter(
         FHIRResource.id == condition_id,
         FHIRResource.resource_type == RESOURCE_TYPE,
-        FHIRResource.deleted == False
+        # FHIRResource.deleted == False
     ).first()
 
     if not condition:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condition not found")
 
     # Update resource_data
-    resource_data = condition.resource_data.copy()
+    resource_data = condition.resource.copy()
 
     if update_data.clinical_status:
         resource_data["clinicalStatus"] = {
@@ -327,9 +329,13 @@ async def update_condition(
     if update_data.note:
         resource_data["note"] = [{"text": update_data.note}]
 
-    condition.resource_data = resource_data
-    condition.version_id += 1
-    condition.last_updated = datetime.utcnow()
+    condition.resource = resource_data
+    condition.version += 1 # version_id -> version
+    # condition.updated_at -> auto updated on commit due to onupdate?
+    # Actually models.py says: updated_at = Column(..., onupdate=datetime.utcnow)
+    # So I don't strictly need to set it, but good practice if I want precise control.
+    # However I'll let SQLAlchemy handle it or set it.
+    condition.updated_at = datetime.utcnow()
 
     db.commit()
     db.refresh(condition)

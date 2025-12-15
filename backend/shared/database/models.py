@@ -596,48 +596,7 @@ class RolePermission(Base):
     )
 
 
-# ============================================================================
-# FHIR RESOURCES
-# ============================================================================
 
-
-class FHIRResource(Base):
-    """Generic FHIR R4 resource storage with versioning"""
-
-    __tablename__ = "fhir_resources"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-
-    # Resource Identification
-    resource_type = Column(
-        String(50), nullable=False
-    )  # Patient, Encounter, Observation, etc.
-    resource_id = Column(String(100), nullable=False)  # FHIR logical ID
-    version = Column(Integer, nullable=False, default=1)
-    is_current = Column(Boolean, nullable=False, default=True)
-
-    # The actual FHIR resource (complete JSON)
-    resource = Column(JSONB, nullable=False)
-
-    # Metadata
-    meta_data = Column(JSONB, default=dict)
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
-
-    # Indexes
-    __table_args__ = (
-        Index("idx_fhir_resources_tenant_type", "tenant_id", "resource_type"),
-        Index("idx_fhir_resources_id_type", "resource_type", "resource_id", "is_current"),
-        Index("idx_fhir_resources_current", "is_current"),
-    )
 
 
 # ============================================================================

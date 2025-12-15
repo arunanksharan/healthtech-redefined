@@ -23,6 +23,7 @@ try:
     from scripts.seed_journeys import seed_journeys
     from scripts.seed_journey_instances import seed_journey_instances
     from scripts.seed_communications import seed_communications
+    from scripts.seed_clinical_data import seed_clinical_data
 except ImportError as e:
     logger.error(f"Failed to import seed modules: {e}")
     # Fallback for when running directly from scripts dir
@@ -32,7 +33,9 @@ except ImportError as e:
         from seed_tickets import seed_tickets
         from seed_journeys import seed_journeys
         from seed_journey_instances import seed_journey_instances
+        from seed_journey_instances import seed_journey_instances
         from seed_communications import seed_communications
+        from seed_clinical_data import seed_clinical_data
     except ImportError:
         logger.critical("Could not import seed modules. Ensure you are running from the correct directory.")
         sys.exit(1)
@@ -61,8 +64,12 @@ def main():
     seed_journey_instances()
     
     # 6. Communication Logs (depend on others)
-    logger.info("\n[6/6] Seeding Communications...")
+    logger.info("\n[6/7] Seeding Communications...")
     seed_communications()
+
+    # 7. Clinical Data (Observations, Medications, Reports)
+    logger.info("\n[7/7] Seeding Clinical Data...")
+    seed_clinical_data()
     
     logger.success("\n✨ All seed scripts executed successfully!")
 
