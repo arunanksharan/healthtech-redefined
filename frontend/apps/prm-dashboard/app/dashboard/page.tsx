@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   Calendar,
   Users,
@@ -33,6 +34,37 @@ import { Button } from '@/components/ui/button';
 import { MagicCard } from '@/components/ui/magic-card';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { BorderBeam } from '@/components/ui/border-beam';
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
+
+const cardHover = {
+  scale: 1.02,
+  y: -4,
+  transition: { type: "spring", stiffness: 400, damping: 25 },
+};
 
 export default function DashboardPage() {
   // Fetch dashboard data
@@ -149,37 +181,50 @@ export default function DashboardPage() {
         <p className="text-muted-foreground mt-1">Here's what's happening with your patients today.</p>
       </div>
 
-      {/* Stats Cards - Upgraded with MagicCard & NumberTicker */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MagicStatCard
-          title="Today's Appointments"
-          value={stats.todaysAppointments}
-          change="+12%"
-          icon={<Calendar className="w-6 h-6" />}
-          color="blue"
-        />
-        <MagicStatCard
-          title="Active Journeys"
-          value={stats.activeJourneys}
-          change="+8%"
-          icon={<Users className="w-6 h-6" />}
-          color="purple"
-        />
-        <MagicStatCard
-          title="Messages Sent"
-          value={stats.messagesSent}
-          change="+23%"
-          icon={<MessageSquare className="w-6 h-6" />}
-          color="green"
-        />
-        <MagicStatCard
-          title="Pending Tickets"
-          value={stats.pendingTickets}
-          change="-4%"
-          icon={<Ticket className="w-6 h-6" />}
-          color="orange"
-        />
-      </div>
+      {/* Stats Cards - Upgraded with MagicCard & NumberTicker & Stagger Animation */}
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={itemVariants}>
+          <MagicStatCard
+            title="Today's Appointments"
+            value={stats.todaysAppointments}
+            change="+12%"
+            icon={<Calendar className="w-6 h-6" />}
+            color="blue"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <MagicStatCard
+            title="Active Journeys"
+            value={stats.activeJourneys}
+            change="+8%"
+            icon={<Users className="w-6 h-6" />}
+            color="purple"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <MagicStatCard
+            title="Messages Sent"
+            value={stats.messagesSent}
+            change="+23%"
+            icon={<MessageSquare className="w-6 h-6" />}
+            color="green"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <MagicStatCard
+            title="Pending Tickets"
+            value={stats.pendingTickets}
+            change="-4%"
+            icon={<Ticket className="w-6 h-6" />}
+            color="orange"
+          />
+        </motion.div>
+      </motion.div>
 
       {/* Analytics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -352,10 +397,14 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {upcomingAppointments.map((apt) => (
-                  <div
+                {upcomingAppointments.map((apt, index) => (
+                  <motion.div
                     key={apt.id}
-                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors border border-border/50"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05, type: "spring", stiffness: 300 }}
+                    whileHover={{ scale: 1.01, x: 4 }}
+                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors border border-border/50 cursor-pointer"
                   >
                     <Avatar>
                       <AvatarFallback>
@@ -382,7 +431,7 @@ export default function DashboardPage() {
                     <Badge variant={apt.status === 'confirmed' ? 'success' : 'default'}>
                       {apt.status}
                     </Badge>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             )}
