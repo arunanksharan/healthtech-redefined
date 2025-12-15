@@ -263,6 +263,24 @@ async def create_condition(
     return _parse_condition_response(condition)
 
 
+@router.get("/{condition_id}", response_model=ConditionResponse)
+async def get_condition(
+    condition_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Get condition by ID"""
+    condition = db.query(FHIRResource).filter(
+        FHIRResource.id == condition_id,
+        FHIRResource.resource_type == RESOURCE_TYPE,
+        FHIRResource.deleted == False
+    ).first()
+
+    if not condition:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condition not found")
+
+    return _parse_condition_response(condition)
+
+
 @router.put("/{condition_id}", response_model=ConditionResponse)
 async def update_condition(
     condition_id: UUID,
