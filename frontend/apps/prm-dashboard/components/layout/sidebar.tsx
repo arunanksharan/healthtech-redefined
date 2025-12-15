@@ -71,8 +71,6 @@ const navigationConfig: NavSection[] = [
       { id: "practitioners", label: "Practitioners", icon: UserCog, href: "/dashboard/practitioners" },
       { id: "organizations", label: "Organizations", icon: Building2, href: "/dashboard/organizations" },
       { id: "locations", label: "Locations", icon: MapPin, href: "/dashboard/locations" },
-      { id: "schedules", label: "Schedules", icon: CalendarDays, href: "/dashboard/schedules" },
-      { id: "slots", label: "Slots", icon: Clock, href: "/dashboard/slots" },
 
       { id: "encounters", label: "Encounters", icon: Hospital, href: "/dashboard/encounters" },
       { id: "observations", label: "Observations", icon: Microscope, href: "/dashboard/observations" },
