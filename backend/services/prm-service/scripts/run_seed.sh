@@ -41,9 +41,7 @@ SERVICE_DIR="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$(dirname "$(dirname "$SERVICE_DIR")")"
 
 # Default values
-DATABASE_URL="${DATABASE_URL:-postgresql://healthtech:healthtech@localhost:5432/healthtech}"
-SEED_FILE="${SCRIPT_DIR}/seed_data.json"
-DROP_EXISTING=""
+DATABASE_URL="${DATABASE_URL:-postgresql://healthtech:healthtech@localhost:5433/healthtech}"
 VERBOSE=""
 
 # Parse command line arguments
@@ -52,14 +50,6 @@ while [[ $# -gt 0 ]]; do
         -d|--database-url)
             DATABASE_URL="$2"
             shift 2
-            ;;
-        -f|--seed-file)
-            SEED_FILE="$2"
-            shift 2
-            ;;
-        -x|--drop-existing)
-            DROP_EXISTING="--drop-existing"
-            shift
             ;;
         -v|--verbose)
             VERBOSE="--verbose"
@@ -72,8 +62,6 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  -d, --database-url URL    PostgreSQL database URL"
-            echo "  -f, --seed-file FILE      Path to seed data JSON file"
-            echo "  -x, --drop-existing       Drop existing data before seeding"
             echo "  -v, --verbose             Enable verbose logging"
             echo "  -h, --help                Show this help message"
             echo ""
@@ -172,15 +160,6 @@ fi
 
 echo -e "${GREEN}All required packages are installed${NC}"
 
-# Check seed file exists
-echo ""
-echo -e "${YELLOW}Checking seed file...${NC}"
-if [[ ! -f "$SEED_FILE" ]]; then
-    echo -e "${RED}Error: Seed file not found: $SEED_FILE${NC}"
-    exit 1
-fi
-echo -e "${GREEN}Found seed file: $SEED_FILE${NC}"
-
 # Check database connection
 echo ""
 echo -e "${YELLOW}Testing database connection...${NC}"
@@ -211,33 +190,15 @@ except Exception as e:
 fi
 echo -e "${GREEN}Database connection successful!${NC}"
 
-# Warn about drop-existing
-if [[ -n "$DROP_EXISTING" ]]; then
-    echo ""
-    echo -e "${RED}============================================================${NC}"
-    echo -e "${RED}WARNING: --drop-existing flag is set!${NC}"
-    echo -e "${RED}This will DELETE ALL existing data in the database!${NC}"
-    echo -e "${RED}============================================================${NC}"
-    echo ""
-    read -p "Are you sure you want to continue? (yes/no): " -r
-    if [[ ! $REPLY == "yes" ]]; then
-        echo -e "${YELLOW}Operation cancelled.${NC}"
-        exit 0
-    fi
-fi
-
 # Run the seeder
 echo ""
 echo -e "${BLUE}============================================================${NC}"
-echo -e "${BLUE}     Starting Database Seeding${NC}"
+echo -e "${BLUE}     Starting Modern Database Seeding${NC}"
 echo -e "${BLUE}============================================================${NC}"
 echo ""
 
 # Build command
 CMD="$PYTHON_CMD ${SCRIPT_DIR}/seed_database.py"
-CMD="$CMD --database-url \"$DATABASE_URL\""
-CMD="$CMD --seed-file \"$SEED_FILE\""
-[[ -n "$DROP_EXISTING" ]] && CMD="$CMD $DROP_EXISTING"
 [[ -n "$VERBOSE" ]] && CMD="$CMD $VERBOSE"
 
 # Execute
