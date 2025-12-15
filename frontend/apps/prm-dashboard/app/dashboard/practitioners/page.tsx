@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Plus, User, Phone, Mail, Edit, MoreVertical, Stethoscope, Users, Activity, TrendingUp, GraduationCap, CheckCircle, XCircle, BadgeCheck } from 'lucide-react';
+import { Search, Plus, User, Phone, Mail, Edit, MoreVertical, Stethoscope, Users, Activity, TrendingUp, GraduationCap, CheckCircle, XCircle, BadgeCheck, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { practitionersAPI, Practitioner, PractitionerCreate } from '@/lib/api/practitioners';
 import {
@@ -26,6 +26,8 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/components/ui/dialog';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,12 +40,13 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { MagicCard } from '@/components/ui/magic-card';
 import { Label } from '@/components/ui/label';
-import toast from 'react-hot-toast';
+import { useToast } from '@/hooks/use-toast';
 
 // Default tenant ID for demo
 const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 export default function PractitionersPage() {
+    const { toast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
     const [specialityFilter, setSpecialityFilter] = useState<string>('all');
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -93,10 +96,12 @@ export default function PractitionersPage() {
             queryClient.invalidateQueries({ queryKey: ['practitioner-specialities'] });
             setIsAddOpen(false);
             resetAddForm();
-            toast.success('Practitioner created successfully');
+            setIsAddOpen(false);
+            resetAddForm();
+            toast({ title: 'Success', description: 'Practitioner created successfully', variant: 'default' });
         },
         onError: (error: any) => {
-            toast.error('Failed to create practitioner: ' + error.message);
+            toast({ title: 'Error', description: 'Failed to create practitioner: ' + error.message, variant: 'destructive' });
         },
     });
 
@@ -108,10 +113,12 @@ export default function PractitionersPage() {
             queryClient.invalidateQueries({ queryKey: ['practitioners'] });
             setIsEditOpen(false);
             setSelectedPractitioner(null);
-            toast.success('Practitioner updated successfully');
+            setIsEditOpen(false);
+            setSelectedPractitioner(null);
+            toast({ title: 'Success', description: 'Practitioner updated successfully', variant: 'default' });
         },
         onError: (error: any) => {
-            toast.error('Failed to update practitioner: ' + error.message);
+            toast({ title: 'Error', description: 'Failed to update practitioner: ' + error.message, variant: 'destructive' });
         },
     });
 
@@ -132,7 +139,7 @@ export default function PractitionersPage() {
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!addForm.first_name || !addForm.last_name) {
-            toast.error('Please fill in required fields');
+            toast({ title: 'Validation Error', description: 'Please fill in required fields', variant: 'destructive' });
             return;
         }
         createMutation.mutate(addForm);
@@ -266,14 +273,13 @@ export default function PractitionersPage() {
                 <Card className="border-border shadow-sm overflow-hidden">
                     <CardContent className="p-0">
                         {isLoading ? (
-                            <div className="flex flex-col items-center justify-center py-20">
-                                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-                                <p className="text-muted-foreground text-sm">Loading practitioners...</p>
-                            </div>
+                            <TableSkeleton />
                         ) : error ? (
-                            <div className="text-center py-12 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20">
-                                Error loading practitioners: {(error as Error).message}
-                            </div>
+                            <Alert variant="destructive" className="m-4">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Error Loading Practitioners</AlertTitle>
+                                <AlertDescription>{(error as Error).message}</AlertDescription>
+                            </Alert>
                         ) : practitioners.length === 0 ? (
                             <div className="text-center py-20 text-muted-foreground">
                                 <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/toaster";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -24,16 +24,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <Providers>
             {children}
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#333',
-                  color: '#fff',
-                },
-              }}
-            />
+            <Toaster />
           </Providers>
         </ErrorBoundary>
       </body>

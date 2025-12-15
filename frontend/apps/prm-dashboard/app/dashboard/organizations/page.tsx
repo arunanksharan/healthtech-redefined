@@ -20,7 +20,8 @@ import {
     Trash2,
     AlertTriangle
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,8 +76,10 @@ import {
 import { Organization } from '@/lib/api/types';
 
 export default function OrganizationsPage() {
+    const { toast } = useToast();
     const router = useRouter();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -104,7 +107,8 @@ export default function OrganizationsPage() {
 
         if (error) {
             console.error('Failed to fetch organizations:', error);
-            toast.error('Failed to load organizations');
+            setError(error.message || 'Failed to load organizations');
+            toast({ title: 'Error', description: 'Failed to load organizations', variant: 'destructive' });
         } else if (data) {
             setOrganizations(data.items);
         }
@@ -148,9 +152,9 @@ export default function OrganizationsPage() {
         const [, error] = await deleteOrganization(orgToDelete.id);
 
         if (error) {
-            toast.error(error.message || 'Failed to delete organization');
+            toast({ title: 'Error', description: error.message || 'Failed to delete organization', variant: 'destructive' });
         } else {
-            toast.success('Organization deleted successfully');
+            toast({ title: 'Success', description: 'Organization deleted successfully', variant: 'default' });
             fetchOrganizations();
         }
         setSubmitting(false);
@@ -161,7 +165,7 @@ export default function OrganizationsPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name) {
-            toast.error('Organization Name is required');
+            toast({ title: 'Validation Error', description: 'Organization Name is required', variant: 'destructive' });
             return;
         }
 
@@ -183,9 +187,9 @@ export default function OrganizationsPage() {
 
         if (error) {
             console.error(`Failed to ${editingOrg ? 'update' : 'create'} organization:`, error);
-            toast.error(error.message || `Failed to ${editingOrg ? 'update' : 'create'} organization`);
+            toast({ title: 'Error', description: error.message || `Failed to ${editingOrg ? 'update' : 'create'} organization`, variant: 'destructive' });
         } else if (result) {
-            toast.success(`Organization ${editingOrg ? 'updated' : 'created'} successfully`);
+            toast({ title: 'Success', description: `Organization ${editingOrg ? 'updated' : 'created'} successfully`, variant: 'default' });
             setOpen(false);
             fetchOrganizations(); // Refresh list
         }
@@ -317,6 +321,14 @@ export default function OrganizationsPage() {
                             />
                         </div>
                     </div>
+
+                    {error && (
+                        <Alert variant="destructive" className="mb-6">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Error</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
 
                     <div className="rounded-xl border border-border overflow-hidden">
                         <Table>

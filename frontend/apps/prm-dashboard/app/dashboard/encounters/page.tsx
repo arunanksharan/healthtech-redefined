@@ -13,9 +13,10 @@ import {
     MoreHorizontal,
     Pencil,
     Activity,
-    Users
+    Users,
+    AlertCircle
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,8 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, TableRowsSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MagicCard } from '@/components/ui/magic-card';
 import {
     Dialog,
@@ -74,7 +76,9 @@ import { Practitioner } from '@/lib/api/practitioners';
 import { PatientCombobox } from '@/components/dashboard/patient-combobox';
 
 export default function EncountersPage() {
+    const { toast } = useToast();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [encounters, setEncounters] = useState<Encounter[]>([]);
     const [patients, setPatients] = useState<Patient[]>([]);
     const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
@@ -98,6 +102,7 @@ export default function EncountersPage() {
 
     const fetchData = async () => {
         setLoading(true);
+        setError(null);
         try {
             const [encountersRes, patientsRes, practitionersRes] = await Promise.all([
                 getEncounters({ page: 1, page_size: 100 }),
@@ -111,7 +116,8 @@ export default function EncountersPage() {
 
             if (encError) {
                 console.error('Failed to fetch encounters:', encError);
-                toast.error('Failed to load encounters');
+                setError('Failed to load encounters');
+                toast({ title: 'Error', description: 'Failed to load encounters', variant: 'destructive' });
             } else if (encData) {
                 setEncounters(encData.items);
             }
@@ -121,7 +127,8 @@ export default function EncountersPage() {
 
         } catch (error) {
             console.error('Error fetching data:', error);
-            toast.error('Failed to load data');
+            setError('Failed to load data');
+            toast({ title: 'Error', description: 'Failed to load data', variant: 'destructive' });
         } finally {
             setLoading(false);
         }
@@ -161,7 +168,7 @@ export default function EncountersPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.patient_id || !formData.practitioner_id) {
-            toast.error('Patient and Practitioner are required');
+            toast({ title: 'Validation Error', description: 'Patient and Practitioner are required', variant: 'destructive' });
             return;
         }
 
@@ -186,9 +193,9 @@ export default function EncountersPage() {
 
         if (error) {
             console.error(`Failed to ${editingEncounter ? 'update' : 'create'} encounter:`, error);
-            toast.error(error.message || `Failed to ${editingEncounter ? 'update' : 'create'} encounter`);
+            toast({ title: 'Error', description: error.message || `Failed to ${editingEncounter ? 'update' : 'create'} encounter`, variant: 'destructive' });
         } else if (result) {
-            toast.success(`Encounter ${editingEncounter ? 'updated' : 'created'} successfully`);
+            toast({ title: 'Success', description: `Encounter ${editingEncounter ? 'updated' : 'created'} successfully`, variant: 'default' });
             setOpen(false);
             fetchData();
         }
@@ -333,16 +340,17 @@ export default function EncountersPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
-                                        </TableRow>
-                                    ))
+                                    <TableSkeleton />
+                                ) : error ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6}>
+                                            <Alert variant="destructive" className="m-4">
+                                                <AlertCircle className="h-4 w-4" />
+                                                <AlertTitle>Error</AlertTitle>
+                                                <AlertDescription>{error}</AlertDescription>
+                                            </Alert>
+                                        </TableCell>
+                                    </TableRow>
                                 ) : filteredEncounters.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">

@@ -24,7 +24,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatSmartDate } from '@/lib/utils/date';
 import { cn } from '@/lib/utils/cn';
-import toast from 'react-hot-toast';
+import { Skeleton, CardSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 import { MagicCard } from '@/components/ui/magic-card';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import {
@@ -50,7 +52,7 @@ export default function JourneysPage() {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     // Fetch all journey definitions
-    const { data: journeysData, isLoading, error, refetch } = useQuery({
+    const { data: journeysData, isLoading, isError, error, refetch } = useQuery({
         queryKey: ['journey-definitions', statusFilter],
         queryFn: async () => {
             const [data, error] = await journeysAPI.getAll();
@@ -215,9 +217,14 @@ export default function JourneysPage() {
 
                 {/* Journeys List */}
                 {isLoading ? (
-                    <div className="flex justify-center py-12">
-                        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    <div className="grid gap-4">
+                        {[1, 2, 3, 4].map((i) => <CardSkeleton key={i} />)}
                     </div>
+                ) : isError ? (
+                    <Alert variant="destructive">
+                        <AlertTitle>Error Loading Journeys</AlertTitle>
+                        <AlertDescription>{(error as Error)?.message}</AlertDescription>
+                    </Alert>
                 ) : filteredJourneys.length === 0 ? (
                     <div className="text-center py-12 bg-card rounded-xl border border-border border-dashed">
                         <Route className="w-12 h-12 mx-auto mb-3 text-muted" />

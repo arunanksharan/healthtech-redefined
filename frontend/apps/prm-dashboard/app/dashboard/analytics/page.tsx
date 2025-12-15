@@ -13,7 +13,8 @@ import {
   Users,
   UserPlus,
 } from "lucide-react";
-import toast from "react-hot-toast";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ const TIME_PERIODS: { value: TimePeriod; label: string }[] = [
 // ============================================================================
 
 export default function AnalyticsDashboardPage() {
+  const { toast } = useToast();
   const [timePeriod, setTimePeriod] = React.useState<TimePeriod>("last_30_days");
 
   // Fetch Analytics Data from API
@@ -101,7 +103,7 @@ export default function AnalyticsDashboardPage() {
             size="icon"
             onClick={() => {
               refetch();
-              toast.success("Refreshed data");
+              toast({ title: "Refreshed", description: "Dashboard data updated" });
             }}
             disabled={isLoading}
           >
@@ -208,7 +210,7 @@ export default function AnalyticsDashboardPage() {
           data={appointmentTrendData}
           type="area"
           period="day"
-          onExport={() => toast("Exporting...")}
+          onExport={() => toast({ title: "Exporting", description: "Your export is being prepared" })}
           isLoading={isLoading}
         />
 
@@ -232,7 +234,7 @@ export default function AnalyticsDashboardPage() {
             orientation="horizontal"
             sortBy="value"
             height={280}
-            onExport={() => toast("Exporting...")}
+            onExport={() => toast({ title: "Exporting", description: "Your export is being prepared" })}
             isLoading={isLoading}
           />
         </div>

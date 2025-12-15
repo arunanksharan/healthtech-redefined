@@ -62,11 +62,14 @@ import {
 } from '@/components/ui/select';
 import { formatDate, formatSmartDate } from '@/lib/utils/date';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import toast from 'react-hot-toast';
+import { Skeleton, CalendarSkeleton, StatsCardSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = 'day' | 'week' | 'month' | 'list';
 
 export default function AppointmentsPage() {
+  const { toast } = useToast();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
@@ -83,7 +86,7 @@ export default function AppointmentsPage() {
   const queryClient = useQueryClient();
 
   // Fetch appointments
-  const { data: appointmentsData, isLoading } = useQuery({
+  const { data: appointmentsData, isLoading, isError, error } = useQuery({
     queryKey: ['appointments', currentDate, viewMode],
     queryFn: async () => {
       const [data, error] = await appointmentsAPI.getAll({
@@ -147,10 +150,10 @@ export default function AppointmentsPage() {
         reason_text: '',
         source_channel: 'web',
       });
-      toast.success('Appointment created successfully!');
+      toast({ title: 'Success', description: 'Appointment created successfully!', variant: 'default' });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create appointment');
+      toast({ title: 'Error', description: error.message || 'Failed to create appointment', variant: 'destructive' });
     },
   });
 
@@ -164,9 +167,10 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setSelectedAppointment(null);
-      toast.success('Appointment confirmed!');
+      setSelectedAppointment(null);
+      toast({ title: 'Success', description: 'Appointment confirmed!', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
   // Check-in mutation
@@ -179,9 +183,10 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setSelectedAppointment(null);
-      toast.success('Patient checked in!');
+      setSelectedAppointment(null);
+      toast({ title: 'Success', description: 'Patient checked in!', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
   // Complete appointment mutation
@@ -194,9 +199,10 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setSelectedAppointment(null);
-      toast.success('Appointment completed!');
+      setSelectedAppointment(null);
+      toast({ title: 'Success', description: 'Appointment completed!', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
   // Cancel appointment mutation
@@ -209,9 +215,10 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setSelectedAppointment(null);
-      toast.success('Appointment cancelled');
+      setSelectedAppointment(null);
+      toast({ title: 'Success', description: 'Appointment cancelled', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
   // Mark no-show mutation
@@ -224,9 +231,10 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setSelectedAppointment(null);
-      toast.success('Marked as no-show');
+      setSelectedAppointment(null);
+      toast({ title: 'Success', description: 'Marked as no-show', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
   // Delete appointment mutation
@@ -238,15 +246,16 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setSelectedAppointment(null);
-      toast.success('Appointment deleted');
+      setSelectedAppointment(null);
+      toast({ title: 'Success', description: 'Appointment deleted', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
   });
 
   const handleNewAppointmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!appointmentForm.patient_id || !appointmentForm.practitioner_id) {
-      toast.error('Please select both patient and practitioner');
+      toast({ title: 'Validation Error', description: 'Please select both patient and practitioner', variant: 'destructive' });
       return;
     }
     createMutation.mutate(appointmentForm);
@@ -430,14 +439,15 @@ export default function AppointmentsPage() {
 
       {/* Calendar/List View */}
       {isLoading ? (
-        <Card className="border-border shadow-sm min-h-[400px]">
-          <CardContent className="py-20">
-            <div className="flex flex-col items-center justify-center">
-              <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-muted-foreground text-sm">Loading schedule...</p>
-            </div>
-          </CardContent>
-        </Card>
+        <CalendarSkeleton />
+      ) : isError ? (
+        <Alert variant="destructive" className="my-8">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Schedule</AlertTitle>
+          <AlertDescription>
+            {(error as Error)?.message || 'Failed to load appointments. Please try again.'}
+          </AlertDescription>
+        </Alert>
       ) : (
         <div className="animate-in fade-in duration-300">
           {viewMode === 'list' ? (
@@ -1062,3 +1072,4 @@ function MonthView({ appointments, currentDate, onSelect }: { appointments: any[
     </div>
   );
 }
+

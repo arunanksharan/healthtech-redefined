@@ -26,7 +26,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatSmartDate } from '@/lib/utils/date';
 import { cn } from '@/lib/utils/cn';
-import toast from 'react-hot-toast';
+import { Skeleton, ListSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 import { MagicCard } from '@/components/ui/magic-card';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import {
@@ -45,6 +47,7 @@ import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
 import { TicketDetailSheet } from '@/components/tickets/ticket-detail-sheet';
 
 export default function TicketsPage() {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -56,7 +59,7 @@ export default function TicketsPage() {
   const queryClient = useQueryClient();
 
   // Fetch all tickets
-  const { data: ticketsData, isLoading, error, refetch } = useQuery({
+  const { data: ticketsData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tickets', categoryFilter, statusFilter, priorityFilter],
     queryFn: async () => {
       const [data, error] = await ticketsAPI.getAll({
@@ -88,9 +91,9 @@ export default function TicketsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      toast.success('Ticket resolved successfully');
+      toast({ title: 'Success', description: 'Ticket resolved successfully', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(`Failed: ${error.message}`),
+    onError: (error: Error) => toast({ title: 'Error', description: `Failed: ${error.message}`, variant: 'destructive' }),
   });
 
   const closeMutation = useMutation({
@@ -101,9 +104,9 @@ export default function TicketsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      toast.success('Ticket closed');
+      toast({ title: 'Success', description: 'Ticket closed', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(`Failed: ${error.message}`),
+    onError: (error: Error) => toast({ title: 'Error', description: `Failed: ${error.message}`, variant: 'destructive' }),
   });
 
   const tickets = ticketsData?.tickets || [];
@@ -245,9 +248,13 @@ export default function TicketsPage() {
 
         {/* Ticket List */}
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <ListSkeleton items={5} />
+        ) : isError ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error Loading Tickets</AlertTitle>
+            <AlertDescription>{(error as Error)?.message}</AlertDescription>
+          </Alert>
         ) : filteredTickets.length === 0 ? (
           <div className="text-center py-12 bg-card rounded-xl border border-border border-dashed">
             <Ticket className="w-12 h-12 mx-auto mb-3 text-muted" />

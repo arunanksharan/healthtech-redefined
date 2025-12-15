@@ -35,9 +35,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MagicCard } from '@/components/ui/magic-card';
 import { Label } from '@/components/ui/label';
 import { formatDate } from '@/lib/utils/date';
-import toast from 'react-hot-toast';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PatientsPage() {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<'name' | 'phone' | 'mrn'>('name');
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -86,10 +89,18 @@ export default function PatientsPage() {
         phone_primary: '',
         email_primary: '',
       });
-      toast.success('Patient created successfully');
+      toast({
+        title: 'Success',
+        description: 'Patient created successfully',
+        variant: 'default'
+      });
     },
     onError: (error: any) => {
-      toast.error('Failed to create patient: ' + error.message);
+      toast({
+        title: 'Error',
+        description: 'Failed to create patient: ' + error.message,
+        variant: 'destructive'
+      });
     },
   });
 
@@ -99,35 +110,59 @@ export default function PatientsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
       queryClient.invalidateQueries({ queryKey: ['patient-stats'] });
-      toast.success('Patient deactivated successfully');
+      toast({
+        title: 'Success',
+        description: 'Patient deactivated successfully',
+        variant: 'default'
+      });
     },
     onError: (error: any) => {
-      toast.error('Failed to deactivate patient: ' + error.message);
+      toast({
+        title: 'Error',
+        description: 'Failed to deactivate patient: ' + error.message,
+        variant: 'destructive'
+      });
     },
   });
 
   // Search patients
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      toast.error('Please enter a search term');
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a search term',
+        variant: 'destructive'
+      });
       return;
     }
 
     const [results, error] = await patientsAPI.search(searchQuery, searchType);
 
     if (error) {
-      toast.error('Search failed: ' + error.message);
+      toast({
+        title: 'Search Failed',
+        description: error.message,
+        variant: 'destructive'
+      });
       return;
     }
 
-    toast.success(`Found ${results?.length || 0} patients`);
+    toast({
+      title: 'Search Complete',
+      description: `Found ${results?.length || 0} patients`,
+      variant: 'default'
+    });
   };
 
   // Handle add form submit
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.first_name || !addForm.last_name || !addForm.date_of_birth) {
-      toast.error('Please fill in required fields');
+      toast({
+        title: 'Missing Fields',
+        description: 'Please fill in required fields',
+        variant: 'destructive'
+      });
       return;
     }
     createMutation.mutate(addForm);
@@ -245,13 +280,18 @@ export default function PatientsPage() {
         <Card className="border-border shadow-sm overflow-hidden">
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-muted-foreground text-sm">Loading patient records...</p>
+              <div className="p-4">
+                <TableSkeleton rows={5} />
               </div>
             ) : error ? (
-              <div className="text-center py-12 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20">
-                Error loading patients: {(error as Error).message}
+              <div className="p-6">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error Loading Patients</AlertTitle>
+                  <AlertDescription>
+                    {(error as Error).message}
+                  </AlertDescription>
+                </Alert>
               </div>
             ) : patients.length === 0 ? (
               <div className="text-center py-20 text-muted-foreground">

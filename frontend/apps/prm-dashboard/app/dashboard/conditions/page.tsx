@@ -10,9 +10,10 @@ import {
     CheckCircle2,
     Calendar,
     Thermometer,
-    Heart
+    Heart,
+    AlertCircle
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,8 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MagicCard } from '@/components/ui/magic-card';
 import {
     Dialog,
@@ -71,7 +73,9 @@ const COMMON_CONDITIONS = [
 ];
 
 export default function ConditionsPage() {
+    const { toast } = useToast();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [conditions, setConditions] = useState<Condition[]>([]);
     const [patients, setPatients] = useState<Patient[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -97,6 +101,7 @@ export default function ConditionsPage() {
 
     const fetchData = async () => {
         setLoading(true);
+        setError(null);
         try {
             const [condRes, patRes] = await Promise.all([
                 getConditions({ page: 1, page_size: 100 }),
@@ -108,7 +113,8 @@ export default function ConditionsPage() {
 
             if (condError) {
                 console.error('Failed to fetch conditions:', condError);
-                toast.error('Failed to load conditions');
+                setError('Failed to load conditions');
+                toast({ title: 'Error', description: 'Failed to load conditions', variant: 'destructive' });
             } else if (condData) {
                 setConditions(condData.items);
             }
@@ -117,7 +123,8 @@ export default function ConditionsPage() {
 
         } catch (error) {
             console.error('Error fetching data:', error);
-            toast.error('Failed to load data');
+            setError('Failed to load data');
+            toast({ title: 'Error', description: 'Failed to load data', variant: 'destructive' });
         } finally {
             setLoading(false);
         }
@@ -164,7 +171,7 @@ export default function ConditionsPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.patient_id || !formData.code_code || !formData.code_display) {
-            toast.error('Please fill in required fields');
+            toast({ title: 'Validation Error', description: 'Please fill in required fields', variant: 'destructive' });
             return;
         }
 
@@ -190,9 +197,9 @@ export default function ConditionsPage() {
 
         if (error) {
             console.error('Failed to create condition:', error);
-            toast.error(error.message || 'Failed to create condition');
+            toast({ title: 'Error', description: error.message || 'Failed to create condition', variant: 'destructive' });
         } else if (result) {
-            toast.success('Condition recorded successfully');
+            toast({ title: 'Success', description: 'Condition recorded successfully', variant: 'default' });
             setOpen(false);
             fetchData();
         }
@@ -315,16 +322,17 @@ export default function ConditionsPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
-                                        </TableRow>
-                                    ))
+                                    <TableSkeleton />
+                                ) : error ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6}>
+                                            <Alert variant="destructive" className="m-4">
+                                                <AlertCircle className="h-4 w-4" />
+                                                <AlertTitle>Error</AlertTitle>
+                                                <AlertDescription>{error}</AlertDescription>
+                                            </Alert>
+                                        </TableCell>
+                                    </TableRow>
                                 ) : filteredConditions.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
