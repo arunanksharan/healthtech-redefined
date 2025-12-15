@@ -96,6 +96,8 @@ from modules.observations.router import router as observations_router
 from modules.conditions.router import router as conditions_router
 from modules.medications.router import router as medications_router
 from modules.diagnostic_reports.router import router as diagnostic_reports_router
+# Phase 3 Routers
+from modules.analytics.router import router as analytics_router
 
 # Include New Domain Routers
 app.include_router(organizations_router, prefix="/api/v1/prm/organizations", tags=["Organizations"])
@@ -105,6 +107,12 @@ app.include_router(observations_router, prefix="/api/v1/prm/observations", tags=
 app.include_router(conditions_router, prefix="/api/v1/prm/conditions", tags=["Conditions"])
 app.include_router(medications_router, prefix="/api/v1/prm/medications", tags=["Medications"])
 app.include_router(diagnostic_reports_router, prefix="/api/v1/prm/diagnostic-reports", tags=["Diagnostic Reports"])
+
+# Phase 3 Routers
+app.include_router(analytics_router, prefix="/api/v1/prm", tags=["Analytics"])
+# app.include_router(telehealth_router, prefix="/api/v1/prm", tags=["Telehealth"])  # Coming Soon
+# app.include_router(billing_router, prefix="/api/v1/prm", tags=["Billing & Insurance"])  # Coming Soon
+
 
 # ==================== Health Check ====================
 
