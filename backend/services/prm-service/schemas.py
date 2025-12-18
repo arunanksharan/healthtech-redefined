@@ -121,6 +121,7 @@ class JourneyStageResponse(BaseModel):
     journey_id: UUID
     name: str
     description: Optional[str] = None
+    code: str
     order_index: int
     trigger_event: Optional[str] = None
     actions: Optional[Dict[str, Any]] = None
@@ -199,8 +200,9 @@ class JourneyResponse(BaseModel):
     tenant_id: UUID
     name: str
     description: Optional[str] = None
-    journey_type: str
-    is_default: bool
+    code: str
+    journey_type: Optional[str] = "wellness"
+    is_default: bool = False
     trigger_conditions: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
@@ -283,13 +285,9 @@ class JourneyInstanceResponse(BaseModel):
     tenant_id: UUID
     journey_id: UUID
     patient_id: UUID
-    appointment_id: Optional[UUID] = None
-    encounter_id: Optional[UUID] = None
     status: str
     current_stage_id: Optional[UUID] = None
-    context: Optional[Dict[str, Any]] = None
-    started_at: datetime
-    completed_at: Optional[datetime] = None
+    meta_data: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -418,19 +416,15 @@ class CommunicationResponse(BaseModel):
 
     id: UUID
     tenant_id: UUID
-    patient_id: UUID
+    patient_id: Optional[UUID] = None
     journey_instance_id: Optional[UUID] = None
     channel: str
-    recipient: str
-    subject: Optional[str] = None
-    message: str
-    template_name: Optional[str] = None
+    direction: str
+    template_code: Optional[str] = None
+    content: Optional[str] = None
+    content_structured: Optional[Dict[str, Any]] = None
     status: str
-    scheduled_for: Optional[datetime] = None
-    sent_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
-    read_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    created_by_user_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 
@@ -523,7 +517,7 @@ class TicketCommentResponse(BaseModel):
 
     id: UUID
     ticket_id: UUID
-    author_id: UUID
+    user_id: UUID
     comment: str
     is_internal: bool
     created_at: datetime
@@ -537,18 +531,16 @@ class TicketResponse(BaseModel):
 
     id: UUID
     tenant_id: UUID
-    patient_id: UUID
-    journey_instance_id: Optional[UUID] = None
+    patient_id: Optional[UUID] = None
     title: str
-    description: str
+    description: Optional[str] = None
     status: str
     priority: str
-    category: Optional[str] = None
-    assigned_to: Optional[UUID] = None
-    resolution_notes: Optional[str] = None
-    resolved_at: Optional[datetime] = None
+    created_by_user_id: Optional[UUID] = None
+    assigned_to_user_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
+    comments: List[TicketCommentResponse] = []
 
     class Config:
         from_attributes = True
@@ -586,6 +578,16 @@ class TicketListResponse(BaseModel):
     page_size: int
     has_next: bool
     has_previous: bool
+
+
+class TicketStats(BaseModel):
+    """Response for ticket statistics"""
+    total: int
+    open: int
+    in_progress: int
+    resolved: int
+    closed: int
+    urgent: int
 
 
 # ==================== Template Schemas ====================

@@ -24,7 +24,7 @@ from loguru import logger
 from shared.database.connection import get_db, engine
 from shared.database.models import (
     Base, Journey, JourneyStage, JourneyInstance, JourneyInstanceStageStatus,
-    Communication, Ticket, Patient
+    Communication, Ticket, TicketComment, Patient
 )
 from shared.events.publisher import publish_event
 from shared.events.types import EventType
@@ -42,8 +42,8 @@ from schemas import (
     JourneyInstanceStageUpdate, AdvanceStageRequest,
     CommunicationCreate, CommunicationUpdate, CommunicationResponse,
     CommunicationListResponse, SendCommunicationRequest,
-    TicketCreate, TicketUpdate, TicketResponse, TicketListResponse,
-    TicketCommentCreate, TicketWithComments,
+    TicketCreate, TicketUpdate, TicketResponse, TicketListResponse, TicketStats,
+    TicketCommentCreate, TicketCommentResponse, TicketWithComments,
     TemplateRenderRequest, TemplateRenderResponse,
     JourneyStatus, StageStatus, CommunicationStatus, TicketStatus
 )
@@ -64,6 +64,8 @@ async def root():
     return RedirectResponse(url="/docs")
 
 
+
+
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -75,6 +77,41 @@ app.add_middleware(
 
 # Include WebSocket router for real-time features
 app.include_router(websocket_router)
+
+# Include modular routers
+from modules.patients.router import router as patients_router
+app.include_router(patients_router, prefix="/api/v1/prm", tags=["Patients"])
+
+from modules.practitioners.router import router as practitioners_router
+app.include_router(practitioners_router, prefix="/api/v1/prm", tags=["Practitioners"])
+
+from modules.appointments.router import router as appointments_router
+app.include_router(appointments_router, prefix="/api/v1/prm", tags=["Appointments"])
+
+# Import new module routers
+from modules.organizations.router import router as organizations_router
+from modules.locations.router import router as locations_router
+from modules.encounters.router import router as encounters_router
+from modules.observations.router import router as observations_router
+from modules.conditions.router import router as conditions_router
+from modules.medications.router import router as medications_router
+from modules.diagnostic_reports.router import router as diagnostic_reports_router
+# Phase 3 Routers
+from modules.analytics.router import router as analytics_router
+
+# Include New Domain Routers
+app.include_router(organizations_router, prefix="/api/v1/prm/organizations", tags=["Organizations"])
+app.include_router(locations_router, prefix="/api/v1/prm/locations", tags=["Locations"])
+app.include_router(encounters_router, prefix="/api/v1/prm/encounters", tags=["Encounters"])
+app.include_router(observations_router, prefix="/api/v1/prm/observations", tags=["Observations"])
+app.include_router(conditions_router, prefix="/api/v1/prm/conditions", tags=["Conditions"])
+app.include_router(medications_router, prefix="/api/v1/prm/medications", tags=["Medications"])
+app.include_router(diagnostic_reports_router, prefix="/api/v1/prm/diagnostic-reports", tags=["Diagnostic Reports"])
+
+# Phase 3 Routers
+app.include_router(analytics_router, prefix="/api/v1/prm", tags=["Analytics"])
+# app.include_router(telehealth_router, prefix="/api/v1/prm", tags=["Telehealth"])  # Coming Soon
+# app.include_router(billing_router, prefix="/api/v1/prm", tags=["Billing & Insurance"])  # Coming Soon
 
 
 # ==================== Health Check ====================
@@ -109,13 +146,12 @@ async def create_journey(
     """
     try:
         # Create journey
+        # Create journey
         journey = Journey(
             tenant_id=journey_data.tenant_id,
             name=journey_data.name,
-            description=journey_data.description,
-            journey_type=journey_data.journey_type.value,
-            is_default=journey_data.is_default,
-            trigger_conditions=journey_data.trigger_conditions
+            code=re.sub(r'[^A-Z0-9]', '_', journey_data.name.upper()),
+            description=journey_data.description
         )
 
         db.add(journey)
@@ -129,6 +165,7 @@ async def create_journey(
                     name=stage_data.name,
                     description=stage_data.description,
                     order_index=stage_data.order_index,
+                    code=re.sub(r'[^A-Z0-9]', '_', stage_data.name.upper()),
                     trigger_event=stage_data.trigger_event,
                     actions=stage_data.actions
                 )
@@ -146,8 +183,8 @@ async def create_journey(
             payload={
                 "journey_id": str(journey.id),
                 "name": journey.name,
-                "journey_type": journey.journey_type,
-                "is_default": journey.is_default
+                "journey_type": journey_data.journey_type.value,
+                "is_default": journey_data.is_default
             },
             source_service="prm-service"
         )
@@ -183,11 +220,7 @@ async def list_journeys(
         if tenant_id:
             query = query.filter(Journey.tenant_id == tenant_id)
 
-        if journey_type:
-            query = query.filter(Journey.journey_type == journey_type.lower())
-
-        if is_default is not None:
-            query = query.filter(Journey.is_default == is_default)
+        # Removed journey_type and is_default filters as they don't exist in model
 
         # Get total count
         total = query.count()
@@ -195,7 +228,6 @@ async def list_journeys(
         # Apply pagination
         offset = (page - 1) * page_size
         journeys = query.order_by(
-            desc(Journey.is_default),
             Journey.name
         ).offset(offset).limit(page_size).all()
 
@@ -213,9 +245,11 @@ async def list_journeys(
 
     except Exception as e:
         logger.error(f"Error listing journeys: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list journeys"
+            detail=f"Failed to list journeys: {str(e)}"
         )
 
 
@@ -560,7 +594,7 @@ async def list_journey_instances(
             query = query.filter(JourneyInstance.journey_id == journey_id)
 
         if status:
-            query = query.filter(JourneyInstance.status == http_status.lower())
+            query = query.filter(JourneyInstance.status == status.lower())
 
         # Get total count
         total = query.count()
@@ -568,7 +602,7 @@ async def list_journey_instances(
         # Apply pagination
         offset = (page - 1) * page_size
         instances = query.order_by(
-            desc(JourneyInstance.started_at)
+            desc(JourneyInstance.created_at)
         ).offset(offset).limit(page_size).all()
 
         has_next = (offset + page_size) < total
@@ -589,6 +623,71 @@ async def list_journey_instances(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list journey instances"
         )
+
+
+@app.get(
+    "/api/v1/prm/instances/stats",
+    tags=["Journey Instances"]
+)
+async def get_journey_instance_stats(
+    tenant_id: Optional[UUID] = Query(None),
+    journey_id: Optional[UUID] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Get journey instance statistics
+
+    Returns counts by status and journey type.
+    Used for dashboard "Active Journeys" card.
+    """
+    from sqlalchemy import func
+
+    query = db.query(JourneyInstance)
+
+    if tenant_id:
+        query = query.filter(JourneyInstance.tenant_id == tenant_id)
+
+    if journey_id:
+        query = query.filter(JourneyInstance.journey_id == journey_id)
+
+    # Total
+    total = query.count()
+
+    # Active count
+    active = query.filter(JourneyInstance.status == "active").count()
+
+    # Completed count
+    completed = query.filter(JourneyInstance.status == "completed").count()
+
+    # Cancelled count
+    cancelled = query.filter(JourneyInstance.status == "cancelled").count()
+
+    # By status
+    status_counts = db.query(
+        JourneyInstance.status,
+        func.count(JourneyInstance.id)
+    ).group_by(JourneyInstance.status).all()
+
+    by_status = {s: count for s, count in status_counts}
+
+    # By journey
+    journey_counts = db.query(
+        Journey.name,
+        func.count(JourneyInstance.id)
+    ).join(
+        Journey, JourneyInstance.journey_id == Journey.id
+    ).group_by(Journey.name).all()
+
+    by_journey = {name: count for name, count in journey_counts}
+
+    return {
+        "total": total,
+        "active": active,
+        "completed": completed,
+        "cancelled": cancelled,
+        "by_status": by_status,
+        "by_journey": by_journey
+    }
 
 
 @app.get(
@@ -630,7 +729,7 @@ async def get_journey_instance(
                 "status": stage_status.status if stage_status else "not_started",
                 "entered_at": stage_status.entered_at.isoformat() if stage_status and stage_status.entered_at else None,
                 "completed_at": stage_status.completed_at.isoformat() if stage_status and stage_status.completed_at else None,
-                "notes": stage_status.notes if stage_status else None
+                "notes": stage_status.meta_data.get("notes") if stage_status and stage_status.meta_data else None
             })
 
         return JourneyInstanceWithStages(
@@ -641,8 +740,8 @@ async def get_journey_instance(
             patient_id=instance.patient_id,
             status=instance.status,
             current_stage_id=instance.current_stage_id,
-            started_at=instance.started_at,
-            completed_at=instance.completed_at,
+            started_at=instance.created_at,
+            completed_at=datetime.fromisoformat(instance.meta_data.get("completed_at")) if instance.meta_data and instance.meta_data.get("completed_at") else None,
             stages=stages
         )
 
@@ -714,7 +813,11 @@ async def advance_journey_stage(
             current_stage_status.status = "completed"
             current_stage_status.completed_at = datetime.utcnow()
             if advance_request.notes:
-                current_stage_status.notes = advance_request.notes
+                if current_stage_status.meta_data is None:
+                    current_stage_status.meta_data = {}
+                current_meta = dict(current_stage_status.meta_data)
+                current_meta["notes"] = advance_request.notes
+                current_stage_status.meta_data = current_meta
 
         # Find next stage
         sorted_stages = sorted(instance.journey.stages, key=lambda s: s.order_index)
@@ -727,7 +830,10 @@ async def advance_journey_stage(
             # No more stages, complete journey
             instance.status = "completed"
             instance.current_stage_id = None
-            instance.completed_at = datetime.utcnow()
+            if instance.meta_data is None: instance.meta_data = {}
+            current_meta_inst = dict(instance.meta_data)
+            current_meta_inst["completed_at"] = datetime.utcnow().isoformat()
+            instance.meta_data = current_meta_inst
 
             db.commit()
             db.refresh(instance)
@@ -880,6 +986,37 @@ async def create_communication(
         )
 
 
+
+@app.get(
+    "/api/v1/prm/communications/stats",
+    tags=["Communications"]
+)
+async def get_communication_stats(
+    db: Session = Depends(get_db)
+):
+    """Get communication statistics"""
+    try:
+        total = db.query(Communication).count()
+        whatsapp = db.query(Communication).filter(Communication.channel == 'whatsapp').count()
+        sms = db.query(Communication).filter(Communication.channel == 'sms').count()
+        email = db.query(Communication).filter(Communication.channel == 'email').count()
+        delivered = db.query(Communication).filter(Communication.status == 'delivered').count()
+        
+        return {
+            "total": total,
+            "whatsapp": whatsapp,
+            "sms": sms,
+            "email": email,
+            "delivered": delivered
+        }
+    except Exception as e:
+        logger.error(f"Error getting communication stats: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get communication stats"
+        )
+
+
 @app.get(
     "/api/v1/prm/communications",
     response_model=CommunicationListResponse,
@@ -908,7 +1045,7 @@ async def list_communications(
             query = query.filter(Communication.channel == channel.lower())
 
         if status:
-            query = query.filter(Communication.status == http_status.lower())
+            query = query.filter(Communication.status == status.lower())
 
         # Get total count
         total = query.count()
@@ -937,6 +1074,107 @@ async def list_communications(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list communications"
         )
+
+
+
+@app.delete(
+    "/api/v1/prm/communications/{communication_id}",
+    status_code=http_status.HTTP_204_NO_CONTENT,
+    tags=["Communications"]
+)
+async def delete_communication(
+    communication_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Delete a communication"""
+    try:
+        communication = db.query(Communication).filter(Communication.id == communication_id).first()
+        if not communication:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="Communication not found"
+            )
+
+        db.delete(communication)
+        db.commit()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting communication: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete communication"
+        )
+
+
+@app.get(
+    "/api/v1/prm/communications/{communication_id}",
+    response_model=CommunicationResponse,
+    tags=["Communications"]
+)
+async def get_communication(
+    communication_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Get communication by ID"""
+    communication = db.query(Communication).filter(
+        Communication.id == communication_id
+    ).first()
+
+    if not communication:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Communication not found"
+        )
+
+    return communication
+
+
+@app.patch(
+    "/api/v1/prm/communications/{communication_id}",
+    response_model=CommunicationResponse,
+    tags=["Communications"]
+)
+async def update_communication(
+    communication_id: UUID,
+    update_data: CommunicationUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update a communication
+
+    Common uses:
+    - Mark as read: status="read"
+    - Mark as delivered: status="delivered"
+    - Mark as failed: status="failed"
+    """
+    communication = db.query(Communication).filter(
+        Communication.id == communication_id
+    ).first()
+
+    if not communication:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Communication not found"
+        )
+
+    # Update fields
+    update_dict = update_data.model_dump(exclude_unset=True, exclude_none=True)
+
+    for field, value in update_dict.items():
+        if hasattr(communication, field):
+            setattr(communication, field, value)
+
+    communication.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(communication)
+
+    logger.info(f"Updated communication: {communication_id}")
+
+    return communication
 
 
 # ==================== Tickets ====================
@@ -973,13 +1211,12 @@ async def create_ticket(
         ticket = Ticket(
             tenant_id=ticket_data.tenant_id,
             patient_id=ticket_data.patient_id,
-            journey_instance_id=ticket_data.journey_instance_id,
             title=ticket_data.title,
             description=ticket_data.description,
             status="open",
             priority=ticket_data.priority.value,
             category=ticket_data.category,
-            assigned_to=ticket_data.assigned_to
+            assigned_to_user_id=ticket_data.assigned_to
         )
 
         db.add(ticket)
@@ -1014,6 +1251,59 @@ async def create_ticket(
         )
 
 
+
+@app.get(
+    "/api/v1/prm/tickets/stats",
+    response_model=TicketStats,
+    tags=["Tickets"]
+)
+async def get_ticket_stats(
+    db: Session = Depends(get_db)
+):
+    """Get ticket statistics"""
+    try:
+        total = db.query(Ticket).count()
+        open_count = db.query(Ticket).filter(Ticket.status == 'open').count()
+        in_progress = db.query(Ticket).filter(Ticket.status == 'in_progress').count()
+        resolved = db.query(Ticket).filter(Ticket.status == 'resolved').count()
+        closed = db.query(Ticket).filter(Ticket.status == 'closed').count()
+        urgent = db.query(Ticket).filter(Ticket.priority == 'urgent').count()
+        
+        return TicketStats(
+            total=total,
+            open=open_count,
+            in_progress=in_progress,
+            resolved=resolved,
+            closed=closed,
+            urgent=urgent
+        )
+    except Exception as e:
+        logger.error(f"Error getting ticket stats: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get ticket stats"
+        )
+
+
+@app.get(
+    "/api/v1/prm/tickets/{ticket_id}",
+    response_model=TicketResponse,
+    tags=["Tickets"]
+)
+async def get_ticket(
+    ticket_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Get ticket by ID"""
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+    return ticket
+
+
 @app.get(
     "/api/v1/prm/tickets",
     response_model=TicketListResponse,
@@ -1036,7 +1326,7 @@ async def list_tickets(
             query = query.filter(Ticket.patient_id == patient_id)
 
         if status:
-            query = query.filter(Ticket.status == http_status.lower())
+            query = query.filter(Ticket.status == status.lower())
 
         if priority:
             query = query.filter(Ticket.priority == priority.lower())
@@ -1067,9 +1357,11 @@ async def list_tickets(
 
     except Exception as e:
         logger.error(f"Error listing tickets: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list tickets"
+            detail=f"Failed to list tickets: {str(e)}"
         )
 
 
@@ -1134,7 +1426,91 @@ async def update_ticket(
         )
 
 
-# ==================== Helper Functions ====================
+# ==================== Ticket Comments ====================
+
+@app.post(
+    "/api/v1/prm/tickets/{ticket_id}/comments",
+    response_model=TicketCommentResponse,
+    status_code=http_status.HTTP_201_CREATED,
+    tags=["Tickets"]
+)
+async def create_ticket_comment(
+    ticket_id: UUID,
+    comment_data: TicketCommentCreate,
+    db: Session = Depends(get_db)
+):
+    """Add a comment to a ticket"""
+    try:
+        # Validate ticket exists
+        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found"
+            )
+
+        # Create comment
+        comment = TicketComment(
+            tenant_id=ticket.tenant_id,
+            ticket_id=ticket_id,
+            user_id=comment_data.author_id,
+            content=comment_data.comment,
+            is_internal=comment_data.is_internal
+        )
+
+        db.add(comment)
+        db.commit()
+        db.refresh(comment)
+
+        logger.info(f"Added comment to ticket {ticket_id}")
+
+        return comment
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating ticket comment: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create ticket comment"
+        )
+
+
+@app.get(
+    "/api/v1/prm/tickets/{ticket_id}/comments",
+    response_model=List[TicketCommentResponse],
+    tags=["Tickets"]
+)
+async def list_ticket_comments(
+    ticket_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """List comments for a ticket"""
+    try:
+        # Validate ticket exists
+        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if not ticket:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found"
+            )
+
+        comments = db.query(TicketComment).filter(
+            TicketComment.ticket_id == ticket_id
+        ).order_by(TicketComment.created_at).all()
+
+        return comments
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing ticket comments: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list ticket comments"
+        )
+
 
 async def _execute_stage_actions(
     instance_id: UUID,

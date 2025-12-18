@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,8 +18,6 @@ import {
   Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/providers/theme-provider";
 import {
   DropdownMenu,
@@ -42,7 +40,7 @@ interface TopBarProps {
   showMenuButton?: boolean;
 }
 
-// Mock notification count - would come from API
+// Mock notification count
 const useNotifications = () => {
   return {
     unreadCount: 4,
@@ -61,7 +59,6 @@ const useBreadcrumbs = (): Breadcrumb[] => {
     const segments = pathname.split("/").filter(Boolean);
     const breadcrumbs: Breadcrumb[] = [];
 
-    // Map segment names to display labels
     const labelMap: Record<string, string> = {
       patients: "Patients",
       practitioners: "Practitioners",
@@ -88,8 +85,6 @@ const useBreadcrumbs = (): Breadcrumb[] => {
     segments.forEach((segment, index) => {
       currentPath += `/${segment}`;
       const isLast = index === segments.length - 1;
-
-      // Check if this is a dynamic segment (ID)
       const isId = /^[a-f0-9-]{20,}$/i.test(segment) || /^\d+$/.test(segment);
 
       if (isId) {
@@ -120,12 +115,10 @@ export function TopBar({
   const { setTheme, resolvedTheme } = useTheme();
   const [isMac, setIsMac] = useState(false);
 
-  // Detect OS for keyboard shortcut display
   useEffect(() => {
     setIsMac(navigator.platform.toUpperCase().indexOf("MAC") >= 0);
   }, []);
 
-  // Global keyboard shortcut for search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -141,20 +134,19 @@ export function TopBar({
   return (
     <header
       className={cn(
-        "h-topbar bg-background/80 backdrop-blur-md border-b border-border/50 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30 supports-[backdrop-filter]:bg-background/60",
+        "h-topbar bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30",
         className
       )}
     >
       {/* Left Section - Menu button and Breadcrumbs */}
       <div className="flex items-center gap-4">
-        {/* Mobile Menu Button */}
         {showMenuButton && (
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-md hover:bg-accent transition-colors"
-            aria-label="Open menu"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 hover:scale-105"
+            aria-label="Toggle sidebar"
           >
-            <Menu className="w-5 h-5 text-muted-foreground" />
+            <Menu className="w-5 h-5 text-gray-500" />
           </button>
         )}
 
@@ -164,17 +156,17 @@ export function TopBar({
             {breadcrumbs.map((crumb, index) => (
               <li key={index} className="flex items-center">
                 {index > 0 && (
-                  <ChevronRight className="w-4 h-4 text-gray-400 mx-1.5" />
+                  <ChevronRight className="w-4 h-4 text-gray-300 mx-1.5" />
                 )}
                 {crumb.href ? (
                   <Link
                     href={crumb.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium"
+                    className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors font-medium"
                   >
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="text-sm font-semibold text-foreground bg-accent/50 px-2 py-0.5 rounded-md">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg">
                     {crumb.label}
                   </span>
                 )}
@@ -188,11 +180,11 @@ export function TopBar({
       <div className="hidden md:flex flex-1 max-w-md mx-8">
         <button
           onClick={onSearchClick}
-          className="flex items-center gap-3 w-full px-4 py-2 bg-muted/50 hover:bg-muted border border-transparent hover:border-border rounded-xl text-sm text-muted-foreground transition-all group focus:outline-none focus:ring-2 focus:ring-blue-100 focus:bg-background focus:border-blue-200 shadow-sm"
+          className="flex items-center gap-3 w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-700 rounded-lg text-sm text-gray-500 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
-          <Search className="w-4 h-4 text-muted-foreground/80 group-hover:text-foreground transition-colors" />
+          <Search className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
           <span className="flex-1 text-left">Search or ask AI...</span>
-          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-background border border-border rounded-md text-[10px] font-bold text-muted-foreground font-mono shadow-sm">
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-md text-[10px] font-bold text-gray-400 font-mono">
             {isMac ? (
               <>
                 <Command className="w-3 h-3" />K
@@ -209,7 +201,7 @@ export function TopBar({
         {/* Mobile Search Button */}
         <button
           onClick={onSearchClick}
-          className="md:hidden p-2 rounded-full hover:bg-accent transition-colors text-muted-foreground"
+          className="md:hidden p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 text-gray-500 hover:scale-105"
           aria-label="Search"
         >
           <Search className="w-5 h-5" />
@@ -219,45 +211,45 @@ export function TopBar({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="relative p-2.5 rounded-full hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+              className="relative p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:scale-105"
               aria-label="Notifications"
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-background rounded-full"></span>
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuContent align="end" className="w-80 rounded-lg border-2 border-gray-100 dark:border-gray-800">
             <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              <Badge variant="secondary" className="bg-blue-50 text-blue-700">{unreadCount} new</Badge>
+              <span className="font-heading">Notifications</span>
+              <span className="bg-blue-500 text-white text-xs font-semibold px-2 py-0.5 rounded-md">{unreadCount} new</span>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
             <div className="max-h-80 overflow-y-auto">
-              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-pointer">
+              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-blue-500 rounded-full" />
                   <span className="font-medium text-sm">New appointment booked</span>
                 </div>
-                <span className="text-xs text-muted-foreground ml-4">
+                <span className="text-xs text-gray-500 ml-4">
                   Patient John Doe scheduled for tomorrow at 10:00 AM
                 </span>
-                <span className="text-xs text-muted-foreground ml-4">5 min ago</span>
+                <span className="text-xs text-gray-400 ml-4">5 min ago</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-pointer">
+              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-amber-500 rounded-full" />
                   <span className="font-medium text-sm">Lab results available</span>
                 </div>
-                <span className="text-xs text-muted-foreground ml-4">
+                <span className="text-xs text-gray-500 ml-4">
                   Complete blood count results for Jane Smith
                 </span>
-                <span className="text-xs text-muted-foreground ml-4">1 hour ago</span>
+                <span className="text-xs text-gray-400 ml-4">1 hour ago</span>
               </DropdownMenuItem>
             </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-center justify-center text-blue-600 font-medium cursor-pointer">
+            <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+            <DropdownMenuItem className="text-center justify-center text-blue-500 font-semibold cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20">
               View all notifications
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -265,37 +257,37 @@ export function TopBar({
 
         {/* Help */}
         <button
-          className="hidden sm:block p-2.5 rounded-full hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+          className="hidden sm:block p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:scale-105"
           aria-label="Help"
         >
           <HelpCircle className="w-5 h-5" />
         </button>
 
-        <div className="h-6 w-px bg-border mx-2 hidden sm:block"></div>
+        <div className="h-6 w-0.5 bg-gray-200 dark:bg-gray-700 mx-2 hidden sm:block"></div>
 
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-full hover:bg-accent border border-transparent hover:border-border transition-all group"
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 group"
               aria-label="User menu"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-background shadow-sm group-hover:shadow-md transition-shadow">
+              <div className="w-9 h-9 rounded-lg bg-blue-500 flex items-center justify-center text-white text-sm font-bold transition-all duration-200 group-hover:scale-105">
                 RS
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:rotate-90 transition-transform duration-200" />
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:rotate-90 transition-transform duration-200" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuContent align="end" className="w-60 rounded-lg border-2 border-gray-100 dark:border-gray-800">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <span className="font-medium">Dr. Rohit Sharma</span>
+                <span className="font-heading">Dr. Rohit Sharma</span>
                 <span className="text-xs font-normal text-gray-500">
                   rohit.sharma@suryahospitals.com
                 </span>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
             <DropdownMenuItem asChild>
               <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
                 <User className="w-4 h-4" />
@@ -319,8 +311,8 @@ export function TopBar({
               )}
               <span>Switch to {resolvedTheme === "dark" ? "Light" : "Dark"} Mode</span>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-2 text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer">
+            <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+            <DropdownMenuItem className="flex items-center gap-2 text-red-500 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20 cursor-pointer">
               <LogOut className="w-4 h-4" />
               <span>Sign out</span>
             </DropdownMenuItem>

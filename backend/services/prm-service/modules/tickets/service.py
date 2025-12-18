@@ -18,7 +18,9 @@ from .schemas import (
     TicketCreate,
     TicketUpdate,
     TicketListResponse,
-    TicketStatus
+    TicketListResponse,
+    TicketStatus,
+    TicketStats
 )
 
 
@@ -186,4 +188,27 @@ class TicketService:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error updating ticket: {e}")
+            raise
+
+    async def get_stats(self) -> TicketStats:
+        """Get ticket statistics"""
+        try:
+            total = self.db.query(Ticket).count()
+            open_count = self.db.query(Ticket).filter(Ticket.status == 'open').count()
+            in_progress = self.db.query(Ticket).filter(Ticket.status == 'in_progress').count()
+            resolved = self.db.query(Ticket).filter(Ticket.status == 'resolved').count()
+            closed = self.db.query(Ticket).filter(Ticket.status == 'closed').count()
+            urgent = self.db.query(Ticket).filter(Ticket.priority == 'urgent').count()
+
+            return TicketStats(
+                total=total,
+                open=open_count,
+                in_progress=in_progress,
+                resolved=resolved,
+                closed=closed,
+                urgent=urgent
+            )
+
+        except Exception as e:
+            logger.error(f"Error getting ticket stats: {e}")
             raise

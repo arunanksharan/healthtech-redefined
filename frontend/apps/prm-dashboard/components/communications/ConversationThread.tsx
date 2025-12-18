@@ -63,11 +63,11 @@ const ChannelIcon = ({ channel }: { channel: string }) => {
     case 'phone':
       return <Phone className="w-4 h-4 text-blue-600" />;
     case 'email':
-      return <Mail className="w-4 h-4 text-gray-600" />;
+      return <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
     case 'sms':
-      return <MessageCircle className="w-4 h-4 text-purple-600" />;
+      return <MessageCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
     default:
-      return <MessageCircle className="w-4 h-4 text-gray-600" />;
+      return <MessageCircle className="w-4 h-4 text-muted-foreground" />;
   }
 };
 
@@ -93,7 +93,7 @@ const MessageBubble = ({ message }: { message: Message }) => {
   if (isSystem) {
     return (
       <div className="flex justify-center my-4">
-        <div className="bg-gray-100 text-gray-600 text-xs px-4 py-2 rounded-full">
+        <div className="bg-muted text-muted-foreground text-xs px-4 py-2 rounded-full">
           {message.textBody}
         </div>
       </div>
@@ -103,11 +103,10 @@ const MessageBubble = ({ message }: { message: Message }) => {
   return (
     <div className={`flex ${isInbound ? 'justify-start' : 'justify-end'} mb-4`}>
       <div
-        className={`max-w-[70%] rounded-lg px-4 py-2 ${
-          isInbound
-            ? 'bg-white border border-gray-200'
+        className={`max-w-[70%] rounded-lg px-4 py-2 ${isInbound
+            ? 'bg-card border border-border'
             : 'bg-blue-600 text-white'
-        }`}
+          }`}
       >
         {/* Message Content */}
         {message.contentType === 'text' && (
@@ -156,31 +155,29 @@ const MessageBubble = ({ message }: { message: Message }) => {
         )}
 
         {/* Message Metadata */}
-        <div
-          className={`flex items-center justify-between mt-2 text-xs ${
-            isInbound ? 'text-gray-500' : 'text-blue-100'
+        className={`flex items-center justify-between mt-2 text-xs ${isInbound ? 'text-muted-foreground' : 'text-blue-100'
           }`}
         >
-          <div className="flex items-center space-x-2">
-            <span>{format(new Date(message.createdAt), 'HH:mm')}</span>
-            {message.sentiment && <SentimentIcon sentiment={message.sentiment} />}
-          </div>
-
-          {!isInbound && message.deliveryStatus && (
-            <span className="capitalize">{message.deliveryStatus}</span>
-          )}
+        <div className="flex items-center space-x-2">
+          <span>{format(new Date(message.createdAt), 'HH:mm')}</span>
+          {message.sentiment && <SentimentIcon sentiment={message.sentiment} />}
         </div>
 
-        {/* Intent Badge */}
-        {message.intent && isInbound && (
-          <div className="mt-2">
-            <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-              Intent: {message.intent}
-            </span>
-          </div>
+        {!isInbound && message.deliveryStatus && (
+          <span className="capitalize">{message.deliveryStatus}</span>
         )}
       </div>
+
+      {/* Intent Badge */}
+      {message.intent && isInbound && (
+        <div className="mt-2">
+          <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+            Intent: {message.intent}
+          </span>
+        </div>
+      )}
     </div>
+    </div >
   );
 };
 
@@ -266,22 +263,22 @@ export default function ConversationThread({
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
-        msg.textBody?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      msg.textBody?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : messages;
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-muted/30">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <ChannelIcon channel={conversation.channelType} />
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-foreground">
                 {conversation.patientName || 'Unknown Patient'}
               </h2>
-              <div className="flex items-center space-x-3 text-sm text-gray-500">
+              <div className="flex items-center space-x-3 text-sm text-muted-foreground">
                 <span className="capitalize">{conversation.status}</span>
                 <span>•</span>
                 <span className="capitalize">{conversation.channelType}</span>
@@ -302,13 +299,13 @@ export default function ConversationThread({
           <div className="flex items-center space-x-2">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search messages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="pl-10 pr-4 py-2 border border-input rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -348,7 +345,7 @@ export default function ConversationThread({
 
       {/* Message Input */}
       {conversation.status !== 'closed' && (
-        <div className="bg-white border-t border-gray-200 px-6 py-4">
+        <div className="bg-card border-t border-border px-6 py-4">
           <div className="flex items-center space-x-3">
             <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
               <Paperclip className="w-5 h-5" />
@@ -363,7 +360,7 @@ export default function ConversationThread({
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-2 border border-input bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
 
             <button

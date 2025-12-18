@@ -136,30 +136,31 @@ export function ProactiveAlertCard({
     <Card className={cn("transition-all", styles.bg, styles.border, className)}>
       <CardContent className="pt-4">
         {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-start gap-3">
-            <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", styles.bg, styles.icon)}>
-              <TypeIcon className="h-5 w-5" />
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start gap-4">
+            <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm", styles.bg, styles.icon)}>
+              <TypeIcon className="h-6 w-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <Badge className={cn("text-xs uppercase font-semibold", styles.badge)}>
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="outline" className={cn("text-xs font-medium border-0 px-2 py-0.5", styles.badge)}>
                   {alert.priority} Priority
                 </Badge>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-[11px] text-muted-foreground font-medium">
                   {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
                 </span>
               </div>
-              <h3 className="font-semibold mt-1">{alert.title}</h3>
+              <h3 className="text-base font-semibold leading-tight text-foreground">{alert.title}</h3>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onDismiss}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0" onClick={onDismiss}>
             <X className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Description */}
-        <p className="text-sm text-muted-foreground mb-4">{alert.description}</p>
+        {/* Description */}
+        <p className="text-sm text-muted-foreground leading-relaxed mb-5 pl-[64px]">{alert.description}</p>
 
         {/* Data Preview */}
         {alert.affectedItems && alert.affectedItems.length > 0 && (
@@ -243,36 +244,44 @@ export function ProactiveAlertCard({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-2">
+        {/* Actions - Redesigned Footer */}
+        <div className="flex items-center gap-3 pt-4 border-t border-border mt-4">
           {alert.primaryAction && (
             <Button
               size="sm"
-              className="flex-1"
+              className={cn("flex-1 shadow-sm font-medium",
+                alert.priority === 'high' ? "bg-red-600 hover:bg-red-700" :
+                  alert.priority === 'medium' ? "bg-amber-600 hover:bg-amber-700" :
+                    "bg-blue-600 hover:bg-blue-700"
+              )}
               onClick={handlePrimaryAction}
               disabled={isActioning}
             >
               {isActioning ? (
                 <>
-                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  <Clock className="h-3.5 w-3.5 mr-2 animate-spin" />
                   Processing...
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-2" />
+                  <Send className="h-3.5 w-3.5 mr-2" />
                   {alert.primaryAction}
                 </>
               )}
             </Button>
           )}
+
           {alert.secondaryAction && (
-            <Button variant="outline" size="sm" onClick={onSecondaryAction}>
+            <Button variant="outline" size="sm" className="font-medium" onClick={onSecondaryAction}>
               {alert.secondaryAction}
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={onDismiss}>
-            Dismiss
-          </Button>
+
+          {!alert.primaryAction && !alert.secondaryAction && (
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={onDismiss}>
+              Dismiss
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

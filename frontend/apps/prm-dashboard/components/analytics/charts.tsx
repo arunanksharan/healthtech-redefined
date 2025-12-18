@@ -114,8 +114,8 @@ export function TimeSeriesChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-popover border rounded-lg shadow-lg p-3">
-          <p className="text-sm font-medium mb-1">
+        <div className="bg-white dark:bg-zinc-900 border border-border rounded-lg shadow-xl p-3 z-50">
+          <p className="text-sm font-medium text-foreground mb-1">
             {format(new Date(label), "PPP")}
           </p>
           {payload.map((entry: any, index: number) => (
@@ -379,8 +379,8 @@ export function BarChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-popover border rounded-lg shadow-lg p-3">
-          <p className="text-sm font-medium mb-1">{label}</p>
+        <div className="bg-white dark:bg-zinc-900 border border-border rounded-lg shadow-xl p-3 z-50">
+          <p className="text-sm font-medium text-foreground mb-1">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
               {entry.name}: {entry.value.toLocaleString()}
@@ -669,8 +669,8 @@ export function DonutChart({
     if (active && payload && payload.length) {
       const item = payload[0].payload;
       return (
-        <div className="bg-popover border rounded-lg shadow-lg p-3">
-          <p className="text-sm font-medium">{item.name}</p>
+        <div className="bg-white dark:bg-zinc-900 border border-border rounded-lg shadow-xl p-3 z-50">
+          <p className="text-sm font-medium text-foreground">{item.name}</p>
           <p className="text-sm text-muted-foreground">
             {item.value.toLocaleString()} ({((item.value / data.reduce((a, b) => a + b.value, 0)) * 100).toFixed(1)}%)
           </p>
@@ -710,13 +710,13 @@ export function DonutChart({
                   <Cell key={`cell-${index}`} fill={entry.fill} cursor="pointer" />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 100 }} />
             </PieChart>
           </ResponsiveContainer>
 
           {/* Center label */}
           {(centerLabel || centerValue) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
               {centerValue && (
                 <span className="text-2xl font-bold">{centerValue}</span>
               )}

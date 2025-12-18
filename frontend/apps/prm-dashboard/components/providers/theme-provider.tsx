@@ -12,12 +12,14 @@ interface ThemeProviderProps {
   attribute?: string;
   enableSystem?: boolean;
   disableTransitionOnChange?: boolean;
+  forcedTheme?: Theme;
 }
 
 interface ThemeProviderState {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   resolvedTheme: "dark" | "light";
+  forcedTheme?: Theme;
 }
 
 const initialState: ThemeProviderState = {
@@ -35,6 +37,7 @@ export function ThemeProvider({
   attribute = "class",
   enableSystem = true,
   disableTransitionOnChange = false,
+  forcedTheme,
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme);
@@ -57,20 +60,26 @@ export function ThemeProvider({
     return t;
   };
 
-  // Initialize theme from storage
+  // Initialize theme from storage (only if not forced)
   useEffect(() => {
+    if (forcedTheme) {
+      setMounted(true);
+      return;
+    }
     const savedTheme = localStorage.getItem(storageKey) as Theme | null;
     if (savedTheme) {
       setTheme(savedTheme);
     }
     setMounted(true);
-  }, [storageKey]);
+  }, [storageKey, forcedTheme]);
 
   // Update resolved theme and apply to document
   useEffect(() => {
     if (!mounted) return;
 
-    const resolved = resolveTheme(theme);
+    // If forced, use forced theme; otherwise use user preference
+    const themeToUse = forcedTheme || theme;
+    const resolved = resolveTheme(themeToUse);
     setResolvedTheme(resolved);
 
     const root = window.document.documentElement;
@@ -94,7 +103,7 @@ export function ThemeProvider({
       void root.offsetWidth;
       root.style.removeProperty("transition");
     }
-  }, [theme, mounted, attribute, disableTransitionOnChange]);
+  }, [theme, mounted, attribute, disableTransitionOnChange, forcedTheme]);
 
   // Listen for system theme changes
   useEffect(() => {
@@ -110,12 +119,15 @@ export function ThemeProvider({
   }, [theme, enableSystem]);
 
   const value = {
-    theme,
+    theme: forcedTheme || theme,
     setTheme: (newTheme: Theme) => {
+      // Don't save to localStorage if theme is forced
+      if (forcedTheme) return;
       localStorage.setItem(storageKey, newTheme);
       setTheme(newTheme);
     },
     resolvedTheme,
+    forcedTheme,
   };
 
   // Prevent flash of incorrect theme

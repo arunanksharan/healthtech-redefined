@@ -3,7 +3,7 @@ Patient Schemas
 FHIR-compliant patient management schemas
 """
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Optional, Any
 from uuid import UUID
 from pydantic import BaseModel, Field, validator, EmailStr
 from enum import Enum
@@ -361,6 +361,15 @@ class PatientListResponse(BaseModel):
     has_previous: bool
 
 
+
+class PatientIdentifierSimple(BaseModel):
+    system: str
+    value: str
+    is_primary: bool = False
+
+    class Config:
+        from_attributes = True
+
 # ==================== Simple Patient Response (matches DB model) ====================
 
 class PatientSimpleResponse(BaseModel):
@@ -403,17 +412,42 @@ class PatientSimpleResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+    # Computed fields (defined last to access others in validators)
+    identifiers: Optional[List[PatientIdentifierSimple]] = Field(default=None, exclude=True)
+    mrn: Optional[str] = None
+
     @property
     def name(self) -> str:
         """Full name"""
         parts = [self.first_name, self.middle_name, self.last_name]
         return " ".join(p for p in parts if p)
 
-    @property
-    def mrn(self) -> Optional[str]:
-        """Get MRN from metadata if available"""
-        if self.meta_data and "mrn" in self.meta_data:
-            return self.meta_data["mrn"]
+    @validator("mrn", always=True)
+    def get_mrn(cls, v, values):
+        """Get MRN from metadata or identifiers"""
+        if v:
+            return v
+            
+        # Try metadata first
+        meta_data = values.get("meta_data")
+        if meta_data and isinstance(meta_data, dict) and "mrn" in meta_data:
+            return meta_data["mrn"]
+            
+        # Try identifiers relationship
+        identifiers = values.get("identifiers")
+        if identifiers:
+            for ident in identifiers:
+                # Handle both dict (if pre-serialized) and ORM object
+                if isinstance(ident, dict):
+                    if ident.get("system") == "MRN":
+                        return ident.get("value")
+                else:
+                    try:
+                        if getattr(ident, "system", None) == "MRN":
+                            return getattr(ident, "value", None)
+                    except Exception:
+                        continue
+                        
         return None
 
     class Config:

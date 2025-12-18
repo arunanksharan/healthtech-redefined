@@ -1,0 +1,1537 @@
+{
+  "_description": "Comprehensive Seed Data for PRM Service - Healthcare Platform",
+  "_version": "2.0.0",
+  "_created": "2025-12-12",
+  "_notes": "Dates with {TODAY}, {TOMORROW}, etc. are placeholders replaced by the seed script",
+  "tenants": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Apollo Multi-Specialty Hospital",
+      "code": "APOLLO001",
+      "domain": "apollo.healthtech.local",
+      "config": {
+        "timezone": "Asia/Kolkata",
+        "currency": "INR",
+        "language": "en",
+        "features": [
+          "appointments",
+          "encounters",
+          "journeys",
+          "telehealth",
+          "analytics"
+        ],
+        "working_hours": {
+          "start": "08:00",
+          "end": "20:00"
+        },
+        "appointment_slot_minutes": 15
+      },
+      "is_active": true
+    }
+  ],
+  "permissions": [
+    {
+      "id": "50100000-0000-0000-0000-000000000001",
+      "resource": "patient",
+      "action": "read",
+      "scope": "all",
+      "description": "View all patients"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000002",
+      "resource": "patient",
+      "action": "write",
+      "scope": "all",
+      "description": "Create/update patients"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000003",
+      "resource": "appointment",
+      "action": "read",
+      "scope": "all",
+      "description": "View all appointments"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000004",
+      "resource": "appointment",
+      "action": "write",
+      "scope": "all",
+      "description": "Manage appointments"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000005",
+      "resource": "encounter",
+      "action": "read",
+      "scope": "all",
+      "description": "View encounters"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000006",
+      "resource": "encounter",
+      "action": "write",
+      "scope": "all",
+      "description": "Create encounters"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000007",
+      "resource": "communication",
+      "action": "read",
+      "scope": "all",
+      "description": "View communications"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000008",
+      "resource": "communication",
+      "action": "write",
+      "scope": "all",
+      "description": "Send communications"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000009",
+      "resource": "ticket",
+      "action": "read",
+      "scope": "all",
+      "description": "View tickets"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000010",
+      "resource": "ticket",
+      "action": "write",
+      "scope": "all",
+      "description": "Manage tickets"
+    },
+    {
+      "id": "50100000-0000-0000-0000-000000000011",
+      "resource": "admin",
+      "action": "all",
+      "scope": "all",
+      "description": "Full admin access"
+    }
+  ],
+  "organizations": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Apollo Multi-Specialty Hospital",
+      "type": "hospital",
+      "phone": "+91-80-12345678",
+      "email": "info@apollo.health",
+      "website": "https://apollo.health",
+      "address_line1": "123 Healthcare Avenue",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560001",
+      "country": "India",
+      "is_active": true,
+      "fhir_resource": {
+        "resourceType": "Organization",
+        "identifier": [
+          {
+            "system": "urn:ietf:rfc:3986",
+            "value": "urn:uuid:10000000-0000-0000-0000-000000000001"
+          }
+        ]
+      },
+      "meta_data": {
+        "beds_total": 500,
+        "established": 2010
+      }
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Apollo Diagnostics Lab",
+      "type": "lab",
+      "phone": "+91-80-12345679",
+      "email": "lab@apollo.health",
+      "address_line1": "123 Healthcare Avenue, Block B",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560001",
+      "country": "India",
+      "is_active": true,
+      "fhir_resource": {},
+      "meta_data": {}
+    }
+  ],
+  "locations": [
+    {
+      "id": "20000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "organization_id": "10000000-0000-0000-0000-000000000001",
+      "name": "Main Building",
+      "type": "building",
+      "code": "MAIN-BLD",
+      "building": "Main",
+      "floor": "Ground",
+      "is_active": true,
+      "operational_status": "active",
+      "fhir_resource": {},
+      "meta_data": {}
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "organization_id": "10000000-0000-0000-0000-000000000001",
+      "name": "Cardiology OPD",
+      "type": "department",
+      "code": "CARDIO-OPD",
+      "building": "Main",
+      "floor": "1",
+      "room": "101-110",
+      "parent_location_id": "20000000-0000-0000-0000-000000000001",
+      "is_active": true,
+      "operational_status": "active",
+      "fhir_resource": {},
+      "meta_data": {
+        "speciality": "cardiology"
+      }
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "organization_id": "10000000-0000-0000-0000-000000000001",
+      "name": "Orthopedics OPD",
+      "type": "department",
+      "code": "ORTHO-OPD",
+      "building": "Main",
+      "floor": "2",
+      "room": "201-210",
+      "parent_location_id": "20000000-0000-0000-0000-000000000001",
+      "is_active": true,
+      "operational_status": "active",
+      "fhir_resource": {},
+      "meta_data": {
+        "speciality": "orthopedics"
+      }
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "organization_id": "10000000-0000-0000-0000-000000000001",
+      "name": "General Medicine OPD",
+      "type": "department",
+      "code": "GENMED-OPD",
+      "building": "Main",
+      "floor": "1",
+      "room": "111-120",
+      "parent_location_id": "20000000-0000-0000-0000-000000000001",
+      "is_active": true,
+      "operational_status": "active",
+      "fhir_resource": {},
+      "meta_data": {
+        "speciality": "general_medicine"
+      }
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "organization_id": "10000000-0000-0000-0000-000000000001",
+      "name": "Emergency Department",
+      "type": "department",
+      "code": "ED",
+      "building": "Main",
+      "floor": "Ground",
+      "room": "ED-01",
+      "parent_location_id": "20000000-0000-0000-0000-000000000001",
+      "is_active": true,
+      "operational_status": "active",
+      "fhir_resource": {},
+      "meta_data": {
+        "is_24x7": true
+      }
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000006",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "organization_id": "10000000-0000-0000-0000-000000000001",
+      "name": "Endocrinology OPD",
+      "type": "department",
+      "code": "ENDO-OPD",
+      "building": "Main",
+      "floor": "3",
+      "room": "301-305",
+      "parent_location_id": "20000000-0000-0000-0000-000000000001",
+      "is_active": true,
+      "operational_status": "active",
+      "fhir_resource": {},
+      "meta_data": {
+        "speciality": "endocrinology"
+      }
+    }
+  ],
+  "practitioners": [
+    {
+      "id": "30000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Rajesh",
+      "last_name": "Sharma",
+      "middle_name": "Kumar",
+      "gender": "male",
+      "qualification": "MD, DM Cardiology",
+      "speciality": "Cardiology",
+      "sub_speciality": "Interventional Cardiology",
+      "license_number": "KA-MED-12345",
+      "registration_number": "KMC-98765",
+      "phone_primary": "+91-98765-43210",
+      "email_primary": "dr.rajesh.sharma@apollo.health",
+      "is_active": true,
+      "fhir_resource": {},
+      "meta_data": {
+        "experience_years": 15,
+        "consultation_fee": 1500
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Priya",
+      "last_name": "Menon",
+      "gender": "female",
+      "qualification": "MS Orthopedics",
+      "speciality": "Orthopedics",
+      "sub_speciality": "Joint Replacement",
+      "license_number": "KA-MED-12346",
+      "registration_number": "KMC-98766",
+      "phone_primary": "+91-98765-43211",
+      "email_primary": "dr.priya.menon@apollo.health",
+      "is_active": true,
+      "fhir_resource": {},
+      "meta_data": {
+        "experience_years": 12,
+        "consultation_fee": 1200
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Arun",
+      "last_name": "Patel",
+      "gender": "male",
+      "qualification": "MD Internal Medicine",
+      "speciality": "Internal Medicine",
+      "license_number": "KA-MED-12347",
+      "registration_number": "KMC-98767",
+      "phone_primary": "+91-98765-43212",
+      "email_primary": "dr.arun.patel@apollo.health",
+      "is_active": true,
+      "fhir_resource": {},
+      "meta_data": {
+        "experience_years": 10,
+        "consultation_fee": 800
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Sunita",
+      "last_name": "Reddy",
+      "gender": "female",
+      "qualification": "MD, DM Endocrinology",
+      "speciality": "Endocrinology",
+      "sub_speciality": "Diabetes Management",
+      "license_number": "KA-MED-12348",
+      "registration_number": "KMC-98768",
+      "phone_primary": "+91-98765-43213",
+      "email_primary": "dr.sunita.reddy@apollo.health",
+      "is_active": true,
+      "fhir_resource": {},
+      "meta_data": {
+        "experience_years": 14,
+        "consultation_fee": 1000
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Vikram",
+      "last_name": "Singh",
+      "gender": "male",
+      "qualification": "MD Emergency Medicine",
+      "speciality": "Emergency Medicine",
+      "license_number": "KA-MED-12349",
+      "registration_number": "KMC-98769",
+      "phone_primary": "+91-98765-43214",
+      "email_primary": "dr.vikram.singh@apollo.health",
+      "is_active": true,
+      "fhir_resource": {},
+      "meta_data": {
+        "experience_years": 8,
+        "consultation_fee": 600
+      }
+    }
+  ],
+  "roles": [
+    {
+      "id": "50000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "name": "System Administrator",
+      "code": "ADMIN",
+      "description": "Full system access",
+      "meta_data": {}
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Doctor",
+      "code": "DOCTOR",
+      "description": "Clinical staff with patient care access",
+      "meta_data": {}
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Nurse",
+      "code": "NURSE",
+      "description": "Nursing staff with patient care access",
+      "meta_data": {}
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Receptionist",
+      "code": "RECEPTIONIST",
+      "description": "Front desk scheduling access",
+      "meta_data": {}
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Care Coordinator",
+      "code": "CARE_COORD",
+      "description": "Patient journey and care coordination",
+      "meta_data": {}
+    }
+  ],
+  "users": [
+    {
+      "id": "60000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "email": "admin@apollo.health",
+      "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/IQe",
+      "full_name": "System Administrator",
+      "is_active": true,
+      "is_superuser": true,
+      "is_verified": true,
+      "meta_data": {}
+    },
+    {
+      "id": "60000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "email": "dr.rajesh.sharma@apollo.health",
+      "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/IQe",
+      "full_name": "Dr. Rajesh Sharma",
+      "practitioner_id": "30000000-0000-0000-0000-000000000001",
+      "is_active": true,
+      "is_superuser": false,
+      "is_verified": true,
+      "meta_data": {}
+    },
+    {
+      "id": "60000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "email": "dr.priya.menon@apollo.health",
+      "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/IQe",
+      "full_name": "Dr. Priya Menon",
+      "practitioner_id": "30000000-0000-0000-0000-000000000002",
+      "is_active": true,
+      "is_superuser": false,
+      "is_verified": true,
+      "meta_data": {}
+    },
+    {
+      "id": "60000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "email": "dr.arun.patel@apollo.health",
+      "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/IQe",
+      "full_name": "Dr. Arun Patel",
+      "practitioner_id": "30000000-0000-0000-0000-000000000003",
+      "is_active": true,
+      "is_superuser": false,
+      "is_verified": true,
+      "meta_data": {}
+    },
+    {
+      "id": "60000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "email": "receptionist@apollo.health",
+      "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/IQe",
+      "full_name": "Reception Desk",
+      "is_active": true,
+      "is_superuser": false,
+      "is_verified": true,
+      "meta_data": {}
+    },
+    {
+      "id": "60000000-0000-0000-0000-000000000006",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "email": "nurse.mary@apollo.health",
+      "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/IQe",
+      "full_name": "Mary Johnson",
+      "is_active": true,
+      "is_superuser": false,
+      "is_verified": true,
+      "meta_data": {
+        "role": "head_nurse"
+      }
+    }
+  ],
+  "patients": [
+    {
+      "id": "40000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Amit",
+      "last_name": "Kumar",
+      "middle_name": "Raj",
+      "date_of_birth": "1985-03-15",
+      "gender": "male",
+      "phone_primary": "+91-99887-76655",
+      "email_primary": "amit.kumar@email.com",
+      "address_line1": "45 MG Road, Apt 302",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560001",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "B+",
+      "language_preferred": "English",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "walk_in",
+        "risk_score": 35,
+        "health_score": 82,
+        "chronic_conditions": [],
+        "allergies": [
+          "Penicillin"
+        ]
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Priya",
+      "last_name": "Sharma",
+      "date_of_birth": "1990-07-22",
+      "gender": "female",
+      "phone_primary": "+91-98765-12345",
+      "email_primary": "priya.sharma@email.com",
+      "address_line1": "78 Indiranagar, 1st Main",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560038",
+      "country": "India",
+      "marital_status": "single",
+      "blood_group": "O+",
+      "language_preferred": "English",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "referral",
+        "risk_score": 22,
+        "health_score": 91,
+        "chronic_conditions": [],
+        "allergies": []
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Ravi",
+      "last_name": "Verma",
+      "date_of_birth": "1965-11-10",
+      "gender": "male",
+      "phone_primary": "+91-88776-65544",
+      "email_primary": "ravi.verma@email.com",
+      "address_line1": "23 Koramangala, 4th Block",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560034",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "A+",
+      "language_preferred": "Hindi",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "whatsapp",
+        "risk_score": 68,
+        "health_score": 58,
+        "chronic_conditions": [
+          "diabetes_type2",
+          "hypertension"
+        ],
+        "allergies": [],
+        "last_hba1c": 7.2
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Meera",
+      "last_name": "Nair",
+      "date_of_birth": "1978-02-28",
+      "gender": "female",
+      "phone_primary": "+91-77665-54433",
+      "email_primary": "meera.nair@email.com",
+      "address_line1": "56 HSR Layout, Sector 2",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560102",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "AB+",
+      "language_preferred": "English",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "phone",
+        "risk_score": 45,
+        "health_score": 72,
+        "chronic_conditions": [
+          "hypothyroidism"
+        ],
+        "allergies": [
+          "Sulfa"
+        ]
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Suresh",
+      "last_name": "Iyer",
+      "date_of_birth": "1958-09-05",
+      "gender": "male",
+      "phone_primary": "+91-66554-43322",
+      "email_primary": "suresh.iyer@email.com",
+      "address_line1": "89 JP Nagar, 6th Phase",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560078",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "O-",
+      "language_preferred": "Kannada",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "walk_in",
+        "risk_score": 78,
+        "health_score": 45,
+        "chronic_conditions": [
+          "coronary_artery_disease",
+          "diabetes_type2",
+          "hypertension"
+        ],
+        "allergies": [],
+        "has_pacemaker": true
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000006",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Ananya",
+      "last_name": "Gupta",
+      "date_of_birth": "1995-12-18",
+      "gender": "female",
+      "phone_primary": "+91-55443-32211",
+      "email_primary": "ananya.gupta@email.com",
+      "address_line1": "12 Whitefield, Palm Meadows",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560066",
+      "country": "India",
+      "marital_status": "single",
+      "blood_group": "B-",
+      "language_preferred": "English",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "web",
+        "risk_score": 15,
+        "health_score": 94,
+        "chronic_conditions": [],
+        "allergies": []
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000007",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Venkat",
+      "last_name": "Rao",
+      "date_of_birth": "1972-06-30",
+      "gender": "male",
+      "phone_primary": "+91-44332-21100",
+      "email_primary": "venkat.rao@email.com",
+      "address_line1": "34 Electronic City, Phase 1",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560100",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "A-",
+      "language_preferred": "Telugu",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "referral",
+        "risk_score": 52,
+        "health_score": 68,
+        "chronic_conditions": [
+          "osteoarthritis"
+        ],
+        "allergies": []
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000008",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Lakshmi",
+      "last_name": "Krishnan",
+      "date_of_birth": "1982-04-12",
+      "gender": "female",
+      "phone_primary": "+91-33221-10099",
+      "email_primary": "lakshmi.krishnan@email.com",
+      "address_line1": "67 Marathahalli, Outer Ring Rd",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560037",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "O+",
+      "language_preferred": "Tamil",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "whatsapp",
+        "risk_score": 28,
+        "health_score": 85,
+        "chronic_conditions": [],
+        "allergies": [],
+        "pregnant": true
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000009",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Rahul",
+      "last_name": "Desai",
+      "date_of_birth": "1988-08-25",
+      "gender": "male",
+      "phone_primary": "+91-22110-09988",
+      "email_primary": "rahul.desai@email.com",
+      "address_line1": "90 Sarjapur Road, Wipro Gate",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560035",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "B+",
+      "language_preferred": "Marathi",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "phone",
+        "risk_score": 32,
+        "health_score": 79,
+        "chronic_conditions": [],
+        "allergies": [
+          "Aspirin"
+        ]
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000010",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Deepa",
+      "last_name": "Hegde",
+      "date_of_birth": "1970-01-08",
+      "gender": "female",
+      "phone_primary": "+91-11009-98877",
+      "email_primary": "deepa.hegde@email.com",
+      "address_line1": "45 Jayanagar, 4th Block",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560041",
+      "country": "India",
+      "marital_status": "widowed",
+      "blood_group": "AB-",
+      "language_preferred": "Kannada",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "walk_in",
+        "risk_score": 61,
+        "health_score": 62,
+        "chronic_conditions": [
+          "rheumatoid_arthritis",
+          "osteoporosis"
+        ],
+        "allergies": []
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000011",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Karthik",
+      "last_name": "Subramanian",
+      "date_of_birth": "1992-05-20",
+      "gender": "male",
+      "phone_primary": "+91-99001-12233",
+      "email_primary": "karthik.s@email.com",
+      "address_line1": "22 Bellandur, Park Street",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560103",
+      "country": "India",
+      "marital_status": "single",
+      "blood_group": "A+",
+      "language_preferred": "English",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "web",
+        "risk_score": 18,
+        "health_score": 92,
+        "chronic_conditions": [],
+        "allergies": []
+      }
+    },
+    {
+      "id": "40000000-0000-0000-0000-000000000012",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "first_name": "Gayatri",
+      "last_name": "Bhat",
+      "date_of_birth": "1968-12-03",
+      "gender": "female",
+      "phone_primary": "+91-88112-23344",
+      "email_primary": "gayatri.bhat@email.com",
+      "address_line1": "15 Malleshwaram, 8th Cross",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "postal_code": "560003",
+      "country": "India",
+      "marital_status": "married",
+      "blood_group": "B+",
+      "language_preferred": "Kannada",
+      "is_deceased": false,
+      "fhir_resource": {},
+      "meta_data": {
+        "source": "phone",
+        "risk_score": 55,
+        "health_score": 65,
+        "chronic_conditions": [
+          "diabetes_type2"
+        ],
+        "allergies": []
+      }
+    }
+  ],
+  "patient_identifiers": [
+    {
+      "id": "41000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000001",
+      "system": "MRN",
+      "value": "MRN-2024-00001",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000002",
+      "patient_id": "40000000-0000-0000-0000-000000000002",
+      "system": "MRN",
+      "value": "MRN-2024-00002",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000003",
+      "patient_id": "40000000-0000-0000-0000-000000000003",
+      "system": "MRN",
+      "value": "MRN-2024-00003",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000004",
+      "patient_id": "40000000-0000-0000-0000-000000000004",
+      "system": "MRN",
+      "value": "MRN-2024-00004",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000005",
+      "patient_id": "40000000-0000-0000-0000-000000000005",
+      "system": "MRN",
+      "value": "MRN-2024-00005",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000006",
+      "patient_id": "40000000-0000-0000-0000-000000000006",
+      "system": "MRN",
+      "value": "MRN-2024-00006",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000007",
+      "patient_id": "40000000-0000-0000-0000-000000000007",
+      "system": "MRN",
+      "value": "MRN-2024-00007",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000008",
+      "patient_id": "40000000-0000-0000-0000-000000000008",
+      "system": "MRN",
+      "value": "MRN-2024-00008",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000009",
+      "patient_id": "40000000-0000-0000-0000-000000000009",
+      "system": "MRN",
+      "value": "MRN-2024-00009",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000010",
+      "patient_id": "40000000-0000-0000-0000-000000000010",
+      "system": "MRN",
+      "value": "MRN-2024-00010",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000011",
+      "patient_id": "40000000-0000-0000-0000-000000000011",
+      "system": "MRN",
+      "value": "MRN-2024-00011",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000012",
+      "patient_id": "40000000-0000-0000-0000-000000000012",
+      "system": "MRN",
+      "value": "MRN-2024-00012",
+      "is_primary": true
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000013",
+      "patient_id": "40000000-0000-0000-0000-000000000003",
+      "system": "ABHA",
+      "value": "91-1234-5678-9012",
+      "is_primary": false
+    },
+    {
+      "id": "41000000-0000-0000-0000-000000000014",
+      "patient_id": "40000000-0000-0000-0000-000000000005",
+      "system": "ABHA",
+      "value": "91-2345-6789-0123",
+      "is_primary": false
+    }
+  ],
+  "consents": [
+    {
+      "id": "C0000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000001",
+      "status": "active",
+      "category": "treatment",
+      "purpose": "General treatment consent",
+      "channel": "in_clinic",
+      "consent_fhir": {},
+      "meta_data": {}
+    },
+    {
+      "id": "C0000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000002",
+      "status": "active",
+      "category": "treatment",
+      "purpose": "General treatment consent",
+      "channel": "web",
+      "consent_fhir": {},
+      "meta_data": {}
+    },
+    {
+      "id": "C0000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000003",
+      "status": "active",
+      "category": "treatment",
+      "purpose": "General treatment consent",
+      "channel": "whatsapp",
+      "consent_fhir": {},
+      "meta_data": {}
+    },
+    {
+      "id": "C0000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000003",
+      "status": "active",
+      "category": "sharing",
+      "purpose": "Data sharing with specialists",
+      "channel": "whatsapp",
+      "consent_fhir": {},
+      "meta_data": {}
+    },
+    {
+      "id": "C0000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000005",
+      "status": "active",
+      "category": "treatment",
+      "purpose": "General treatment consent",
+      "channel": "phone",
+      "consent_fhir": {},
+      "meta_data": {}
+    },
+    {
+      "id": "C0000000-0000-0000-0000-000000000006",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000005",
+      "status": "active",
+      "category": "research",
+      "purpose": "Cardiac research participation",
+      "channel": "in_clinic",
+      "consent_fhir": {},
+      "meta_data": {}
+    }
+  ],
+  "provider_schedules": [
+    {
+      "id": "70000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "practitioner_id": "30000000-0000-0000-0000-000000000001",
+      "location_id": "20000000-0000-0000-0000-000000000002",
+      "specialty_code": "CARDIO",
+      "valid_from": "2024-01-01",
+      "day_of_week": 1,
+      "start_time": "09:00:00",
+      "end_time": "13:00:00",
+      "slot_duration_minutes": 30,
+      "max_patients_per_slot": 1,
+      "is_active": true
+    },
+    {
+      "id": "70000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "practitioner_id": "30000000-0000-0000-0000-000000000001",
+      "location_id": "20000000-0000-0000-0000-000000000002",
+      "specialty_code": "CARDIO",
+      "valid_from": "2024-01-01",
+      "day_of_week": 3,
+      "start_time": "14:00:00",
+      "end_time": "18:00:00",
+      "slot_duration_minutes": 30,
+      "max_patients_per_slot": 1,
+      "is_active": true
+    },
+    {
+      "id": "70000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "practitioner_id": "30000000-0000-0000-0000-000000000002",
+      "location_id": "20000000-0000-0000-0000-000000000003",
+      "specialty_code": "ORTHO",
+      "valid_from": "2024-01-01",
+      "day_of_week": 2,
+      "start_time": "10:00:00",
+      "end_time": "14:00:00",
+      "slot_duration_minutes": 20,
+      "max_patients_per_slot": 1,
+      "is_active": true
+    },
+    {
+      "id": "70000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "practitioner_id": "30000000-0000-0000-0000-000000000003",
+      "location_id": "20000000-0000-0000-0000-000000000004",
+      "specialty_code": "GENMED",
+      "valid_from": "2024-01-01",
+      "day_of_week": 1,
+      "start_time": "08:00:00",
+      "end_time": "16:00:00",
+      "slot_duration_minutes": 15,
+      "max_patients_per_slot": 1,
+      "is_active": true
+    },
+    {
+      "id": "70000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "practitioner_id": "30000000-0000-0000-0000-000000000004",
+      "location_id": "20000000-0000-0000-0000-000000000006",
+      "specialty_code": "ENDO",
+      "valid_from": "2024-01-01",
+      "day_of_week": 4,
+      "start_time": "09:00:00",
+      "end_time": "13:00:00",
+      "slot_duration_minutes": 30,
+      "max_patients_per_slot": 1,
+      "is_active": true
+    }
+  ],
+  "_dynamic_data": {
+    "_note": "The following data has date placeholders that are filled by seed_database.py",
+    "time_slots": "GENERATED_BY_SCRIPT",
+    "appointments": "GENERATED_BY_SCRIPT",
+    "encounters": "GENERATED_BY_SCRIPT",
+    "communications": "GENERATED_BY_SCRIPT"
+  },
+  "journeys": [
+    {
+      "id": "90000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "code": "CARDIO_OPD_NEW",
+      "name": "Cardiology New Patient Journey",
+      "description": "Pre-visit to post-visit journey for new cardiology patients",
+      "journey_type": "cardiology",
+      "is_default": true,
+      "trigger_conditions": {},
+      "is_active": true
+    },
+    {
+      "id": "90000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "code": "ORTHO_POST_SURGERY",
+      "name": "Orthopedic Post-Surgery Journey",
+      "description": "Post-operative care journey for orthopedic patients",
+      "journey_type": "post_surgery",
+      "is_default": false,
+      "trigger_conditions": {},
+      "is_active": true
+    },
+    {
+      "id": "90000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "code": "DIABETES_MANAGEMENT",
+      "name": "Diabetes Management Program",
+      "description": "Ongoing diabetes care and monitoring journey",
+      "journey_type": "chronic_care",
+      "is_default": false,
+      "trigger_conditions": {},
+      "is_active": true
+    },
+    {
+      "id": "90000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "code": "GENERAL_FOLLOWUP",
+      "name": "General Follow-up Journey",
+      "description": "Standard follow-up care journey",
+      "journey_type": "wellness",
+      "is_default": false,
+      "trigger_conditions": {},
+      "is_active": true
+    }
+  ],
+  "journey_stages": [
+    {
+      "id": "91000000-0000-0000-0000-000000000001",
+      "journey_id": "90000000-0000-0000-0000-000000000001",
+      "order_index": 1,
+      "code": "PRE_VISIT",
+      "name": "Pre-Visit Preparation",
+      "description": "Patient preparation before appointment",
+      "trigger_event": "Appointment.Created",
+      "auto_advance": false,
+      "actions": {
+        "days_before": 3,
+        "send_reminders": true
+      }
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000002",
+      "journey_id": "90000000-0000-0000-0000-000000000001",
+      "order_index": 2,
+      "code": "DAY_OF_VISIT",
+      "name": "Day of Visit",
+      "description": "Check-in and consultation",
+      "trigger_event": "Appointment.CheckedIn",
+      "auto_advance": true,
+      "actions": {}
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000003",
+      "journey_id": "90000000-0000-0000-0000-000000000001",
+      "order_index": 3,
+      "code": "POST_VISIT",
+      "name": "Post-Visit Follow-up",
+      "description": "Post-consultation care instructions",
+      "trigger_event": "Encounter.Completed",
+      "auto_advance": false,
+      "actions": {
+        "follow_up_days": 7
+      }
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000004",
+      "journey_id": "90000000-0000-0000-0000-000000000002",
+      "order_index": 1,
+      "code": "IMMEDIATE_POST_OP",
+      "name": "Immediate Post-Op",
+      "description": "First 24-48 hours after surgery",
+      "auto_advance": false,
+      "actions": {}
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000005",
+      "journey_id": "90000000-0000-0000-0000-000000000002",
+      "order_index": 2,
+      "code": "RECOVERY",
+      "name": "Recovery Phase",
+      "description": "First 2 weeks of recovery",
+      "auto_advance": false,
+      "actions": {
+        "duration_days": 14
+      }
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000006",
+      "journey_id": "90000000-0000-0000-0000-000000000002",
+      "order_index": 3,
+      "code": "REHABILITATION",
+      "name": "Rehabilitation",
+      "description": "Physical therapy and recovery exercises",
+      "auto_advance": false,
+      "actions": {
+        "duration_weeks": 6
+      }
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000007",
+      "journey_id": "90000000-0000-0000-0000-000000000003",
+      "order_index": 1,
+      "code": "INITIAL_ASSESSMENT",
+      "name": "Initial Assessment",
+      "description": "Comprehensive diabetes evaluation",
+      "auto_advance": false,
+      "actions": {}
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000008",
+      "journey_id": "90000000-0000-0000-0000-000000000003",
+      "order_index": 2,
+      "code": "ONGOING_MONITORING",
+      "name": "Ongoing Monitoring",
+      "description": "Regular monitoring and adjustments",
+      "auto_advance": false,
+      "actions": {
+        "check_interval_days": 30
+      }
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000009",
+      "journey_id": "90000000-0000-0000-0000-000000000004",
+      "order_index": 1,
+      "code": "SCHEDULE_FOLLOWUP",
+      "name": "Schedule Follow-up",
+      "description": "Schedule next appointment",
+      "auto_advance": false,
+      "actions": {}
+    },
+    {
+      "id": "91000000-0000-0000-0000-000000000010",
+      "journey_id": "90000000-0000-0000-0000-000000000004",
+      "order_index": 2,
+      "code": "FOLLOWUP_COMPLETE",
+      "name": "Follow-up Complete",
+      "description": "Follow-up completed",
+      "auto_advance": false,
+      "actions": {}
+    }
+  ],
+  "journey_instances": [
+    {
+      "id": "92000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "journey_id": "90000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000003",
+      "current_stage_id": "91000000-0000-0000-0000-000000000003",
+      "status": "active",
+      "meta_data": {
+        "started_reason": "cardiac_checkup"
+      }
+    },
+    {
+      "id": "92000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "journey_id": "90000000-0000-0000-0000-000000000003",
+      "patient_id": "40000000-0000-0000-0000-000000000003",
+      "current_stage_id": "91000000-0000-0000-0000-000000000008",
+      "status": "active",
+      "meta_data": {
+        "condition": "Type 2 Diabetes",
+        "enrolled_date": "2024-06-15"
+      }
+    },
+    {
+      "id": "92000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "journey_id": "90000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000005",
+      "current_stage_id": "91000000-0000-0000-0000-000000000002",
+      "status": "active",
+      "meta_data": {
+        "started_reason": "heart_disease_followup"
+      }
+    },
+    {
+      "id": "92000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "journey_id": "90000000-0000-0000-0000-000000000003",
+      "patient_id": "40000000-0000-0000-0000-000000000012",
+      "current_stage_id": "91000000-0000-0000-0000-000000000008",
+      "status": "active",
+      "meta_data": {
+        "condition": "Type 2 Diabetes"
+      }
+    },
+    {
+      "id": "92000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "journey_id": "90000000-0000-0000-0000-000000000002",
+      "patient_id": "40000000-0000-0000-0000-000000000007",
+      "current_stage_id": "91000000-0000-0000-0000-000000000005",
+      "status": "active",
+      "meta_data": {
+        "surgery_type": "knee_replacement"
+      }
+    },
+    {
+      "id": "92000000-0000-0000-0000-000000000006",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "journey_id": "90000000-0000-0000-0000-000000000004",
+      "patient_id": "40000000-0000-0000-0000-000000000001",
+      "current_stage_id": "91000000-0000-0000-0000-000000000009",
+      "status": "active",
+      "meta_data": {}
+    }
+  ],
+  "journey_instance_stage_statuses": [
+    {
+      "id": "93000000-0000-0000-0000-000000000001",
+      "journey_instance_id": "92000000-0000-0000-0000-000000000001",
+      "stage_id": "91000000-0000-0000-0000-000000000001",
+      "status": "completed",
+      "meta_data": {}
+    },
+    {
+      "id": "93000000-0000-0000-0000-000000000002",
+      "journey_instance_id": "92000000-0000-0000-0000-000000000001",
+      "stage_id": "91000000-0000-0000-0000-000000000002",
+      "status": "completed",
+      "meta_data": {}
+    },
+    {
+      "id": "93000000-0000-0000-0000-000000000003",
+      "journey_instance_id": "92000000-0000-0000-0000-000000000001",
+      "stage_id": "91000000-0000-0000-0000-000000000003",
+      "status": "in_progress",
+      "meta_data": {}
+    },
+    {
+      "id": "93000000-0000-0000-0000-000000000004",
+      "journey_instance_id": "92000000-0000-0000-0000-000000000002",
+      "stage_id": "91000000-0000-0000-0000-000000000007",
+      "status": "completed",
+      "meta_data": {}
+    },
+    {
+      "id": "93000000-0000-0000-0000-000000000005",
+      "journey_instance_id": "92000000-0000-0000-0000-000000000002",
+      "stage_id": "91000000-0000-0000-0000-000000000008",
+      "status": "in_progress",
+      "meta_data": {}
+    },
+    {
+      "id": "93000000-0000-0000-0000-000000000006",
+      "journey_instance_id": "92000000-0000-0000-0000-000000000003",
+      "stage_id": "91000000-0000-0000-0000-000000000001",
+      "status": "completed",
+      "meta_data": {}
+    },
+    {
+      "id": "93000000-0000-0000-0000-000000000007",
+      "journey_instance_id": "92000000-0000-0000-0000-000000000003",
+      "stage_id": "91000000-0000-0000-0000-000000000002",
+      "status": "in_progress",
+      "meta_data": {}
+    }
+  ],
+  "tickets": [
+    {
+      "id": "B0000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000003",
+      "title": "Request for prescription refill",
+      "description": "Patient needs refill of blood pressure medication - Amlodipine 5mg",
+      "status": "open",
+      "priority": "medium",
+      "created_by_user_id": "60000000-0000-0000-0000-000000000005"
+    },
+    {
+      "id": "B0000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000005",
+      "title": "Insurance claim follow-up",
+      "description": "Patient requesting status of insurance claim for cardiac procedure",
+      "status": "in_progress",
+      "priority": "high",
+      "created_by_user_id": "60000000-0000-0000-0000-000000000005",
+      "assigned_to_user_id": "60000000-0000-0000-0000-000000000001"
+    },
+    {
+      "id": "B0000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000010",
+      "title": "Appointment reschedule request",
+      "description": "Patient requesting to reschedule orthopedic consultation to next week",
+      "status": "resolved",
+      "priority": "low",
+      "created_by_user_id": "60000000-0000-0000-0000-000000000005"
+    },
+    {
+      "id": "B0000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000007",
+      "title": "Medical records request",
+      "description": "Patient requesting copies of medical records for insurance purposes",
+      "status": "open",
+      "priority": "medium",
+      "created_by_user_id": "60000000-0000-0000-0000-000000000005"
+    },
+    {
+      "id": "B0000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000012",
+      "title": "Urgent: Abnormal lab results",
+      "description": "HbA1c result requires immediate attention - value 9.2%",
+      "status": "open",
+      "priority": "urgent",
+      "created_by_user_id": "60000000-0000-0000-0000-000000000006",
+      "assigned_to_user_id": "60000000-0000-0000-0000-000000000004"
+    },
+    {
+      "id": "B0000000-0000-0000-0000-000000000006",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000001",
+      "title": "Billing inquiry",
+      "description": "Question about charges on last visit bill",
+      "status": "closed",
+      "priority": "low",
+      "created_by_user_id": "60000000-0000-0000-0000-000000000005"
+    },
+    {
+      "id": "B0000000-0000-0000-0000-000000000007",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "patient_id": "40000000-0000-0000-0000-000000000008",
+      "title": "Pre-natal care coordination",
+      "description": "Need to coordinate with OB-GYN for prenatal checkups",
+      "status": "in_progress",
+      "priority": "high",
+      "created_by_user_id": "60000000-0000-0000-0000-000000000006"
+    }
+  ],
+  "wards": [
+    {
+      "id": "D0000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "location_id": "20000000-0000-0000-0000-000000000001",
+      "code": "WARD-1A",
+      "name": "General Ward 1A",
+      "type": "general",
+      "floor": "1",
+      "capacity": 20,
+      "is_active": true,
+      "meta_data": {}
+    },
+    {
+      "id": "D0000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "location_id": "20000000-0000-0000-0000-000000000001",
+      "code": "ICU-1",
+      "name": "Intensive Care Unit",
+      "type": "icu",
+      "floor": "Ground",
+      "capacity": 10,
+      "is_active": true,
+      "meta_data": {}
+    },
+    {
+      "id": "D0000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "location_id": "20000000-0000-0000-0000-000000000001",
+      "code": "CARDIO-WARD",
+      "name": "Cardiology Ward",
+      "type": "general",
+      "floor": "2",
+      "capacity": 15,
+      "is_active": true,
+      "meta_data": {
+        "speciality": "cardiology"
+      }
+    }
+  ],
+  "beds": [
+    {
+      "id": "D1000000-0000-0000-0000-000000000001",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "ward_id": "D0000000-0000-0000-0000-000000000001",
+      "code": "1A-01",
+      "type": "standard",
+      "status": "available",
+      "meta_data": {}
+    },
+    {
+      "id": "D1000000-0000-0000-0000-000000000002",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "ward_id": "D0000000-0000-0000-0000-000000000001",
+      "code": "1A-02",
+      "type": "standard",
+      "status": "occupied",
+      "meta_data": {}
+    },
+    {
+      "id": "D1000000-0000-0000-0000-000000000003",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "ward_id": "D0000000-0000-0000-0000-000000000001",
+      "code": "1A-03",
+      "type": "standard",
+      "status": "available",
+      "meta_data": {}
+    },
+    {
+      "id": "D1000000-0000-0000-0000-000000000004",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "ward_id": "D0000000-0000-0000-0000-000000000002",
+      "code": "ICU-01",
+      "type": "icu",
+      "status": "available",
+      "meta_data": {}
+    },
+    {
+      "id": "D1000000-0000-0000-0000-000000000005",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "ward_id": "D0000000-0000-0000-0000-000000000002",
+      "code": "ICU-02",
+      "type": "ventilator",
+      "status": "available",
+      "meta_data": {}
+    },
+    {
+      "id": "D1000000-0000-0000-0000-000000000006",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "ward_id": "D0000000-0000-0000-0000-000000000003",
+      "code": "CARD-01",
+      "type": "standard",
+      "status": "available",
+      "meta_data": {}
+    },
+    {
+      "id": "D1000000-0000-0000-0000-000000000007",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "ward_id": "D0000000-0000-0000-0000-000000000003",
+      "code": "CARD-02",
+      "type": "monitoring",
+      "status": "occupied",
+      "meta_data": {}
+    }
+  ]
+}

@@ -19,22 +19,34 @@ export function formatRelativeTime(date: string | Date): string {
 /**
  * Format date with smart labels (Today, Yesterday, Tomorrow)
  */
-export function formatSmartDate(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+export function formatSmartDate(date: string | Date | null | undefined): string {
+  if (!date) return '';
 
-  if (isToday(dateObj)) {
-    return `Today, ${format(dateObj, 'h:mm a')}`;
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) {
+      return '';
+    }
+
+    if (isToday(dateObj)) {
+      return `Today, ${format(dateObj, 'h:mm a')}`;
+    }
+
+    if (isTomorrow(dateObj)) {
+      return `Tomorrow, ${format(dateObj, 'h:mm a')}`;
+    }
+
+    if (isYesterday(dateObj)) {
+      return `Yesterday, ${format(dateObj, 'h:mm a')}`;
+    }
+
+    return format(dateObj, 'MMM d, h:mm a');
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '';
   }
-
-  if (isTomorrow(dateObj)) {
-    return `Tomorrow, ${format(dateObj, 'h:mm a')}`;
-  }
-
-  if (isYesterday(dateObj)) {
-    return `Yesterday, ${format(dateObj, 'h:mm a')}`;
-  }
-
-  return format(dateObj, 'MMM d, h:mm a');
 }
 
 /**
