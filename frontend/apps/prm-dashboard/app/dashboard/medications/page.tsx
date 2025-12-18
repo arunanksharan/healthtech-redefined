@@ -217,52 +217,46 @@ export default function MedicationsPage() {
 
     return (
         <div className="space-y-8 pb-10">
-            {/* Header */}
-            <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-background/90 backdrop-blur-md py-4 -mx-6 px-6 border-b border-border/50">
+            {/* Flat Header */}
+            <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-white dark:bg-gray-900 py-4 -mx-6 px-6 border-b-2 border-gray-100 dark:border-gray-800">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Medications</h1>
-                    <p className="text-muted-foreground text-sm">Patient prescriptions and medication history</p>
+                    <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Medications</h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">Patient prescriptions and medication history</p>
                 </div>
                 <Button
                     onClick={() => setOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6"
+                    className="flat-btn-primary"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Prescribe Medication
                 </Button>
             </div>
 
-            {/* Stats */}
+            {/* Flat Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--primary) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Prescriptions</CardTitle>
-                        <Pill className="w-4 h-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Prescriptions</span>
+                        <Pill className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-                        <Activity className="w-4 h-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.active}</div>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</span>
+                        <Activity className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.active}</div>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--muted-foreground) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Completed/Stopped</CardTitle>
-                        <CheckCircle2 className="w-4 h-4 text-gray-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.completed}</div>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed/Stopped</span>
+                        <CheckCircle2 className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-gray-600 dark:text-gray-400">{stats.completed}</div>
+                </div>
             </div>
 
             {/* List */}
@@ -362,14 +356,14 @@ export default function MedicationsPage() {
 
             {/* Dialog */}
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-2xl border-border">
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                    <div className="bg-blue-600 px-6 py-5 text-white border-b-2 border-blue-700">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/20 rounded-xl">
+                            <div className="p-2 bg-white/20 rounded-lg border-2 border-white/30">
                                 <Pill className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                                <DialogTitle className="text-lg font-semibold text-white">Prescribe Medication</DialogTitle>
+                                <DialogTitle className="text-lg font-heading text-white">Prescribe Medication</DialogTitle>
                                 <DialogDescription className="text-blue-100 text-sm mt-0.5">
                                     Add a new medication order for the patient
                                 </DialogDescription>

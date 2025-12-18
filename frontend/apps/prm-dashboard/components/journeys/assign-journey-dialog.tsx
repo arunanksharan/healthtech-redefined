@@ -109,23 +109,20 @@ export function AssignJourneyDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-0 shadow-2xl [&>button]:hidden">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white relative overflow-hidden">
+            <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-2 border-gray-200 dark:border-gray-700 rounded-lg [&>button]:hidden">
+                <div className="bg-blue-600 p-8 text-white relative overflow-hidden border-b-2 border-blue-700">
                     {/* Close Button */}
                     <button
                         type="button"
                         onClick={() => onOpenChange(false)}
-                        className="absolute right-4 top-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                        className="absolute right-4 top-4 p-2 bg-white/10 hover:bg-white/20 rounded-lg border-2 border-white/30 text-white transition-colors z-50 focus:outline-none focus:ring-2 focus:ring-white/50"
                     >
                         <X className="w-4 h-4" />
                     </button>
 
-                    {/* Decorative background element */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
-
                     <DialogHeader className="relative z-10">
-                        <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-white">
-                            <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                        <DialogTitle className="text-2xl font-heading flex items-center gap-3 text-white">
+                            <div className="p-2 bg-white/10 rounded-lg border-2 border-white/30">
                                 <Play className="w-5 h-5 text-white" />
                             </div>
                             Start Care Journey
@@ -198,7 +195,7 @@ export function AssignJourneyDialog({
                                 <Button
                                     type="submit"
                                     disabled={loading}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 px-8 rounded-xl h-11"
+                                    className="flat-btn-primary"
                                 >
                                     {loading ? (
                                         <>

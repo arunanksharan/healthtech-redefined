@@ -193,14 +193,14 @@ export function CreateMessageDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-2xl border-gray-200">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                <div className="bg-blue-600 px-6 py-5 text-white border-b-2 border-blue-700">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white/20 rounded-xl">
+                        <div className="p-2 bg-white/20 rounded-lg border-2 border-white/30">
                             <Send className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                            <DialogTitle className="text-lg font-semibold text-white">New Message</DialogTitle>
+                            <DialogTitle className="text-lg font-heading text-white">New Message</DialogTitle>
                             <DialogDescription className="text-blue-100 text-sm mt-0.5">
                                 Send a direct message, alert, or notification to a patient.
                             </DialogDescription>
@@ -393,7 +393,7 @@ export function CreateMessageDialog({
                                 <Button
                                     type="submit"
                                     disabled={loading}
-                                    className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
+                                    className="flat-btn-primary"
                                 >
                                     {loading ? (
                                         <>

@@ -41,7 +41,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MagicCard } from '@/components/ui/magic-card';
+import { MagicCard } from '@/components/ui/magic-card'; // Keep import but will replace usage
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -294,137 +294,125 @@ export default function AppointmentsPage() {
 
   return (
     <div className="space-y-8 pb-10">
-      {/* Sticky Header */}
-      <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-background/90 backdrop-blur-md py-4 -mx-6 px-6 border-b border-border/50">
+      {/* Flat Header */}
+      <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-white dark:bg-gray-900 py-4 -mx-6 px-6 border-b-2 border-gray-100 dark:border-gray-800">
         <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Appointments</h1>
-          <p className="text-muted-foreground text-sm">Manage and schedule your patient visits</p>
+          <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Appointments</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Manage and schedule your patient visits</p>
         </div>
         <Button
           onClick={() => setIsNewAppointmentOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6"
+          className="flat-btn-primary"
         >
           <Plus className="w-4 h-4 mr-2" />
           New Appointment
         </Button>
       </div>
 
-      {/* Magic Stats */}
+      {/* Flat Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.2)">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
-            <CalendarIcon className="w-4 h-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">All appointments</p>
-          </CardContent>
-        </MagicCard>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total</span>
+            <CalendarIcon className="w-5 h-5 text-blue-500" />
+          </div>
+          <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+          <p className="text-xs text-gray-500 mt-1">All appointments</p>
+        </div>
 
-        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--warning) / 0.2)">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-            <AlertCircle className="w-4 h-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.pending}</div>
-            <p className="text-xs text-amber-600 mt-1 font-medium">Needs action</p>
-          </CardContent>
-        </MagicCard>
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</span>
+            <AlertCircle className="w-5 h-5 text-amber-500" />
+          </div>
+          <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.pending}</div>
+          <p className="text-xs text-amber-600 mt-1">Needs action</p>
+        </div>
 
-        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(217 91% 60% / 0.2)">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Checked In</CardTitle>
-            <LogIn className="w-4 h-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.checkedIn}</div>
-            <p className="text-xs text-purple-600 mt-1 font-medium">In progress</p>
-          </CardContent>
-        </MagicCard>
+        <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Checked In</span>
+            <LogIn className="w-5 h-5 text-purple-500" />
+          </div>
+          <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.checkedIn}</div>
+          <p className="text-xs text-purple-600 mt-1">In progress</p>
+        </div>
 
-        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.2)">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
-            <ClipboardCheck className="w-4 h-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.completed}</div>
-            <p className="text-xs text-emerald-600 mt-1 font-medium">Done</p>
-          </CardContent>
-        </MagicCard>
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</span>
+            <ClipboardCheck className="w-5 h-5 text-emerald-500" />
+          </div>
+          <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.completed}</div>
+          <p className="text-xs text-emerald-600 mt-1">Done</p>
+        </div>
 
-        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(142 76% 36% / 0.2)">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Confirmed</CardTitle>
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.confirmed}</div>
-            <p className="text-xs text-green-600 mt-1 font-medium">Ready</p>
-          </CardContent>
-        </MagicCard>
+        <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Confirmed</span>
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+          </div>
+          <div className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.confirmed}</div>
+          <p className="text-xs text-green-600 mt-1">Ready</p>
+        </div>
 
-        <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--destructive) / 0.2)">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
-            <XCircle className="w-4 h-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.cancelled}</div>
-            <p className="text-xs text-red-500 mt-1 font-medium">{stats.noShow} no-shows</p>
-          </CardContent>
-        </MagicCard>
+        <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Cancelled</span>
+            <XCircle className="w-5 h-5 text-red-500" />
+          </div>
+          <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.cancelled}</div>
+          <p className="text-xs text-red-500 mt-1">{stats.noShow} no-shows</p>
+        </div>
       </div>
 
       {/* Calendar Controls */}
-      <div className="bg-card p-2 rounded-xl border border-border shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-white dark:bg-gray-800 p-2 rounded-lg border-2 border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
         {/* Date Navigation */}
         <div className="flex items-center gap-2 pl-2">
-          <Button variant="ghost" size="icon" onClick={() => navigateDate('prev')} className="h-8 w-8 hover:bg-accent rounded-full">
-            <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+          <Button variant="ghost" size="icon" onClick={() => navigateDate('prev')} className="h-8 w-8 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+            <ChevronLeft className="w-5 h-5 text-gray-500" />
           </Button>
-          <div className="text-base font-semibold min-w-[200px] text-center text-foreground">
+          <div className="text-base font-semibold min-w-[200px] text-center text-gray-900 dark:text-white">
             {viewMode === 'day' && format(currentDate, 'EEEE, MMMM d, yyyy')}
             {viewMode === 'week' && `${format(startOfWeek(currentDate), 'MMM d')} - ${format(endOfWeek(currentDate), 'MMM d, yyyy')}`}
             {viewMode === 'month' && format(currentDate, 'MMMM yyyy')}
             {viewMode === 'list' && 'All Appointments'}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => navigateDate('next')} className="h-8 w-8 hover:bg-accent rounded-full">
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          <Button variant="ghost" size="icon" onClick={() => navigateDate('next')} className="h-8 w-8 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+            <ChevronRight className="w-5 h-5 text-gray-500" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="ml-2 h-8 text-xs font-medium border-border">
+          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="ml-2 h-8 text-xs font-medium border-2 border-gray-200 dark:border-gray-600">
             Today
           </Button>
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex bg-background p-1 rounded-lg border border-border/50">
+        <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg border-2 border-gray-200 dark:border-gray-600">
           <button
             onClick={() => setViewMode('day')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'day' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'day' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
               }`}
           >
             Day
           </button>
           <button
             onClick={() => setViewMode('week')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'week' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'week' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
               }`}
           >
             Week
           </button>
           <button
             onClick={() => setViewMode('month')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'month' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'month' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
               }`}
           >
             Month
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1 ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1 ${viewMode === 'list' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
               }`}
           >
             <List className="w-4 h-4" />
@@ -432,7 +420,7 @@ export default function AppointmentsPage() {
           </button>
         </div>
 
-        <Button variant="outline" size="icon" className="h-9 w-9 border-border mr-2 text-muted-foreground">
+        <Button variant="outline" size="icon" className="h-9 w-9 border-2 border-gray-200 dark:border-gray-600 mr-2 text-gray-500">
           <Filter className="w-4 h-4" />
         </Button>
       </div>
@@ -464,15 +452,15 @@ export default function AppointmentsPage() {
 
       {/* New Appointment Dialog */}
       <Dialog open={isNewAppointmentOpen} onOpenChange={setIsNewAppointmentOpen}>
-        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden rounded-2xl border-border">
-          {/* Header with gradient */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+          {/* Flat Header */}
+          <div className="bg-blue-500 px-6 py-5 text-white">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-xl">
-                <CalendarIcon className="h-5 w-5" />
+              <div className="p-2 bg-white rounded-lg">
+                <CalendarIcon className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-semibold text-white">Schedule New Appointment</DialogTitle>
+                <DialogTitle className="text-lg font-heading text-white">Schedule New Appointment</DialogTitle>
                 <DialogDescription className="text-blue-100 text-sm mt-0.5">
                   Book a new appointment for a patient with a practitioner
                 </DialogDescription>

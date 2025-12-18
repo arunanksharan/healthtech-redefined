@@ -91,11 +91,8 @@ export function TicketDetailSheet({ ticketId, open, onOpenChange }: TicketDetail
                     </div>
                 ) : ticket ? (
                     <div className="flex flex-col h-full">
-                        {/* Header with Gradient */}
-                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white shrink-0 relative overflow-hidden">
-                            {/* Decorative background element */}
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
-
+                        {/* Flat Header */}
+                        <div className="bg-blue-600 p-8 text-white shrink-0 relative overflow-hidden border-b-2 border-blue-700">
                             <div className="relative z-10">
                                 <div className="flex items-center gap-2 mb-4">
                                     <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 border-0 backdrop-blur-md px-3 capitalize">

@@ -157,6 +157,57 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+/* Flat Design System Utilities */
+@layer components {
+  /* Flat Card - No shadow, scale hover */
+  .flat-card {
+    @apply bg-white rounded-lg p-6 transition-all duration-200;
+    box-shadow: none !important;
+  }
+  .flat-card:hover {
+    @apply scale-[1.02];
+  }
+
+  /* Flat Button Primary */
+  .flat-btn-primary {
+    @apply bg-blue-500 text-white font-semibold rounded-md px-8 py-4 transition-all duration-200;
+    box-shadow: none !important;
+  }
+  .flat-btn-primary:hover {
+    @apply bg-blue-600 scale-105;
+  }
+  .flat-btn-primary:focus {
+    @apply ring-2 ring-offset-2 ring-blue-500 outline-none;
+  }
+
+  /* Flat Button Outline */
+  .flat-btn-outline {
+    @apply bg-transparent border-4 border-blue-500 text-blue-500 font-semibold rounded-md px-8 py-4 transition-all duration-200;
+  }
+  .flat-btn-outline:hover {
+    @apply bg-blue-500 text-white scale-105;
+  }
+  .flat-btn-outline:focus {
+    @apply ring-2 ring-offset-2 ring-blue-500 outline-none;
+  }
+
+  /* Flat Input */
+  .flat-input {
+    @apply bg-gray-100 text-gray-900 rounded-md px-4 py-3 border-0 transition-all duration-200;
+  }
+  .flat-input:focus {
+    @apply bg-white border-2 border-blue-500 outline-none;
+  }
+
+  /* Outfit Headings */
+  .font-heading {
+    font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+    @apply font-bold tracking-tight;
+    letter-spacing: -0.02em;
   }
 }
 

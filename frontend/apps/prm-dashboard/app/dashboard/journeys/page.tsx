@@ -104,16 +104,16 @@ export default function JourneysPage() {
 
     return (
         <div className="flex flex-col min-h-screen bg-muted/40">
-            {/* Sticky Glassmorphic Header */}
-            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
+            {/* Flat Header */}
+            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Care Journeys</h1>
-                    <p className="text-sm text-muted-foreground mt-1">Manage patient care pathways and recovery plans</p>
+                    <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Care Journeys</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage patient care pathways and recovery plans</p>
                 </div>
                 <div className="flex gap-3">
                     <Button
                         onClick={() => setIsCreateDialogOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all hover:scale-105"
+                        className="flat-btn-primary"
                     >
                         <Plus className="w-4 h-4 mr-2" />
                         New Journey
@@ -122,77 +122,61 @@ export default function JourneysPage() {
             </header>
 
             <div className="p-6 space-y-6">
-                {/* Magic Stats Cards */}
+                {/* Flat Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Journeys</CardTitle>
-                            <Route className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">
-                                <NumberTicker value={stats.total} />
-                            </div>
-                            <div className="flex items-center mt-1 text-xs text-blue-600 dark:text-blue-400">
-                                <TrendingUp className="w-3 h-3 mr-1" />
-                                <span>Active tracking</span>
-                            </div>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Journeys</span>
+                            <Route className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+                        <div className="flex items-center mt-1 text-xs text-blue-600 dark:text-blue-400">
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            <span>Active tracking</span>
+                        </div>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-                            <Activity className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">
-                                <NumberTicker value={stats.active} />
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">Currently progressing</div>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</span>
+                            <Activity className="w-5 h-5 text-emerald-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.active}</div>
+                        <div className="mt-1 text-xs text-gray-500">Currently progressing</div>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
-                            <CheckCircle2 className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">
-                                <NumberTicker value={stats.completed} />
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">Successful outcomes</div>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</span>
+                            <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats.completed}</div>
+                        <div className="mt-1 text-xs text-gray-500">Successful outcomes</div>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--warning) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Paused</CardTitle>
-                            <Pause className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">
-                                <NumberTicker value={stats.paused} />
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">Requires attention</div>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Paused</span>
+                            <Pause className="w-5 h-5 text-amber-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.paused}</div>
+                        <div className="mt-1 text-xs text-gray-500">Requires attention</div>
+                    </div>
                 </div>
 
-                {/* Search & Filters */}
-                <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+                {/* Flat Search & Filters */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border-2 border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div className="relative w-full md:w-96">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <Input
                             placeholder="Search by patient or journey title..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 bg-muted/50 border-border focus:bg-background transition-all"
+                            className="pl-9 border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500 bg-gray-50 dark:bg-gray-700 rounded-lg"
                         />
                     </div>
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                        <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border">
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-700 p-1 rounded-lg border-2 border-gray-200 dark:border-gray-600">
                             {['all', 'active', 'completed', 'paused'].map((filter) => (
                                 <button
                                     key={filter}

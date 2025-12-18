@@ -99,7 +99,7 @@ export default function InboxPage() {
     return (
         // FIX 1: Main container set to fixed height with flex-col. 
         // Uses h-[calc(100vh-6rem)] to account for navbar/margins.
-        <div className="flex flex-col h-[calc(100vh-6rem)] overflow-hidden border border-border rounded-xl shadow-sm bg-background">
+        <div className="flex flex-col h-[calc(100vh-6rem)] overflow-hidden border-2 border-gray-200 dark:border-gray-700 rounded-lg bg-background">
 
             <ResizablePanelGroup direction="horizontal" className="h-full">
 

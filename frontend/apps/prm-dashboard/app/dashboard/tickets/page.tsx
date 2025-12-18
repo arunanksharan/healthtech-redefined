@@ -146,15 +146,15 @@ export default function TicketsPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
+      {/* Flat Header */}
+      <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800">
         <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Support Tickets</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track and resolve patient inquiries</p>
+          <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Support Tickets</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track and resolve patient inquiries</p>
         </div>
         <Button
           onClick={() => setIsCreateDialogOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+          className="flat-btn-primary"
         >
           <Plus className="w-4 h-4 mr-2" />
           New Ticket
@@ -162,53 +162,37 @@ export default function TicketsPage() {
       </header>
 
       <div className="p-6 space-y-6">
-        {/* Stats Grid */}
+        {/* Flat Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Tickets</CardTitle>
-              <Ticket className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                <NumberTicker value={stats.total} />
-              </div>
-            </CardContent>
-          </MagicCard>
-          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--destructive) / 0.15)">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Urgent</CardTitle>
-              <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                <NumberTicker value={stats.urgent} />
-              </div>
-              <div className="mt-1 text-xs text-red-600 dark:text-red-400 font-medium">Needs attention</div>
-            </CardContent>
-          </MagicCard>
-          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Resolved</CardTitle>
-              <CheckCircle2 className="w-4 h-4 text-green-500 dark:text-green-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                <NumberTicker value={stats.resolved} />
-              </div>
-            </CardContent>
-          </MagicCard>
-          <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--warning) / 0.15)">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">In Progress</CardTitle>
-              <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                <NumberTicker value={stats.inProgress} />
-              </div>
-            </CardContent>
-          </MagicCard>
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tickets</span>
+              <Ticket className="w-5 h-5 text-blue-500" />
+            </div>
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+          </div>
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Urgent</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+            </div>
+            <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.urgent}</div>
+            <p className="text-xs text-red-600 mt-1">Needs attention</p>
+          </div>
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</span>
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.resolved}</div>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</span>
+              <Clock className="w-5 h-5 text-amber-500" />
+            </div>
+            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.inProgress}</div>
+          </div>
         </div>
 
         {/* Filters */}

@@ -91,12 +91,12 @@ export default function AnalyticsDashboardPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Sticky Glassmorphic Header */}
-      <header className="sticky top-0 z-30 flex flex-col gap-4 p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60 transition-all">
+      {/* Flat Header */}
+      <header className="sticky top-0 z-30 flex flex-col gap-4 p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">{getGreeting()}</h1>
-            <p className="text-sm text-muted-foreground mt-1">Here's your practice analytics overview</p>
+            <h1 className="text-2xl font-heading text-gray-900 dark:text-white">{getGreeting()}</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Here's your practice analytics overview</p>
           </div>
           <Button
             variant="outline"
@@ -106,13 +106,14 @@ export default function AnalyticsDashboardPage() {
               toast({ title: "Refreshed", description: "Dashboard data updated" });
             }}
             disabled={isLoading}
+            className="border-2 border-gray-200 dark:border-gray-600 rounded-lg"
           >
             <RefreshCw className={cn("h-4 w-4 text-gray-500", isLoading && "animate-spin")} />
           </Button>
         </div>
 
         {/* Time Period Selector */}
-        <div className="flex items-center gap-1.5 p-1 bg-muted/50 rounded-lg overflow-x-auto max-w-full">
+        <div className="flex items-center gap-1.5 p-1 bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto max-w-full">
           {TIME_PERIODS.map((period) => (
             <button
               key={period.value}
@@ -120,8 +121,8 @@ export default function AnalyticsDashboardPage() {
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap",
                 timePeriod === period.value
-                  ? "bg-background text-blue-700 shadow-sm ring-1 ring-border"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  ? "bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400"
+                  : "text-gray-500 hover:bg-gray-200/50 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-white"
               )}
             >
               {period.label}
@@ -131,77 +132,78 @@ export default function AnalyticsDashboardPage() {
       </header>
 
       <div className="p-6 space-y-6">
-        {/* Row 1: KPI Cards */}
+        {/* Row 1: Flat KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {/* Total Appointments */}
-          <MagicCard className="bg-card border border-border shadow-sm p-4" gradientColor="#eff6ff">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 transition-all hover:scale-[1.02]">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Appointments</p>
-              <Calendar className="h-4 w-4 text-blue-600" />
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Appointments</p>
+              <Calendar className="h-5 w-5 text-blue-500" />
             </div>
-            <span className="text-2xl font-bold text-foreground">
-              <NumberTicker value={kpi.totalAppointments} />
+            <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+              {kpi.totalAppointments}
             </span>
-          </MagicCard>
+          </div>
 
           {/* Completion Rate */}
-          <MagicCard className="bg-card border border-border shadow-sm p-4" gradientColor="#f0fdf4">
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-4 transition-all hover:scale-[1.02]">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Completion Rate</p>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Completion Rate</p>
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
             </div>
             <div className="flex items-end gap-1">
-              <span className="text-2xl font-bold text-foreground">{kpi.completionRate}</span>
-              <span className="text-sm text-muted-foreground mb-0.5">%</span>
+              <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{kpi.completionRate}</span>
+              <span className="text-sm text-gray-500 mb-0.5">%</span>
             </div>
-          </MagicCard>
+          </div>
 
           {/* Cancellation Rate */}
-          <MagicCard className="bg-card border border-border shadow-sm p-4" gradientColor="#fef2f2">
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-4 transition-all hover:scale-[1.02]">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Cancellation Rate</p>
-              <XCircle className="h-4 w-4 text-red-600" />
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Cancellation Rate</p>
+              <XCircle className="h-5 w-5 text-red-500" />
             </div>
             <div className="flex items-end gap-1">
-              <span className="text-2xl font-bold text-foreground">{kpi.cancellationRate}</span>
-              <span className="text-sm text-muted-foreground mb-0.5">%</span>
+              <span className="text-3xl font-bold text-red-600 dark:text-red-400">{kpi.cancellationRate}</span>
+              <span className="text-sm text-gray-500 mb-0.5">%</span>
             </div>
-          </MagicCard>
+          </div>
 
           {/* No-Show Rate */}
-          <MagicCard className="bg-card border border-border shadow-sm p-4" gradientColor="#fff7ed">
+          <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 rounded-lg p-4 transition-all hover:scale-[1.02]">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-medium text-muted-foreground">No-Show Rate</p>
-              <Activity className="h-4 w-4 text-orange-600" />
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">No-Show Rate</p>
+              <Activity className="h-5 w-5 text-orange-500" />
             </div>
             <div className="flex items-end gap-1">
-              <span className="text-2xl font-bold text-foreground">{kpi.noShowRate}</span>
-              <span className="text-sm text-muted-foreground mb-0.5">%</span>
+              <span className="text-3xl font-bold text-orange-600 dark:text-orange-400">{kpi.noShowRate}</span>
+              <span className="text-sm text-gray-500 mb-0.5">%</span>
             </div>
-          </MagicCard>
+          </div>
 
           {/* Total Patients */}
-          <MagicCard className="bg-card border border-border shadow-sm p-4" gradientColor="#faf5ff">
+          <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-4 transition-all hover:scale-[1.02]">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Total Patients</p>
-              <Users className="h-4 w-4 text-purple-600" />
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Patients</p>
+              <Users className="h-5 w-5 text-purple-500" />
             </div>
-            <span className="text-2xl font-bold text-foreground">
-              <NumberTicker value={kpi.totalPatients} />
+            <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+              {kpi.totalPatients}
             </span>
-          </MagicCard>
+          </div>
 
           {/* New Patients */}
-          <MagicCard className="bg-card border border-border shadow-sm p-4" gradientColor="#ecfdf5">
+          <div className="bg-teal-50 dark:bg-teal-900/20 border-2 border-teal-200 dark:border-teal-800 rounded-lg p-4 transition-all hover:scale-[1.02]">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-medium text-muted-foreground">New Patients</p>
-              <UserPlus className="h-4 w-4 text-emerald-600" />
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">New Patients</p>
+              <UserPlus className="h-5 w-5 text-teal-500" />
             </div>
-            <span className="text-2xl font-bold text-foreground">
-              <NumberTicker value={kpi.newPatients} />
+            <span className="text-3xl font-bold text-teal-600 dark:text-teal-400">
+              {kpi.newPatients}
             </span>
-          </MagicCard>
+          </div>
         </div>
+
 
         {/* Row 2: Main Chart */}
         <TimeSeriesChart
@@ -240,10 +242,10 @@ export default function AnalyticsDashboardPage() {
         </div>
 
         {/* Row 4: Coming Soon */}
-        <Card className="border-2 border-dashed">
+        <Card className="border-2 border-dashed border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <span className="text-muted-foreground">More Analytics Coming Soon</span>
+              <span className="text-gray-500 dark:text-gray-400">More Analytics Coming Soon</span>
               <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
                 In Development
               </Badge>
@@ -253,7 +255,7 @@ export default function AnalyticsDashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-500">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-gray-300" />
                 Journey Analytics
@@ -274,6 +276,6 @@ export default function AnalyticsDashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </div >
   );
 }

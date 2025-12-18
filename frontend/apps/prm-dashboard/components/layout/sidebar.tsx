@@ -12,9 +12,6 @@ import {
   UserCog,
   Building2,
   MapPin,
-  CalendarDays,
-  Clock,
-  ClipboardList,
   Hospital,
   Microscope,
   Stethoscope,
@@ -24,17 +21,13 @@ import {
   MessageSquare,
   Video,
   CreditCard,
-  Settings,
   ChevronDown,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Route,
   Ticket,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { Badge } from "@/components/ui/badge";
 
 // Navigation configuration
 interface NavItem {
@@ -71,7 +64,6 @@ const navigationConfig: NavSection[] = [
       { id: "practitioners", label: "Practitioners", icon: UserCog, href: "/dashboard/practitioners" },
       { id: "organizations", label: "Organizations", icon: Building2, href: "/dashboard/organizations" },
       { id: "locations", label: "Locations", icon: MapPin, href: "/dashboard/locations" },
-
       { id: "encounters", label: "Encounters", icon: Hospital, href: "/dashboard/encounters" },
       { id: "observations", label: "Observations", icon: Microscope, href: "/dashboard/observations" },
       { id: "conditions", label: "Conditions", icon: Stethoscope, href: "/dashboard/conditions" },
@@ -113,13 +105,11 @@ export function Sidebar({ className, onCollapsedChange, forceCollapsed }: Sideba
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  // Use forceCollapsed if provided, otherwise use internal state
   const collapsed = forceCollapsed !== undefined ? forceCollapsed : internalCollapsed;
 
   const toggleCollapsed = useCallback(() => {
     setInternalCollapsed((prev) => {
       const newValue = !prev;
-      // Schedule the callback for after the state update
       setTimeout(() => onCollapsedChange?.(newValue), 0);
       return newValue;
     });
@@ -138,32 +128,30 @@ export function Sidebar({ className, onCollapsedChange, forceCollapsed }: Sideba
   }, []);
 
   const isActive = (href: string) => {
-    // Exact match for root or dashboard home
     if (href === "/" || href === "/dashboard") {
       return pathname === href;
     }
-    // Partial match for sub-routes (e.g. /dashboard/appointments matches /dashboard/appointments/123)
     return pathname.startsWith(href);
   };
 
   return (
     <aside
       className={cn(
-        "h-full bg-background border-r border-border flex flex-col transition-all duration-300 ease-in-out relative",
+        "h-full bg-white dark:bg-gray-900 border-r-2 border-gray-100 dark:border-gray-800 flex flex-col transition-all duration-200",
         collapsed ? "w-sidebar-collapsed" : "w-sidebar",
         className
       )}
     >
-      {/* Logo */}
-      <div className="h-topbar flex items-center px-4 border-b border-border bg-background">
+      {/* Logo - Flat solid blue */}
+      <div className="h-topbar flex items-center px-4 border-b-2 border-gray-100 dark:border-gray-800">
         <Link href="/" target="_self" className="flex items-center gap-3 group">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow transition-all">
+          <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center transition-all duration-200 group-hover:scale-105 group-hover:bg-blue-600">
             <Hospital className="w-5 h-5 text-white" />
           </div>
           {!collapsed && (
-            <div className="flex flex-col animate-in fade-in slide-in-from-left-2 duration-300">
-              <span className="font-bold text-foreground leading-tight">HealthPRM</span>
-              <span className="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Surya Hospitals</span>
+            <div className="flex flex-col">
+              <span className="font-heading text-lg text-gray-900 dark:text-white leading-tight">HealthPRM</span>
+              <span className="text-[10px] uppercase tracking-widest text-blue-500 font-semibold">Surya Hospitals</span>
             </div>
           )}
         </Link>
@@ -175,11 +163,11 @@ export function Sidebar({ className, onCollapsedChange, forceCollapsed }: Sideba
           <div key={section.id}>
             {/* Section Header */}
             {!collapsed && (
-              <div className="px-3 mb-2">
+              <div className="px-3 mb-3">
                 {section.collapsible ? (
                   <button
                     onClick={() => toggleSection(section.id)}
-                    className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group"
+                    className="flex items-center justify-between w-full text-xs font-semibold text-gray-400 uppercase tracking-widest hover:text-gray-600 dark:hover:text-gray-300 transition-colors group"
                   >
                     <span>{section.title}</span>
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -191,7 +179,7 @@ export function Sidebar({ className, onCollapsedChange, forceCollapsed }: Sideba
                     </span>
                   </button>
                 ) : (
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
                     {section.title}
                   </span>
                 )}
@@ -211,33 +199,47 @@ export function Sidebar({ className, onCollapsedChange, forceCollapsed }: Sideba
                       href={item.href}
                       target="_self"
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all relative group",
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group",
                         active
-                          ? "bg-background text-blue-700 shadow-sm ring-1 ring-border"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                        collapsed && "justify-center px-2"
+                          ? "bg-blue-500 text-white"
+                          : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white",
+                        collapsed && "justify-center px-2",
+                        !active && "hover:scale-[1.02]"
                       )}
                       title={collapsed ? item.label : undefined}
                     >
-                      <item.icon className={cn("w-5 h-5 shrink-0 transition-colors", active ? "text-blue-600" : "text-muted-foreground group-hover:text-foreground")} />
+                      <item.icon
+                        className={cn(
+                          "w-5 h-5 shrink-0 transition-all duration-200",
+                          active ? "text-white" : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300",
+                          !active && "group-hover:scale-110"
+                        )}
+                      />
 
                       {!collapsed && (
                         <>
                           <span className="flex-1 truncate">{item.label}</span>
                           {badgeValue !== undefined && badgeValue > 0 && (
-                            <Badge variant="secondary" className="ml-auto text-xs h-5 min-w-5 flex items-center justify-center bg-blue-100 text-blue-700 hover:bg-blue-100">
+                            <span
+                              className={cn(
+                                "ml-auto text-xs font-semibold px-2 py-0.5 rounded-md",
+                                active
+                                  ? "bg-white/20 text-white"
+                                  : "bg-blue-500 text-white"
+                              )}
+                            >
                               {badgeValue > 99 ? "99+" : badgeValue}
-                            </Badge>
+                            </span>
                           )}
                         </>
                       )}
 
                       {/* Tooltip for collapsed state */}
                       {collapsed && (
-                        <div className="absolute left-full ml-2 px-2 py-1 bg-foreground text-background text-xs rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
+                        <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
                           {item.label}
                           {badgeValue !== undefined && badgeValue > 0 && (
-                            <span className="ml-2 inline-flex items-center justify-center bg-blue-500 text-white rounded-full h-4 min-w-[1rem] px-1">
+                            <span className="ml-2 inline-flex items-center justify-center bg-blue-500 text-white rounded-md h-5 min-w-[1.25rem] px-1 text-xs font-semibold">
                               {badgeValue}
                             </span>
                           )}
@@ -251,8 +253,6 @@ export function Sidebar({ className, onCollapsedChange, forceCollapsed }: Sideba
           </div>
         ))}
       </nav>
-
-
     </aside>
   );
 }

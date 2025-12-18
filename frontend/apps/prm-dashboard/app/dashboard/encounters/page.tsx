@@ -37,7 +37,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton, TableRowsSkeleton } from '@/components/ui/skeleton';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MagicCard } from '@/components/ui/magic-card';
 import {
@@ -228,77 +228,67 @@ export default function EncountersPage() {
 
     return (
         <div className="space-y-8 pb-10">
-            {/* Header */}
-            <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-background/90 backdrop-blur-md py-4 -mx-6 px-6 border-b border-border/50">
+            {/* Flat Header */}
+            <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-white dark:bg-gray-900 py-4 -mx-6 px-6 border-b-2 border-gray-100 dark:border-gray-800">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Encounters</h1>
-                    <p className="text-muted-foreground text-sm">Patient visits and interactions</p>
+                    <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Encounters</h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">Patient visits and interactions</p>
                 </div>
                 <Button
                     onClick={() => setOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6"
+                    className="flat-btn-primary"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     New Encounter
                 </Button>
             </div>
 
-            {/* Stats */}
+            {/* Flat Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--primary) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
-                        <Activity className="w-4 h-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-                        <p className="text-xs text-muted-foreground mt-1">All Visits</p>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total</span>
+                        <Activity className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+                    <p className="text-xs text-gray-500 mt-1">All Visits</p>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Planned</CardTitle>
-                        <Calendar className="w-4 h-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.planned}</div>
-                        <p className="text-xs text-blue-500 mt-1 font-medium">Scheduled</p>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Planned</span>
+                        <Calendar className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats.planned}</div>
+                    <p className="text-xs text-indigo-600 mt-1">Scheduled</p>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--warning) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">In Progress</CardTitle>
-                        <Clock className="w-4 h-4 text-yellow-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.inProgress}</div>
-                        <p className="text-xs text-yellow-500 mt-1 font-medium">Ongoing</p>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</span>
+                        <Clock className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.inProgress}</div>
+                    <p className="text-xs text-amber-600 mt-1">Ongoing</p>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.completed}</div>
-                        <p className="text-xs text-green-500 mt-1 font-medium">Finished</p>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</span>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.completed}</div>
+                    <p className="text-xs text-emerald-600 mt-1">Finished</p>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--destructive) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
-                        <XCircle className="w-4 h-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.cancelled}</div>
-                        <p className="text-xs text-red-500 mt-1 font-medium">Did Not Occur</p>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Cancelled</span>
+                        <XCircle className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.cancelled}</div>
+                    <p className="text-xs text-red-500 mt-1">Did Not Occur</p>
+                </div>
             </div>
 
             {/* List */}
@@ -340,7 +330,13 @@ export default function EncountersPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    <TableSkeleton />
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            {Array.from({ length: 6 }).map((_, j) => (
+                                                <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                                            ))}
+                                        </TableRow>
+                                    ))
                                 ) : error ? (
                                     <TableRow>
                                         <TableCell colSpan={6}>
@@ -421,14 +417,14 @@ export default function EncountersPage() {
 
             {/* Dialog */}
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-2xl border-border">
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                    <div className="bg-blue-600 px-6 py-5 text-white border-b-2 border-blue-700">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/20 rounded-xl">
+                            <div className="p-2 bg-white/20 rounded-lg border-2 border-white/30">
                                 <Activity className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                                <DialogTitle className="text-lg font-semibold text-white">
+                                <DialogTitle className="text-lg font-heading text-white">
                                     {editingEncounter ? 'Edit Encounter' : 'New Encounter'}
                                 </DialogTitle>
                                 <DialogDescription className="text-blue-100 text-sm mt-0.5">

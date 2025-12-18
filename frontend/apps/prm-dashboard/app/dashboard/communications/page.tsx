@@ -239,17 +239,17 @@ export default function CommunicationsPage() {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-theme(spacing.16))]">
-            {/* Sticky Glassmorphic Header */}
-            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
+        <div className="flex flex-col h-[calc(100vh-2rem)] min-h-[700px]">
+            {/* Flat Header */}
+            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-200 dark:border-gray-700">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Communications</h1>
+                    <h1 className="text-2xl font-heading text-foreground tracking-tight">Communications</h1>
                     <p className="text-sm text-muted-foreground mt-1">Manage patient conversations and alerts</p>
                 </div>
                 <div className="flex gap-3">
                     <Button
                         onClick={() => setIsCreateDialogOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all hover:scale-105"
+                        className="flat-btn-primary"
                     >
                         <Plus className="w-4 h-4 mr-2" />
                         New Message
@@ -258,23 +258,27 @@ export default function CommunicationsPage() {
             </header>
 
             <div className="flex-1 p-6 overflow-hidden flex flex-col gap-6">
-                {/* Magic Stats */}
+                {/* Flat Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800 hover:scale-[1.02] transition-transform">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                             <CardTitle className="text-sm font-medium text-muted-foreground">Total Messages</CardTitle>
-                            <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg border-2 border-blue-200 dark:border-blue-700">
+                                <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-foreground">{stats.total}</div>
                             <p className="text-xs text-muted-foreground mt-1">Across all channels</p>
                         </CardContent>
-                    </MagicCard>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-800 hover:scale-[1.02] transition-transform">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                             <CardTitle className="text-sm font-medium text-muted-foreground">WhatsApp</CardTitle>
-                            <MessageCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <div className="p-2 bg-green-100 dark:bg-green-800 rounded-lg border-2 border-green-200 dark:border-green-700">
+                                <MessageCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-foreground">{stats.whatsapp}</div>
@@ -283,33 +287,37 @@ export default function CommunicationsPage() {
                                 <p className="text-xs text-muted-foreground">Active channel</p>
                             </div>
                         </CardContent>
-                    </MagicCard>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800 hover:scale-[1.02] transition-transform">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                             <CardTitle className="text-sm font-medium text-muted-foreground">SMS Sent</CardTitle>
-                            <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg border-2 border-blue-200 dark:border-blue-700">
+                                <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-foreground">{stats.sms}</div>
                             <p className="text-xs text-muted-foreground mt-1">High open rate</p>
                         </CardContent>
-                    </MagicCard>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--primary) / 0.15)">
+                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-800 hover:scale-[1.02] transition-transform">
                         <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                             <CardTitle className="text-sm font-medium text-muted-foreground">Emails</CardTitle>
-                            <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                            <div className="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg border-2 border-purple-200 dark:border-purple-700">
+                                <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-foreground">{stats.email}</div>
                             <p className="text-xs text-muted-foreground mt-1">{stats.delivered} Delivered</p>
                         </CardContent>
-                    </MagicCard>
+                    </div>
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 bg-card border border-border rounded-xl shadow-sm overflow-hidden flex">
+                <div className="flex-1 bg-card border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex">
                     <ResizablePanelGroup direction="horizontal">
                         {/* Thread List - Sidebar */}
                         <ResizablePanel defaultSize={35} minSize={25} maxSize={45}>
@@ -455,7 +463,7 @@ export default function CommunicationsPage() {
                                     </div>
 
                                     {/* Message Content Area */}
-                                    <ScrollArea className="flex-1 p-6 bg-gradient-to-b from-muted/30 to-card">
+                                    <ScrollArea className="flex-1 p-6 bg-muted/20">
                                         {/* Template / Subject Info */}
                                         {(selectedComm.subject || selectedComm.template_id) && (
                                             <div className="mb-6 flex justify-center">

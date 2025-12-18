@@ -202,62 +202,54 @@ export default function ObservationsPage() {
 
     return (
         <div className="space-y-8 pb-10">
-            {/* Header */}
-            <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-background/90 backdrop-blur-md py-4 -mx-6 px-6 border-b border-border/50">
+            {/* Flat Header */}
+            <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-white dark:bg-gray-900 py-4 -mx-6 px-6 border-b-2 border-gray-100 dark:border-gray-800">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Observations</h1>
-                    <p className="text-muted-foreground text-sm">Vital signs, lab results, and clinical measurements</p>
+                    <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Observations</h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">Vital signs, lab results, and clinical measurements</p>
                 </div>
                 <Button
                     onClick={() => setOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6"
+                    className="flat-btn-primary"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Record Vitals
                 </Button>
             </div>
 
-            {/* Stats */}
+            {/* Flat Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--primary) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Records</CardTitle>
-                        <FileText className="w-4 h-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Records</span>
+                        <FileText className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Vital Signs</CardTitle>
-                        <Activity className="w-4 h-4 text-purple-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.vitals}</div>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Vital Signs</span>
+                        <Activity className="w-5 h-5 text-purple-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.vitals}</div>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--destructive) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Abnormal</CardTitle>
-                        <AlertCircle className="w-4 h-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.abnormal}</div>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Abnormal</span>
+                        <AlertCircle className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.abnormal}</div>
+                </div>
 
-                <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.2)">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Finalized</CardTitle>
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-foreground">{stats.final}</div>
-                    </CardContent>
-                </MagicCard>
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Finalized</span>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.final}</div>
+                </div>
             </div>
 
             {/* List */}
@@ -363,14 +355,14 @@ export default function ObservationsPage() {
 
             {/* Create Dialog */}
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-2xl border-border">
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                    <div className="bg-blue-600 px-6 py-5 text-white border-b-2 border-blue-700">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/20 rounded-xl">
+                            <div className="p-2 bg-white/20 rounded-lg border-2 border-white/30">
                                 <Activity className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                                <DialogTitle className="text-lg font-semibold text-white">Record Observation</DialogTitle>
+                                <DialogTitle className="text-lg font-heading text-white">Record Observation</DialogTitle>
                                 <DialogDescription className="text-blue-100 text-sm mt-0.5">
                                     Log vital signs or other clinical measurements
                                 </DialogDescription>

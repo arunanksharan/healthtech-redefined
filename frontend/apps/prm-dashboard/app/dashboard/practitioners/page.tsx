@@ -173,15 +173,15 @@ export default function PractitionersPage() {
 
     return (
         <div className="flex flex-col min-h-screen bg-muted/40">
-            {/* Sticky Glassmorphic Header */}
-            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
+            {/* Flat Header */}
+            <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Practitioners</h1>
-                    <p className="text-sm text-muted-foreground mt-1">Manage your healthcare providers and staff</p>
+                    <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Practitioners</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your healthcare providers and staff</p>
                 </div>
                 <Button
                     onClick={() => setIsAddOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all hover:scale-105"
+                    className="flat-btn-primary"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Practitioner
@@ -189,72 +189,64 @@ export default function PractitionersPage() {
             </header>
 
             <div className="p-6 space-y-6">
-                {/* Magic Stats */}
+                {/* Flat Stats Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--info) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Practitioners</CardTitle>
-                            <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">{totalCount}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Healthcare providers</p>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Practitioners</span>
+                            <Users className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{totalCount}</div>
+                        <p className="text-xs text-gray-500 mt-1">Healthcare providers</p>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--success) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-                            <Activity className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">{activeCount}</div>
-                            <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
-                                {totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0}% of total
-                            </p>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</span>
+                            <Activity className="w-5 h-5 text-emerald-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{activeCount}</div>
+                        <p className="text-xs text-emerald-600 mt-1">
+                            {totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0}% of total
+                        </p>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--destructive) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
-                            <TrendingUp className="w-4 h-4 text-red-500 dark:text-red-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">{inactiveCount}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Not currently active</p>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactive</span>
+                            <TrendingUp className="w-5 h-5 text-red-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-red-600 dark:text-red-400">{inactiveCount}</div>
+                        <p className="text-xs text-gray-500 mt-1">Not currently active</p>
+                    </div>
 
-                    <MagicCard className="bg-card border border-border shadow-sm" gradientColor="hsl(var(--channel-voice) / 0.15)">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Specialities</CardTitle>
-                            <Stethoscope className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-foreground">{uniqueSpecialities}</div>
-                            <p className="text-xs text-purple-600 dark:text-purple-400 mt-1 font-medium">Different specialties</p>
-                        </CardContent>
-                    </MagicCard>
+                    <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Specialities</span>
+                            <Stethoscope className="w-5 h-5 text-purple-500" />
+                        </div>
+                        <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{uniqueSpecialities}</div>
+                        <p className="text-xs text-purple-600 mt-1">Different specialties</p>
+                    </div>
                 </div>
 
-                {/* Search & Filters Bar */}
-                <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+                {/* Flat Search Bar */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border-2 border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <Input
                             placeholder="Search by name or speciality..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                            className="pl-10 border-border focus:border-blue-300 dark:focus:border-blue-600 focus:ring-blue-100 dark:focus:ring-blue-900/30 bg-muted/50"
+                            className="pl-10 border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500 rounded-lg bg-gray-50 dark:bg-gray-700"
                         />
                     </div>
                     <div className="flex items-center gap-3">
                         <select
                             value={specialityFilter}
                             onChange={(e) => setSpecialityFilter(e.target.value)}
-                            className="h-10 px-4 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 bg-muted/50"
+                            className="h-10 px-4 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-700"
                         >
                             <option value="all">All Specialities</option>
                             {specialities?.map((spec) => (
@@ -263,7 +255,7 @@ export default function PractitionersPage() {
                                 </option>
                             ))}
                         </select>
-                        <Button onClick={handleSearch} variant="outline" className="h-10 border-border hover:bg-accent text-muted-foreground">
+                        <Button onClick={handleSearch} variant="outline" className="h-10 border-2 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
                             Search
                         </Button>
                     </div>
@@ -406,15 +398,15 @@ export default function PractitionersPage() {
 
             {/* Add Practitioner Dialog */}
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-2xl border-gray-200">
-                    {/* Header with gradient */}
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                    {/* Flat Header */}
+                    <div className="bg-blue-600 px-6 py-5 text-white border-b-2 border-blue-700">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/20 rounded-xl">
+                            <div className="p-2 bg-white/20 rounded-lg border-2 border-white/30">
                                 <Plus className="h-5 w-5" />
                             </div>
                             <div>
-                                <DialogTitle className="text-lg font-semibold text-white">Add New Practitioner</DialogTitle>
+                                <DialogTitle className="text-lg font-heading text-white">Add New Practitioner</DialogTitle>
                                 <DialogDescription className="text-blue-100 text-sm mt-0.5">
                                     Add a new healthcare provider to your organization
                                 </DialogDescription>
@@ -546,7 +538,7 @@ export default function PractitionersPage() {
                             <Button
                                 type="submit"
                                 disabled={createMutation.isPending}
-                                className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
+                                className="flat-btn-primary"
                             >
                                 {createMutation.isPending ? (
                                     <>
@@ -567,15 +559,15 @@ export default function PractitionersPage() {
 
             {/* Edit Practitioner Dialog */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-2xl border-gray-200">
-                    {/* Header with gradient */}
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                    {/* Flat Header */}
+                    <div className="bg-blue-600 px-6 py-5 text-white border-b-2 border-blue-700">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/20 rounded-xl">
+                            <div className="p-2 bg-white/20 rounded-lg border-2 border-white/30">
                                 <Edit className="h-5 w-5" />
                             </div>
                             <div>
-                                <DialogTitle className="text-lg font-semibold text-white">Edit Practitioner</DialogTitle>
+                                <DialogTitle className="text-lg font-heading text-white">Edit Practitioner</DialogTitle>
                                 <DialogDescription className="text-blue-100 text-sm mt-0.5">
                                     Update practitioner information
                                 </DialogDescription>

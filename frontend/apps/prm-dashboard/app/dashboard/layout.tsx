@@ -87,14 +87,13 @@ export default function DashboardLayout({
         </AppShell>
       </WebSocketProvider>
 
-      {/* Floating AI Trigger Button */}
+      {/* Floating AI Trigger Button - Flat Design */}
       {!aiPanelOpen && (
         <button
           onClick={() => handleAiPanelToggle(true)}
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center group"
+          className="fixed bottom-6 right-6 z-50 h-14 w-14 bg-blue-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-blue-600 hover:scale-105 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:outline-none"
           title="Open AI Assistant"
         >
-          <div className="absolute inset-0 rounded-full bg-white/20 animate-pulse" />
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -105,7 +104,7 @@ export default function DashboardLayout({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="text-white relative z-10"
+            className="text-white"
           >
             <path d="M12 8V4H8" />
             <rect width="16" height="12" x="4" y="8" rx="2" />

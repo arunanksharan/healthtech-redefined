@@ -11,7 +11,7 @@ export class IntentParser {
 
   constructor(openaiApiKey?: string) {
     this.openai = new OpenAI({
-      apiKey: openaiApiKey || process.env.OPENAI_API_KEY || '',
+      apiKey: openaiApiKey || process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '',
       dangerouslyAllowBrowser: true,
     });
   }
@@ -27,6 +27,10 @@ export class IntentParser {
       // Build context for GPT-4
       const systemPrompt = this.buildSystemPrompt(allCapabilities);
 
+      console.log('🤖 [OpenAI Debug] Sending request...');
+      console.log('📝 User Input:', userInput);
+      console.log('🔑 API Key exists:', !!this.openai.apiKey);
+
       // Call GPT-4 to classify intent
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4-turbo-preview',
@@ -41,9 +45,14 @@ export class IntentParser {
       const result = completion.choices[0].message.content;
       const classification = result ? JSON.parse(result) : this.getDefaultClassification();
 
+      console.log('✅ [OpenAI Debug] Response received:');
+      console.log('📊 Classification:', JSON.stringify(classification, null, 2));
+      console.log('🎯 Agent:', classification.agentName, '| Confidence:', classification.confidence);
+
       return classification;
     } catch (error: any) {
-      console.error('Intent parsing failed:', error);
+      console.error('❌ [OpenAI Debug] Intent parsing failed:', error.message);
+      console.error('📦 Full error:', error);
       return this.getDefaultClassification();
     }
   }
