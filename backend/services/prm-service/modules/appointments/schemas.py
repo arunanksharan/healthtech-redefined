@@ -15,7 +15,9 @@ class AppointmentStatus(str, Enum):
     """Appointment lifecycle status"""
     REQUESTED = "requested"
     PENDING_CONFIRM = "pending_confirm"
+    BOOKED = "booked"
     CONFIRMED = "confirmed"
+    CHECKED_IN = "checked_in"
     RESCHEDULED = "rescheduled"
     CANCELED = "canceled"
     NO_SHOW = "no_show"
@@ -136,18 +138,29 @@ class AppointmentUpdate(BaseModel):
 # ==================== Response Schemas ====================
 
 class AppointmentResponse(BaseModel):
-    """Appointment response"""
+    """Appointment response - matches database model with enriched frontend fields"""
     id: UUID
+    tenant_id: Optional[UUID] = None
     patient_id: UUID
-    practitioner_id: Optional[UUID]
-    practitioner_name: Optional[str]
-    location_id: Optional[UUID]
-    location_name: Optional[str]
-    status: AppointmentStatus
-    confirmed_start: Optional[datetime]
-    confirmed_end: Optional[datetime]
-    channel_origin: str
-    reason: Optional[str]
+    practitioner_id: Optional[UUID] = None
+    location_id: Optional[UUID] = None
+    time_slot_id: Optional[UUID] = None
+    
+    appointment_type: Optional[str] = None
+    status: str
+    reason_text: Optional[str] = None
+    source_channel: Optional[str] = None
+    encounter_id: Optional[UUID] = None
+    meta_data: Optional[Dict[str, Any]] = None
+    
+    # Frontend-expected fields (enriched from relationships)
+    scheduled_at: Optional[str] = None  # ISO datetime string from TimeSlot
+    start_time: Optional[str] = None    # Same as scheduled_at for frontend compatibility
+    end_time: Optional[str] = None      # From TimeSlot.end_datetime
+    patient_name: Optional[str] = None
+    practitioner_name: Optional[str] = None
+    location_name: Optional[str] = None
+    
     created_at: datetime
     updated_at: datetime
 
@@ -263,6 +276,20 @@ class AppointmentDirectCreate(BaseModel):
     meta_data: Optional[Dict[str, Any]] = None
 
 
+class AppointmentQuickCreate(BaseModel):
+    """Simplified appointment creation from web form - auto-populates missing fields"""
+    patient_id: UUID
+    practitioner_id: UUID
+    
+    # Date/time fields for creating the time slot
+    appointment_date: str = Field(..., description="Date in YYYY-MM-DD format")
+    appointment_time: str = Field(..., description="Time in HH:MM format")
+    
+    appointment_type: str = Field("consultation", description="new, follow_up, checkup, procedure, test")
+    reason_text: Optional[str] = None
+    source_channel: str = Field("web", description="web, whatsapp, callcenter, walk_in")
+
+
 # ==================== Enhanced Appointment Response ====================
 
 class AppointmentDetailResponse(BaseModel):
@@ -295,3 +322,18 @@ class AppointmentDetailResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AppointmentStats(BaseModel):
+    """Appointment statistics"""
+    total: int
+    today: int
+    upcoming: int
+    requested: int
+    pending_confirm: int
+    booked: int
+    confirmed: int
+    checked_in: int
+    completed: int
+    cancelled: int
+    no_show: int

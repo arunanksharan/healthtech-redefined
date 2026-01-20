@@ -10,7 +10,7 @@ from sqlalchemy import and_
 from loguru import logger
 import dateparser
 
-from backend.shared.database.models import Patient, Appointment, Practitioner, Location, PractitionerSchedule
+from backend.shared.database.models import Patient, Appointment, Practitioner, Location, ProviderSchedule
 from backend.shared.database.conversation_voice_models import (
     VoiceCall,
     VoiceCallTranscript,
@@ -533,8 +533,8 @@ class VoiceWebhookService:
         slots = []
 
         # Get practitioner's weekly schedule
-        schedules = self.db.query(PractitionerSchedule).filter(
-            PractitionerSchedule.practitioner_id == practitioner.id
+        schedules = self.db.query(ProviderSchedule).filter(
+            ProviderSchedule.practitioner_id == practitioner.id
         ).all()
 
         if not schedules:
@@ -581,7 +581,7 @@ class VoiceWebhookService:
     def _generate_day_slots(
         self,
         date: datetime.date,
-        schedule: PractitionerSchedule,
+        schedule: ProviderSchedule,
         practitioner: Practitioner,
         location: Location,
         preferred_hour: Optional[int] = None,
@@ -589,15 +589,9 @@ class VoiceWebhookService:
         """Generate slots for a specific day"""
         slots = []
 
-        # Convert schedule times to datetime
-        start_time = datetime.combine(
-            date,
-            time(hour=schedule.start_minute // 60, minute=schedule.start_minute % 60)
-        )
-        end_time = datetime.combine(
-            date,
-            time(hour=schedule.end_minute // 60, minute=schedule.end_minute % 60)
-        )
+        # Convert schedule times to datetime (ProviderSchedule uses Time objects)
+        start_time = datetime.combine(date, schedule.start_time)
+        end_time = datetime.combine(date, schedule.end_time)
 
         # Generate slots at regular intervals
         current_slot = start_time
@@ -618,7 +612,7 @@ class VoiceWebhookService:
                         formatted_time=formatted_time,
                     ))
 
-            current_slot += timedelta(minutes=schedule.slot_minutes)
+            current_slot += timedelta(minutes=schedule.slot_duration_minutes)
 
         return slots
 

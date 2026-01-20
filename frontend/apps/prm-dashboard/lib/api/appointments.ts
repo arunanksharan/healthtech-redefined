@@ -1,14 +1,43 @@
 import { apiClient, PaginatedResponse, apiCall } from './client';
-import type { Appointment, AppointmentSlot } from '@/lib/types';
+import type { Appointment, AppointmentSlot, AppointmentStats } from '@/lib/api/types';
 
 /**
  * Appointment API Module
- * Using latest patterns with proper error handling
+ * Complete API coverage for appointment management
  */
+
+// ==================== Types ====================
+
+
+
+export interface SlotSearchParams {
+  conversation_id?: string;
+  patient_phone?: string;
+  practitioner_id?: string;
+  specialty?: string;
+  preferred_date?: string;
+  preferred_time?: string;
+  days_ahead?: number;
+}
+
+export interface ConflictCheckParams {
+  practitioner_id: string;
+  start_datetime: string;
+  end_datetime: string;
+  exclude_appointment_id?: string;
+}
+
+export interface AppointmentConflict {
+  has_conflict: boolean;
+  conflicting_appointments: Appointment[];
+  message: string;
+}
+
+// ==================== API Methods ====================
 
 export const appointmentsAPI = {
   /**
-   * Get all appointments
+   * Get all appointments with filters
    */
   async getAll(params?: {
     page?: number;
@@ -16,53 +45,50 @@ export const appointmentsAPI = {
     practitioner_id?: string;
     patient_id?: string;
     status?: string;
-    date_start?: string;
-    date_end?: string;
+    start_date?: string;
+    end_date?: string;
   }) {
-    // MOCK DATA for Dashboard
-    const mockAppointments: Appointment[] = [
-      {
-        id: '1',
-        patient_id: 'p1',
-        patient: { id: 'p1', name: 'John Doe', mrn: 'MRN001', phone: '555-0101', date_of_birth: '1980-01-01', gender: 'male', created_at: '', updated_at: '' },
-        practitioner_id: 'dr1',
-        practitioner: { id: 'dr1', name: 'Dr. Sarah Wilson', speciality: 'Cardiology', qualification: 'MD' },
-        start_time: new Date().toISOString(), // Today
-        scheduled_at: new Date().toISOString(), // Same as start_time
-        end_time: new Date(Date.now() + 30 * 60000).toISOString(),
-        appointment_type: 'consultation',
-        status: 'confirmed',
-        location: { id: 'l1', name: 'Room 302' },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        patient_id: 'p2',
-        patient: { id: 'p2', name: 'Jane Smith', mrn: 'MRN002', phone: '555-0102', date_of_birth: '1990-05-15', gender: 'female', created_at: '', updated_at: '' },
-        practitioner_id: 'dr1',
-        practitioner: { id: 'dr1', name: 'Dr. Sarah Wilson', speciality: 'Cardiology', qualification: 'MD' },
-        start_time: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-        scheduled_at: new Date(Date.now() + 86400000).toISOString(), // Same as start_time
-        end_time: new Date(Date.now() + 86400000 + 30 * 60000).toISOString(),
-        appointment_type: 'follow_up',
-        status: 'scheduled',
-        location: { id: 'l1', name: 'Room 302' },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-    ];
+    return apiCall<PaginatedResponse<Appointment>>(
+      apiClient.get('/api/v1/prm/appointments', { params })
+    );
+  },
 
-    return [
-      {
-        items: mockAppointments,
-        total: 2,
-        page: 1,
-        page_size: 20,
-        total_pages: 1
-      } as PaginatedResponse<Appointment>,
-      null
-    ];
+  /**
+   * Get today's appointments
+   */
+  async getToday(params?: {
+    practitioner_id?: string;
+    status?: string;
+  }) {
+    return apiCall<Appointment[]>(
+      apiClient.get('/api/v1/prm/appointments/today', { params })
+    );
+  },
+
+  /**
+   * Get upcoming appointments (next 7 days)
+   */
+  async getUpcoming(params?: {
+    practitioner_id?: string;
+    patient_id?: string;
+    days?: number;
+  }) {
+    return apiCall<Appointment[]>(
+      apiClient.get('/api/v1/prm/appointments/upcoming', { params })
+    );
+  },
+
+  /**
+   * Get appointment statistics
+   */
+  async getStats(params?: {
+    start_date?: string;
+    end_date?: string;
+    practitioner_id?: string;
+  }) {
+    return apiCall<AppointmentStats>(
+      apiClient.get('/api/v1/prm/appointments/stats', { params })
+    );
   },
 
   /**
@@ -75,14 +101,34 @@ export const appointmentsAPI = {
   },
 
   /**
-   * Create new appointment
+   * Create new appointment (quick create from web form)
    */
   async create(data: {
     patient_id: string;
     practitioner_id: string;
-    slot_id: string;
+    appointment_date: string;
+    appointment_time: string;
     appointment_type: string;
-    notes?: string;
+    reason_text?: string;
+  }) {
+    return apiCall<Appointment>(
+      apiClient.post('/api/v1/prm/appointments/quick', data)
+    );
+  },
+
+  /**
+   * Create appointment with full details (requires time_slot_id)
+   */
+  async createDirect(data: {
+    tenant_id: string;
+    patient_id: string;
+    practitioner_id: string;
+    location_id: string;
+    time_slot_id: string;
+    appointment_type?: string;
+    reason_text?: string;
+    source_channel?: string;
+    meta_data?: Record<string, any>;
   }) {
     return apiCall<Appointment>(
       apiClient.post('/api/v1/prm/appointments', data)
@@ -99,12 +145,20 @@ export const appointmentsAPI = {
   },
 
   /**
-   * Cancel appointment
+   * Delete appointment
+   */
+  async delete(id: string) {
+    return apiCall<void>(
+      apiClient.delete(`/api/v1/prm/appointments/${id}`)
+    );
+  },
+
+  /**
+   * Cancel appointment (using dedicated endpoint)
    */
   async cancel(id: string, reason?: string) {
     return apiCall<Appointment>(
-      apiClient.patch(`/api/v1/prm/appointments/${id}`, {
-        status: 'cancelled',
+      apiClient.post(`/api/v1/prm/appointments/${id}/cancel`, {
         cancellation_reason: reason,
       })
     );
@@ -123,7 +177,21 @@ export const appointmentsAPI = {
   },
 
   /**
-   * Get available slots
+   * Find available slots for booking
+   */
+  async findSlots(params: SlotSearchParams) {
+    return apiCall<{
+      conversation_id: string;
+      slots: AppointmentSlot[];
+      message_to_user: string;
+      total_slots: number;
+    }>(
+      apiClient.post('/api/v1/prm/appointments/find-slots', params)
+    );
+  },
+
+  /**
+   * Get available slots (GET method for simpler queries)
    */
   async getAvailableSlots(params: {
     practitioner_id?: string;
@@ -135,6 +203,35 @@ export const appointmentsAPI = {
   }) {
     return apiCall<AppointmentSlot[]>(
       apiClient.get('/api/v1/prm/appointments/slots', { params })
+    );
+  },
+
+  /**
+   * Check for appointment conflicts
+   */
+  async checkConflicts(params: ConflictCheckParams) {
+    return apiCall<AppointmentConflict>(
+      apiClient.get('/api/v1/prm/appointments/conflicts', { params })
+    );
+  },
+
+  /**
+   * Handle slot selection from conversation flow
+   */
+  async selectSlot(data: {
+    conversation_id: string;
+    user_text: string;
+    available_slots: AppointmentSlot[];
+  }) {
+    return apiCall<{
+      success: boolean;
+      message: string;
+      action: string;
+      appointment_id?: string;
+      needs_clarification: boolean;
+      follow_up_message?: string;
+    }>(
+      apiClient.post('/api/v1/prm/appointments/select-slot', data)
     );
   },
 
@@ -160,4 +257,27 @@ export const appointmentsAPI = {
       })
     );
   },
+
+  /**
+   * Mark patient as no-show
+   */
+  async markNoShow(id: string) {
+    return apiCall<Appointment>(
+      apiClient.patch(`/api/v1/prm/appointments/${id}`, {
+        status: 'no_show',
+      })
+    );
+  },
+
+  /**
+   * Confirm appointment
+   */
+  async confirm(id: string) {
+    return apiCall<Appointment>(
+      apiClient.patch(`/api/v1/prm/appointments/${id}`, {
+        status: 'confirmed',
+      })
+    );
+  },
 };
+

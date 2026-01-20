@@ -34,7 +34,14 @@ from .presence_manager import (
     presence_manager,
 )
 from .message_broker import MessageBroker, message_broker, MessagePriority
-from .room_manager import RoomManager, room_manager, RoomType, RoomPermission
+from .room_manager import (
+    RoomManager,
+    room_manager,
+    RoomType,
+    RoomPermission,
+    Room,
+    RoomMember
+)
 from .notification_service import NotificationService, notification_service, NotificationChannel
 
 logger = logging.getLogger(__name__)
@@ -54,6 +61,14 @@ class WebSocketAuth:
         # Placeholder - integrate with your auth system
         # This should decode the JWT and return user info
         try:
+            # Explicitly handle dev token
+            if token == "dev-token-123":
+                 return {
+                    "user_id": "user123",
+                    "tenant_id": "tenant456",
+                    "roles": ["user", "admin"],
+                }
+
             # Example structure - replace with real JWT validation
             return {
                 "user_id": "user123",
@@ -110,6 +125,7 @@ async def websocket_endpoint(
         if token:
             user_info = await WebSocketAuth.validate_token(token)
             if user_info:
+                logger.warning(f"DEBUG: Authenticating connection {connection.connection_id} with: {user_info}")
                 await connection_manager.authenticate(
                     connection.connection_id,
                     user_id=user_info["user_id"],
@@ -125,13 +141,17 @@ async def websocket_endpoint(
                     activity=ActivityType.ACTIVE,
                     device_id=connection.connection_id,
                 )
+            else:
+                logger.warning(f"DEBUG: Token validation failed for token: {token}")
 
         # Main message loop
         while True:
             try:
                 raw_message = await websocket.receive_text()
+                # print(f"DEBUG: Received message: {raw_message}") # Too noisy?
                 await handle_websocket_message(connection, raw_message)
             except WebSocketDisconnect:
+                print(f"DEBUG: WebSocket disconnected: {connection.connection_id}")
                 logger.info(f"WebSocket disconnected: {connection.connection_id}")
                 break
 
@@ -391,10 +411,47 @@ async def handle_join_room(connection: Connection, message: WebSocketMessage):
         return
 
     # Check room exists and user has access
+    logger.warning(f"DEBUG: Attempting to join room: {room_id}, User: {connection.user_id}, Tenant: {connection.tenant_id}")
     room = await room_manager.get_room(room_id)
     if not room:
-        await send_error(connection, "Room not found", message.message_id)
-        return
+        # Auto-create room for the conversation if it doesn't exist
+        # This acts as a bridge between SQL conversations and Redis rooms
+        if connection.tenant_id and connection.user_id:
+            room = await room_manager.create_room(
+                tenant_id=connection.tenant_id,
+                room_type=RoomType.GROUP,
+                name=f"Conversation {room_id}",
+                creator_id=connection.user_id,
+                member_ids=[connection.user_id],  # Add creator immediately
+                metadata={"conversation_id": room_id}
+            )
+            # Force the ID to match the requested room_id (conversation_id)
+            # Note: create_room generates a random ID, implying we might need to overrule it
+            # or usage room_manager methods effectively.
+            # Actually, room_manager.create_room makes a new UUID. 
+            # We need to register THIS specific room_id.
+            
+            # Since create_room generates a new ID, we should manually create/store the room 
+            # to ensure the ID matches the conversation_id.
+            room = Room(
+                room_id=room_id, # Use the requested ID
+                tenant_id=connection.tenant_id,
+                room_type=RoomType.GROUP,
+                name=f"Conversation {room_id}",
+                owner_id=connection.user_id,
+                members={
+                    connection.user_id: RoomMember(
+                        user_id=connection.user_id,
+                        permission=RoomPermission.WRITE
+                    )
+                }
+            )
+            await room_manager._store_room(room)
+            await room_manager._add_user_room(connection.user_id, room_id)
+            logger.info(f"Auto-created room for conversation: {room_id}")
+        else:
+             await send_error(connection, "Room not found", message.message_id)
+             return
 
     if connection.user_id not in room.members:
         await send_error(connection, "Not a member of this room", message.message_id)
@@ -404,13 +461,14 @@ async def handle_join_room(connection: Connection, message: WebSocketMessage):
     await connection_manager.join_room(connection.connection_id, room_id)
 
     # Send room info
+    # Send ACK to satisfy client request
     await connection_manager.send_to_connection(
         connection.connection_id,
         WebSocketMessage(
-            type=MessageType.ROOM_UPDATE,
+            type=MessageType.ACK,
             payload={
-                "action": "joined",
-                "room": room.to_dict(),
+                "status": "success",
+                "roomId": room_id
             },
             correlation_id=message.message_id,
         )

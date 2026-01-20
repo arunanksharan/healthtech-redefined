@@ -329,6 +329,46 @@ class Location(Base):
     )
 
 
+
+class Department(Base):
+    """Hospital departments/services (Cardiology, Orthopedics, etc.)"""
+
+    __tablename__ = "departments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+    location_id = Column(UUID(as_uuid=True), ForeignKey("locations.id"))
+
+    # Department Details
+    name = Column(String(255), nullable=False)
+    code = Column(String(50))
+    description = Column(Text)
+    specialty = Column(String(100))
+
+    # Status
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    # Metadata
+    meta_data = Column(JSONB, default=dict)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_departments_tenant", "tenant_id"),
+        Index("idx_departments_organization", "organization_id"),
+        Index("idx_departments_code", "code"),
+    )
+
+
 # ============================================================================
 # CONSENT & PRIVACY
 # ============================================================================
@@ -556,48 +596,7 @@ class RolePermission(Base):
     )
 
 
-# ============================================================================
-# FHIR RESOURCES
-# ============================================================================
 
-
-class FHIRResource(Base):
-    """Generic FHIR R4 resource storage with versioning"""
-
-    __tablename__ = "fhir_resources"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-
-    # Resource Identification
-    resource_type = Column(
-        String(50), nullable=False
-    )  # Patient, Encounter, Observation, etc.
-    resource_id = Column(String(100), nullable=False)  # FHIR logical ID
-    version = Column(Integer, nullable=False, default=1)
-    is_current = Column(Boolean, nullable=False, default=True)
-
-    # The actual FHIR resource (complete JSON)
-    resource = Column(JSONB, nullable=False)
-
-    # Metadata
-    meta_data = Column(JSONB, default=dict)
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
-
-    # Indexes
-    __table_args__ = (
-        Index("idx_fhir_resources_tenant_type", "tenant_id", "resource_type"),
-        Index("idx_fhir_resources_id_type", "resource_type", "resource_id", "is_current"),
-        Index("idx_fhir_resources_current", "is_current"),
-    )
 
 
 # ============================================================================
@@ -669,7 +668,7 @@ class StoredEvent(Base):
 
     # Metadata
     occurred_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    meta_data = Column(JSONB, default=dict)
+    event_metadata = Column(JSONB, default=dict)
 
     # Indexes for efficient queries
     __table_args__ = (
@@ -739,7 +738,7 @@ class FailedEvent(Base):
     resolved_at = Column(DateTime(timezone=True))
 
     # Metadata
-    meta_data = Column(JSONB, default=dict)
+    event_metadata = Column(JSONB, default=dict)
 
     # Indexes
     __table_args__ = (
@@ -853,7 +852,7 @@ class Appointment(Base):
     practitioner = relationship("Practitioner")
     location = relationship("Location")
     time_slot = relationship("TimeSlot", back_populates="appointments")
-    encounter = relationship("Encounter", foreign_keys=[encounter_id])
+    encounter = relationship("Encounter", uselist=False, foreign_keys=[encounter_id])
 
     # Indexes
     __table_args__ = (
@@ -917,6 +916,10 @@ class Journey(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text)
 
+    journey_type = Column(String(50), nullable=False, default="wellness")
+    is_default = Column(Boolean, nullable=False, default=False)
+    trigger_conditions = Column(JSONB, default=dict)
+
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -936,16 +939,16 @@ class JourneyStage(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
     journey_id = Column(UUID(as_uuid=True), ForeignKey("journeys.id", ondelete="CASCADE"), nullable=False)
-    sequence = Column(Integer, nullable=False)
+    order_index = Column(Integer, nullable=False)
     code = Column(String(100), nullable=False)  # PRE_VISIT, DAY_OF_VISIT
     name = Column(String(255), nullable=False)
     description = Column(Text)
 
-    entry_event_type = Column(String(100))  # Appointment.Created
+    trigger_event = Column(String(100))  # Appointment.Created
     exit_event_type = Column(String(100))
     auto_advance = Column(Boolean, nullable=False, default=False)
 
-    config = Column(JSONB, default=dict)  # days_before_visit, templates, etc.
+    actions = Column(JSONB, default=dict)  # days_before_visit, templates, etc.
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -954,7 +957,7 @@ class JourneyStage(Base):
     journey = relationship("Journey", back_populates="stages")
 
     # Indexes
-    __table_args__ = (Index("idx_journey_stages_journey", "journey_id", "sequence"),)
+    __table_args__ = (Index("idx_journey_stages_journey", "journey_id", "order_index"),)
 
 
 class JourneyInstance(Base):
@@ -975,6 +978,10 @@ class JourneyInstance(Base):
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def started_at(self):
+        return self.created_at
 
     # Relationships
     journey = relationship("Journey", back_populates="instances")
@@ -1057,20 +1064,50 @@ class Ticket(Base):
     description = Column(Text)
     status = Column(String(50), nullable=False, default="open")  # open, in_progress, resolved, closed
     priority = Column(String(50), nullable=False, default="medium")  # low, medium, high, urgent
+    category = Column(String(50), nullable=False, default="general")  # billing, clinical, technical, administrative
 
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     assigned_to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at = Column(DateTime(timezone=True))
+    resolution_notes = Column(Text)
 
     # Relationships
     patient = relationship("Patient", back_populates="tickets")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
+    comments = relationship("TicketComment", back_populates="ticket", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (Index("idx_tickets_patient", "patient_id", "status"),)
+
+
+class TicketComment(Base):
+    """Comments on support tickets"""
+
+    __tablename__ = "ticket_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    ticket_id = Column(UUID(as_uuid=True), ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    content = Column(Text, nullable=False)
+    is_internal = Column(Boolean, nullable=False, default=False)  # Internal notes vs patient visible
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    ticket = relationship("Ticket", back_populates="comments")
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_ticket_comments_ticket", "ticket_id", "created_at"),
+    )
 
 
 # ====================================================================================

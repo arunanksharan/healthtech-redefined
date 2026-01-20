@@ -120,6 +120,47 @@ export async function processUserInput(
   });
 }
 
+/**
+ * Execute a confirmed plan (called after user clicks "Confirm Action")
+ */
+export async function executeConfirmedPlan(
+  plan: any,
+  agentName: string,
+  userId: string,
+  orgId: string,
+  sessionId: string,
+  permissions: string[] = []
+) {
+  const agent = agentRegistry.getAgent(agentName);
+
+  if (!agent) {
+    return {
+      success: false,
+      message: `Agent ${agentName} not found`,
+      error: { code: 'AGENT_NOT_FOUND', message: `Agent ${agentName} not found` },
+    };
+  }
+
+  const context = {
+    userId,
+    orgId,
+    sessionId,
+    requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    permissions,
+  };
+
+  console.log('🚀 [AI Debug] Executing confirmed plan...');
+  console.log('📋 Agent:', agentName);
+  console.log('📝 Plan:', JSON.stringify(plan, null, 2));
+
+  // Call the agent's executeWithConfirmation method
+  const result = await agent.executeWithConfirmation(plan, context);
+
+  console.log('✅ [AI Debug] Execution result:', result);
+
+  return result;
+}
+
 // Export singleton instances
 export { orchestrator, toolRegistry, agentRegistry, intentParser };
 

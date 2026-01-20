@@ -139,6 +139,15 @@ export const communicationsAPI = {
   },
 
   /**
+   * Get communication stats
+   */
+  async getStats(): Promise<[any | null, APIError | null]> {
+    return apiCall<any>(
+      apiClient.get('/api/v1/prm/communications/stats')
+    );
+  },
+
+  /**
    * Update communication status
    */
   async updateStatus(
@@ -147,6 +156,15 @@ export const communicationsAPI = {
   ): Promise<[Communication | null, APIError | null]> {
     return apiCall<Communication>(
       apiClient.patch(`/api/v1/prm/communications/${id}`, { status })
+    );
+  },
+
+  /**
+   * Delete communication
+   */
+  async delete(id: string): Promise<[null, APIError | null]> {
+    return apiCall<null>(
+      apiClient.delete(`/api/v1/prm/communications/${id}`)
     );
   },
 };

@@ -33,6 +33,8 @@
     --warning-foreground: 0 0% 0%;
     --info: 221 83% 53%;
     --info-foreground: 0 0% 100%;
+    --purple: 262 83% 58%;
+
 
     /* Healthcare-Specific Colors */
     --urgent: 0 72% 51%;
@@ -102,6 +104,8 @@
     --warning-foreground: 0 0% 0%;
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
+    --purple: 262 80% 65%;
+
 
     /* Healthcare-Specific - Dark */
     --urgent: 0 72% 55%;
@@ -136,9 +140,13 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+
   .theme {
     --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
     --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+    --animate-marquee: marquee var(--duration) infinite linear;
+    --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+    --animate-blink-cursor: blink-cursor 1.2s step-end infinite;
   }
 }
 
@@ -146,8 +154,60 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+/* Flat Design System Utilities */
+@layer components {
+  /* Flat Card - No shadow, scale hover */
+  .flat-card {
+    @apply bg-white rounded-lg p-6 transition-all duration-200;
+    box-shadow: none !important;
+  }
+  .flat-card:hover {
+    @apply scale-[1.02];
+  }
+
+  /* Flat Button Primary */
+  .flat-btn-primary {
+    @apply bg-blue-500 text-white font-semibold rounded-md px-8 py-4 transition-all duration-200;
+    box-shadow: none !important;
+  }
+  .flat-btn-primary:hover {
+    @apply bg-blue-600 scale-105;
+  }
+  .flat-btn-primary:focus {
+    @apply ring-2 ring-offset-2 ring-blue-500 outline-none;
+  }
+
+  /* Flat Button Outline */
+  .flat-btn-outline {
+    @apply bg-transparent border-4 border-blue-500 text-blue-500 font-semibold rounded-md px-8 py-4 transition-all duration-200;
+  }
+  .flat-btn-outline:hover {
+    @apply bg-blue-500 text-white scale-105;
+  }
+  .flat-btn-outline:focus {
+    @apply ring-2 ring-offset-2 ring-blue-500 outline-none;
+  }
+
+  /* Flat Input */
+  .flat-input {
+    @apply bg-gray-100 text-gray-900 rounded-md px-4 py-3 border-0 transition-all duration-200;
+  }
+  .flat-input:focus {
+    @apply bg-white border-2 border-blue-500 outline-none;
+  }
+
+  /* Outfit Headings */
+  .font-heading {
+    font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+    @apply font-bold tracking-tight;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -174,6 +234,7 @@
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -183,6 +244,7 @@
   from {
     transform: translateX(0);
   }
+
   to {
     transform: translateX(100%);
   }
@@ -192,15 +254,19 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -218,28 +284,142 @@
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Bento Card Animations */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes float-slow {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes float-slower {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 4s ease-in-out infinite;
+}
+
+.animate-float-slower {
+  animation: float-slower 5s ease-in-out infinite;
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-500 {
+  animation-delay: 0.5s;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
 .animate-pulse-slow {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  /* End of globals.css */
 }
 
 @theme inline {
-  @keyframes shimmer-slide {
-  to {
-    transform: translate(calc(100cqw - 100%), 0);
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
     }
   }
-  @keyframes spin-around {
-  0% {
-    transform: translateZ(0) rotate(0);
+
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
     }
-  15%, 35% {
-    transform: translateZ(0) rotate(90deg);
+
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
     }
-  65%, 85% {
-    transform: translateZ(0) rotate(270deg);
+  }
+
+  @keyframes blink-cursor {
+
+    0%,
+    49% {
+      opacity: 1;
     }
-  100% {
-    transform: translateZ(0) rotate(360deg);
+
+    50%,
+    100% {
+      opacity: 0;
     }
   }
 }

@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, Plus, User, Phone, Mail, Eye, Edit, MoreVertical, Activity, Users, Clock, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Search, Plus, User, Phone, Mail, Eye, Activity, Users, AlertCircle, TrendingUp, Calendar } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { patientsAPI } from '@/lib/api/patients';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -20,17 +19,81 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MagicCard } from '@/components/ui/magic-card';
+import { Label } from '@/components/ui/label';
 import { formatDate } from '@/lib/utils/date';
-import toast from 'react-hot-toast';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
+
+// Flat Stat Card Component
+function FlatStatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  color
+}: {
+  title: string;
+  value: number | string;
+  subtitle: string;
+  icon: any;
+  color: 'blue' | 'green' | 'indigo' | 'amber'
+}) {
+  const colors = {
+    blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
+    green: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
+    indigo: 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800',
+    amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
+  };
+  const iconColors = {
+    blue: 'text-blue-500',
+    green: 'text-emerald-500',
+    indigo: 'text-indigo-500',
+    amber: 'text-amber-500',
+  };
+  const valueColors = {
+    blue: 'text-blue-600 dark:text-blue-400',
+    green: 'text-emerald-600 dark:text-emerald-400',
+    indigo: 'text-indigo-600 dark:text-indigo-400',
+    amber: 'text-amber-600 dark:text-amber-400',
+  };
+
+  return (
+    <div className={`${colors[color]} border-2 rounded-lg p-5 transition-all duration-200 hover:scale-[1.02]`}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</span>
+        <Icon className={`w-5 h-5 ${iconColors[color]}`} />
+      </div>
+      <div className={`text-3xl font-bold ${valueColors[color]}`}>{value}</div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+    </div>
+  );
+}
 
 export default function PatientsPage() {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<'name' | 'phone' | 'mrn'>('name');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: 'male',
+    phone_primary: '',
+    email_primary: '',
+  });
+  const queryClient = useQueryClient();
 
   // Fetch all patients
   const { data: patientsData, isLoading, error } = useQuery({
@@ -42,240 +105,403 @@ export default function PatientsPage() {
     },
   });
 
+  // Fetch patient statistics
+  const { data: stats } = useQuery({
+    queryKey: ['patient-stats'],
+    queryFn: async () => {
+      const [data, error] = await patientsAPI.getStats();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+
+  // Create patient mutation
+  const createMutation = useMutation({
+    mutationFn: (data: typeof addForm) => patientsAPI.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-stats'] });
+      setIsAddOpen(false);
+      setAddForm({
+        first_name: '',
+        last_name: '',
+        date_of_birth: '',
+        gender: 'male',
+        phone_primary: '',
+        email_primary: '',
+      });
+      toast({ title: 'Success', description: 'Patient created successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: 'Failed to create patient: ' + error.message, variant: 'destructive' });
+    },
+  });
+
   // Search patients
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      toast.error('Please enter a search term');
+      toast({ title: 'Validation Error', description: 'Please enter a search term', variant: 'destructive' });
       return;
     }
-
     const [results, error] = await patientsAPI.search(searchQuery, searchType);
-
     if (error) {
-      toast.error('Search failed: ' + error.message);
+      toast({ title: 'Search Failed', description: error.message, variant: 'destructive' });
       return;
     }
+    toast({ title: 'Search Complete', description: `Found ${results?.length || 0} patients` });
+  };
 
-    toast.success(`Found ${results?.length || 0} patients`);
+  // Handle add form submit
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.first_name || !addForm.last_name || !addForm.date_of_birth) {
+      toast({ title: 'Missing Fields', description: 'Please fill in required fields', variant: 'destructive' });
+      return;
+    }
+    createMutation.mutate(addForm);
   };
 
   const patients = patientsData?.items || [];
-  const totalCount = patientsData?.total || 0;
+  const totalCount = stats?.total_patients ?? patientsData?.total ?? 0;
+  const activeCount = stats?.active_patients ?? patients.filter((p) => p.status === 'active').length;
+  const newThisMonth = stats?.new_this_month ?? 0;
+  const maleCount = stats?.by_gender?.male ?? 0;
+  const femaleCount = stats?.by_gender?.female ?? 0;
 
   return (
-    <div className="space-y-8 pb-10">
-      {/* Sticky Header */}
-      <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-gray-50/90 backdrop-blur-md py-4 -mx-6 px-6 border-b border-gray-200/50">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Flat Header */}
+      <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Patients</h1>
-          <p className="text-gray-500 text-sm">
-            Manage your patient directory and records
-          </p>
+          <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Patients</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your patient directory and records</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all rounded-full px-6">
+        <Button
+          onClick={() => setIsAddOpen(true)}
+          className="flat-btn-primary"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Patient
         </Button>
-      </div>
+      </header>
 
-      {/* Magic Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#eff6ff">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Total Patients</CardTitle>
-            <Users className="w-4 h-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{totalCount}</div>
-            <p className="text-xs text-gray-500 mt-1">+12% from last month</p>
-          </CardContent>
-        </MagicCard>
-
-        <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#f0fdf4">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Active</CardTitle>
-            <Activity className="w-4 h-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {patients.filter((p) => p.status === 'active').length}
-            </div>
-            <p className="text-xs text-green-600 mt-1 font-medium">98% adherence rate</p>
-          </CardContent>
-        </MagicCard>
-
-        <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#eff6ff">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">New This Month</CardTitle>
-            <User className="w-4 h-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">12</div>
-            <p className="text-xs text-gray-500 mt-1">4 pending intake</p>
-          </CardContent>
-        </MagicCard>
-
-        <MagicCard className="bg-white border border-gray-200 shadow-sm" gradientColor="#fefce8">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-gray-500">Pending Follow-up</CardTitle>
-            <AlertCircle className="w-4 h-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">3</div>
-            <p className="text-xs text-amber-600 mt-1 font-medium">Action required</p>
-          </CardContent>
-        </MagicCard>
-      </div>
-
-      {/* Search & Filters Bar */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search by name, MRN, or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            className="pl-10 border-gray-200 focus:border-blue-300 focus:ring-blue-100 bg-gray-50/50"
+      <div className="p-6 space-y-6">
+        {/* Flat Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <FlatStatCard
+            title="Total Patients"
+            value={totalCount}
+            subtitle={maleCount > 0 || femaleCount > 0 ? `${maleCount} male, ${femaleCount} female` : 'All registered patients'}
+            icon={Users}
+            color="blue"
+          />
+          <FlatStatCard
+            title="Active"
+            value={activeCount}
+            subtitle={`${totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0}% of total`}
+            icon={Activity}
+            color="green"
+          />
+          <FlatStatCard
+            title="New This Month"
+            value={newThisMonth}
+            subtitle="Recent registrations"
+            icon={TrendingUp}
+            color="indigo"
+          />
+          <FlatStatCard
+            title="Avg Age"
+            value={stats?.average_age ? Math.round(stats.average_age) : '--'}
+            subtitle="Years old"
+            icon={User}
+            color="amber"
           />
         </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={searchType}
-            onChange={(e) => setSearchType(e.target.value as any)}
-            className="h-10 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-gray-50/50"
-          >
-            <option value="name">Name</option>
-            <option value="phone">Phone</option>
-            <option value="mrn">MRN</option>
-          </select>
-          <Button onClick={handleSearch} variant="outline" className="h-10 border-gray-200 hover:bg-gray-50 text-gray-700">
-            Search
-          </Button>
-        </div>
-      </div>
 
-      {/* Patients Table */}
-      <Card className="border-gray-200 shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-gray-500 text-sm">Loading patient records...</p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-12 text-red-600 bg-red-50">
-              Error loading patients: {(error as Error).message}
-            </div>
-          ) : patients.length === 0 ? (
-            <div className="text-center py-20 text-gray-500">
-              <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User className="w-8 h-8 text-gray-400" />
+        {/* Flat Search Bar */}
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border-2 border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search by name, MRN, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-10 border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500 rounded-lg bg-gray-50 dark:bg-gray-700"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <select
+              value={searchType}
+              onChange={(e) => setSearchType(e.target.value as any)}
+              className="h-10 px-4 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-gray-700"
+            >
+              <option value="name">Name</option>
+              <option value="phone">Phone</option>
+              <option value="mrn">MRN</option>
+            </select>
+            <Button onClick={handleSearch} variant="outline" className="h-10 border-2 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Search
+            </Button>
+          </div>
+        </div>
+
+        {/* Flat Patients Table */}
+        <Card className="border-2 border-gray-100 dark:border-gray-700 rounded-lg overflow-hidden">
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-4">
+                <TableSkeleton rows={5} />
               </div>
-              <p className="text-lg font-medium text-gray-900">No patients found</p>
-              <p className="text-sm mt-1">Try adjusting your search or add a new patient.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader className="bg-gray-50/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="font-semibold text-gray-600">Patient</TableHead>
-                  <TableHead className="font-semibold text-gray-600">Contact Info</TableHead>
-                  <TableHead className="font-semibold text-gray-600">MRN</TableHead>
-                  <TableHead className="font-semibold text-gray-600">Date of Birth</TableHead>
-                  <TableHead className="font-semibold text-gray-600">Status</TableHead>
-                  <TableHead className="text-right font-semibold text-gray-600">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {patients.map((patient) => (
-                  <TableRow key={patient.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 border border-gray-100">
-                          <AvatarImage src={patient.avatar_url} />
-                          <AvatarFallback className="bg-blue-50 text-blue-600 text-xs font-bold">
-                            {patient.name
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium text-gray-900">{patient.name}</div>
-                          <div className="text-xs text-gray-500">
-                            {patient.gender || 'Not specified'}
+            ) : error ? (
+              <div className="p-6">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error Loading Patients</AlertTitle>
+                  <AlertDescription>{(error as Error).message}</AlertDescription>
+                </Alert>
+              </div>
+            ) : patients.length === 0 ? (
+              <div className="text-center py-20 text-gray-500">
+                <div className="bg-gray-100 dark:bg-gray-800 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <User className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-lg font-medium text-gray-700 dark:text-gray-300">No patients found</p>
+                <p className="text-sm mt-1">Try adjusting your search or add a new patient.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="bg-gray-50 dark:bg-gray-800">
+                  <TableRow className="hover:bg-transparent border-b-2 border-gray-100 dark:border-gray-700">
+                    <TableHead className="font-semibold text-gray-600 dark:text-gray-300">Patient</TableHead>
+                    <TableHead className="font-semibold text-gray-600 dark:text-gray-300">Contact Info</TableHead>
+                    <TableHead className="font-semibold text-gray-600 dark:text-gray-300">MRN</TableHead>
+                    <TableHead className="font-semibold text-gray-600 dark:text-gray-300">Date of Birth</TableHead>
+                    <TableHead className="font-semibold text-gray-600 dark:text-gray-300">Status</TableHead>
+                    <TableHead className="text-right font-semibold text-gray-600 dark:text-gray-300">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {patients.map((patient) => (
+                    <TableRow key={patient.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors border-b border-gray-100 dark:border-gray-800">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9 rounded-lg border-2 border-gray-200 dark:border-gray-600">
+                            <AvatarImage src={patient.avatar_url} />
+                            <AvatarFallback className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-lg">
+                              {(patient.name || patient.legal_name || `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'P')
+                                .split(' ')
+                                .map((n: any) => n[0])
+                                .join('')
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">{patient.name || patient.legal_name || `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'Unknown'}</div>
+                            <div className="text-xs text-gray-500">{patient.gender || 'Not specified'}</div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {patient.phone && (
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <Phone className="w-3 h-3 text-gray-400" />
-                            {patient.phone}
-                          </div>
-                        )}
-                        {patient.email && (
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <Mail className="w-3 h-3 text-gray-400" />
-                            {patient.email}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <code className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono border border-gray-200">
-                        {patient.mrn}
-                      </code>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-600">
-                      {patient.date_of_birth
-                        ? formatDate(patient.date_of_birth, 'MMM d, yyyy')
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          patient.status === 'active'
-                            ? 'success'
-                            : patient.status === 'inactive'
-                              ? 'secondary'
-                              : 'warning'
-                        }
-                        className={
-                          patient.status === 'active'
-                            ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                            : 'bg-gray-100 text-gray-600 border-gray-200'
-                        }
-                      >
-                        {patient.status || 'Unknown'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {patient.phone_primary && (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <Phone className="w-3 h-3" />
+                              {patient.phone_primary}
+                            </div>
+                          )}
+                          {patient.email_primary && (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <Mail className="w-3 h-3" />
+                              {patient.email_primary}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-md font-mono border-2 border-gray-200 dark:border-gray-700">
+                          {patient.mrn}
+                        </code>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-500">
+                        {patient.date_of_birth ? formatDate(patient.date_of_birth, 'MMM d, yyyy') : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            patient.status === 'active'
+                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-2 border-emerald-200 dark:border-emerald-800'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-700'
+                          }
+                        >
+                          {patient.status || 'Unknown'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
                         <Link href={`/dashboard/patients/${patient.id}`}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all duration-200 hover:scale-105">
                             <Eye className="w-4 h-4" />
                           </Button>
                         </Link>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-900">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Flat Add Patient Dialog */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+          {/* Flat Header */}
+          <div className="bg-blue-500 px-6 py-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg">
+                <Plus className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-heading text-white">Add New Patient</DialogTitle>
+                <DialogDescription className="text-blue-100 text-sm mt-0.5">
+                  Enter patient information to create a new record
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleAddSubmit} className="px-6 py-5">
+            <div className="space-y-5">
+              {/* Name Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="add_first_name" className="text-sm font-medium flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-gray-400" />
+                    First Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="add_first_name"
+                    value={addForm.first_name}
+                    onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })}
+                    className="h-11 rounded-lg border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500"
+                    placeholder="John"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add_last_name" className="text-sm font-medium flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-gray-400" />
+                    Last Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="add_last_name"
+                    value={addForm.last_name}
+                    onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })}
+                    className="h-11 rounded-lg border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500"
+                    placeholder="Doe"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* DOB and Gender Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="add_dob" className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                    Date of Birth <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="add_dob"
+                    type="date"
+                    value={addForm.date_of_birth}
+                    onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })}
+                    className="h-11 rounded-lg border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add_gender" className="text-sm font-medium flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5 text-gray-400" />
+                    Gender
+                  </Label>
+                  <select
+                    id="add_gender"
+                    value={addForm.gender}
+                    onChange={(e) => setAddForm({ ...addForm, gender: e.target.value })}
+                    className="h-11 w-full rounded-lg border-2 border-gray-200 dark:border-gray-600 px-3 text-sm focus:border-blue-500 bg-white dark:bg-gray-800 outline-none"
+                  >
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="add_phone" className="text-sm font-medium flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-gray-400" />
+                  Phone Number
+                </Label>
+                <Input
+                  id="add_phone"
+                  value={addForm.phone_primary}
+                  onChange={(e) => setAddForm({ ...addForm, phone_primary: e.target.value })}
+                  className="h-11 rounded-lg border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <Label htmlFor="add_email" className="text-sm font-medium flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-gray-400" />
+                  Email Address
+                </Label>
+                <Input
+                  id="add_email"
+                  type="email"
+                  value={addForm.email_primary}
+                  onChange={(e) => setAddForm({ ...addForm, email_primary: e.target.value })}
+                  className="h-11 rounded-lg border-2 border-gray-200 dark:border-gray-600 focus:border-blue-500"
+                  placeholder="john.doe@email.com"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t-2 border-gray-100 dark:border-gray-700">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddOpen(false)}
+                className="px-5 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="flat-btn-primary px-6"
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Patient
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

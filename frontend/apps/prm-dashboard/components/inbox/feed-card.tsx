@@ -45,38 +45,38 @@ const channelConfig: Record<ChannelType, {
   zoice: {
     icon: Phone,
     label: "Zoice Call",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-900/30",
   },
   whatsapp: {
     icon: MessageCircle,
     label: "WhatsApp",
-    color: "text-green-600",
-    bgColor: "bg-green-50",
+    color: "text-green-600 dark:text-green-400",
+    bgColor: "bg-green-50 dark:bg-green-900/30",
   },
   email: {
     icon: Mail,
     label: "Email",
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
+    color: "text-purple-600 dark:text-purple-400",
+    bgColor: "bg-purple-50 dark:bg-purple-900/30",
   },
   sms: {
     icon: MessageSquare,
     label: "SMS",
-    color: "text-indigo-600",
-    bgColor: "bg-indigo-50",
+    color: "text-indigo-600 dark:text-indigo-400",
+    bgColor: "bg-indigo-50 dark:bg-indigo-900/30",
   },
   app: {
     icon: Smartphone,
     label: "App",
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
+    color: "text-orange-600 dark:text-orange-400",
+    bgColor: "bg-orange-50 dark:bg-orange-900/30",
   },
   system: {
     icon: Bell,
     label: "System",
-    color: "text-gray-500",
-    bgColor: "bg-gray-100",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted",
   },
 };
 
@@ -86,24 +86,24 @@ const sentimentConfig: Record<SentimentLabel, {
   bgColor: string;
 }> = {
   positive: {
-    color: "text-green-700",
-    bgColor: "bg-green-50 border-green-200",
+    color: "text-green-700 dark:text-green-300",
+    bgColor: "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800",
   },
   negative: {
-    color: "text-red-700",
-    bgColor: "bg-red-50 border-red-200",
+    color: "text-red-700 dark:text-red-300",
+    bgColor: "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800",
   },
   neutral: {
-    color: "text-gray-700",
-    bgColor: "bg-gray-50 border-gray-200",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted border-border",
   },
   frustrated: {
-    color: "text-orange-700",
-    bgColor: "bg-orange-50 border-orange-200",
+    color: "text-orange-700 dark:text-orange-300",
+    bgColor: "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800",
   },
   anxious: {
-    color: "text-purple-700",
-    bgColor: "bg-purple-50 border-purple-200",
+    color: "text-purple-700 dark:text-purple-300",
+    bgColor: "bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800",
   },
 };
 
@@ -114,18 +114,18 @@ const priorityConfig: Record<PriorityLevel, {
   borderColor: string;
 }> = {
   high: {
-    color: "text-red-600",
-    bgColor: "bg-red-50",
+    color: "text-red-600 dark:text-red-400",
+    bgColor: "bg-red-50 dark:bg-red-900/20",
     borderColor: "border-l-red-500",
   },
   medium: {
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
+    color: "text-orange-600 dark:text-orange-400",
+    bgColor: "bg-orange-50 dark:bg-orange-900/20",
     borderColor: "border-l-orange-500",
   },
   low: {
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-900/20",
     borderColor: "border-l-blue-500",
   },
 };
@@ -195,15 +195,15 @@ export function FeedCard({
   return (
     <MagicCard
       onClick={isMultiSelectMode ? onCheck : onClick}
-      gradientColor="#EFF6FF" // blue-50
+      gradientColor="hsl(var(--info) / 0.15)"
       gradientOpacity={0.6}
       className={cn(
-        "cursor-pointer overflow-visible transition-all duration-200 border border-gray-200",
-        "bg-white shadow-sm hover:shadow-md",
+        "cursor-pointer overflow-visible transition-all duration-200 border border-border",
+        "bg-card shadow-sm hover:shadow-md",
         "border-l-4",
         priority.borderColor,
-        isSelected && "bg-blue-50/50 border-blue-200 ring-1 ring-blue-200 shadow-md",
-        isChecked && "bg-blue-50/30",
+        isSelected && "bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 ring-1 ring-blue-200 dark:ring-blue-800 shadow-md",
+        isChecked && "bg-blue-50/30 dark:bg-blue-900/10",
         className
       )}
     >
@@ -229,10 +229,10 @@ export function FeedCard({
               <div className={cn("p-1.5 rounded-md", channel.bgColor)}>
                 <ChannelIcon className={cn("h-4 w-4", channel.color)} />
               </div>
-              <span className="text-sm font-medium text-gray-600">
+              <span className="text-sm font-medium text-muted-foreground">
                 {channel.label}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-muted-foreground/60">
                 • {formatTimestamp(item.timestamp)}
               </span>
             </div>
@@ -245,7 +245,7 @@ export function FeedCard({
 
               {/* Status badge */}
               {item.status === "resolved" && (
-                <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">Resolved</Badge>
+                <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">Resolved</Badge>
               )}
               {item.status === "escalated" && (
                 <Badge variant="destructive" className="text-xs">Escalated</Badge>
@@ -254,7 +254,7 @@ export function FeedCard({
               {/* Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -277,17 +277,17 @@ export function FeedCard({
 
           {/* Patient info */}
           <div className="flex items-center gap-3 mb-3">
-            <Avatar className="h-10 w-10 border border-gray-100">
+            <Avatar className="h-10 w-10 border border-border">
               <AvatarImage src={item.patient.avatar} />
-              <AvatarFallback className="text-sm bg-gradient-to-br from-blue-50 to-purple-50 text-blue-700 font-medium">
+              <AvatarFallback className="text-sm bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-700 dark:text-blue-300 font-medium">
                 {item.patient.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-gray-900 truncate">
+              <h4 className="font-semibold text-foreground truncate">
                 {item.patient.name}
               </h4>
-              <p className="text-sm text-gray-500 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {item.context}
               </p>
             </div>
@@ -298,13 +298,13 @@ export function FeedCard({
             <Badge variant="outline" className={cn("text-xs border", sentiment.bgColor, sentiment.color)}>
               {item.sentiment.emoji} {item.sentiment.label}
             </Badge>
-            <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200">
+            <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground hover:bg-accent">
               {item.intent.split("_").join(" ")}
             </Badge>
           </div>
 
           {/* Preview */}
-          <p className="text-sm text-gray-600 line-clamp-2 mb-4 leading-relaxed">
+          <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
             "{item.preview}"
           </p>
 
@@ -314,20 +314,20 @@ export function FeedCard({
               {item.attachments!.slice(0, 3).map((attachment) => (
                 <div
                   key={attachment.id}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-xs text-gray-600 font-medium"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-muted border border-border rounded-md text-xs text-muted-foreground font-medium"
                 >
                   {attachment.type === "image" ? (
                     <Image className="h-3.5 w-3.5 text-blue-500" />
                   ) : attachment.type === "document" ? (
                     <FileText className="h-3.5 w-3.5 text-orange-500" />
                   ) : (
-                    <Paperclip className="h-3.5 w-3.5 text-gray-500" />
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                   <span className="truncate max-w-[100px]">{attachment.name}</span>
                 </div>
               ))}
               {item.attachments!.length > 3 && (
-                <span className="text-xs text-gray-500 font-medium pl-1">
+                <span className="text-xs text-muted-foreground font-medium pl-1">
                   +{item.attachments!.length - 3} more
                 </span>
               )}
@@ -335,7 +335,7 @@ export function FeedCard({
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+          <div className="flex items-center justify-between pt-3 border-t border-border">
             <div className="flex items-center gap-2">
               {primaryAction && (
                 <Button
@@ -357,7 +357,7 @@ export function FeedCard({
                     e.stopPropagation();
                     onAction?.(secondaryAction);
                   }}
-                  className="h-8 border-gray-200 text-gray-700 hover:bg-gray-50"
+                  className="h-8 border-border text-muted-foreground hover:bg-accent"
                 >
                   {secondaryAction.label}
                 </Button>
@@ -368,7 +368,7 @@ export function FeedCard({
               variant="ghost"
               size="sm"
               onClick={onClick}
-              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 h-8"
             >
               View Details
               <ChevronRight className="h-4 w-4 ml-1" />
@@ -390,31 +390,31 @@ export function FeedCard({
 // Skeleton loader for feed cards
 export function FeedCardSkeleton() {
   return (
-    <div className="bg-white border rounded-xl p-4 border-gray-200 shadow-sm">
+    <div className="bg-card border rounded-xl p-4 border-border shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-100 rounded-md animate-pulse" />
-          <div className="w-24 h-4 bg-gray-100 rounded animate-pulse" />
+          <div className="w-8 h-8 bg-muted rounded-md animate-pulse" />
+          <div className="w-24 h-4 bg-muted rounded animate-pulse" />
         </div>
       </div>
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 bg-gray-100 rounded-full animate-pulse" />
+        <div className="w-10 h-10 bg-muted rounded-full animate-pulse" />
         <div className="flex-1">
-          <div className="w-32 h-4 bg-gray-100 rounded animate-pulse mb-2" />
-          <div className="w-24 h-3 bg-gray-100 rounded animate-pulse" />
+          <div className="w-32 h-4 bg-muted rounded animate-pulse mb-2" />
+          <div className="w-24 h-3 bg-muted rounded animate-pulse" />
         </div>
       </div>
       <div className="flex gap-2 mb-3">
-        <div className="w-20 h-6 bg-gray-100 rounded animate-pulse" />
-        <div className="w-24 h-6 bg-gray-100 rounded animate-pulse" />
+        <div className="w-20 h-6 bg-muted rounded animate-pulse" />
+        <div className="w-24 h-6 bg-muted rounded animate-pulse" />
       </div>
-      <div className="w-full h-12 bg-gray-100 rounded animate-pulse mb-4" />
-      <div className="flex justify-between pt-3 border-t border-gray-100">
+      <div className="w-full h-12 bg-muted rounded animate-pulse mb-4" />
+      <div className="flex justify-between pt-3 border-t border-border">
         <div className="flex gap-2">
-          <div className="w-24 h-8 bg-gray-100 rounded animate-pulse" />
-          <div className="w-20 h-8 bg-gray-100 rounded animate-pulse" />
+          <div className="w-24 h-8 bg-muted rounded animate-pulse" />
+          <div className="w-20 h-8 bg-muted rounded animate-pulse" />
         </div>
-        <div className="w-24 h-8 bg-gray-100 rounded animate-pulse" />
+        <div className="w-24 h-8 bg-muted rounded animate-pulse" />
       </div>
     </div>
   );

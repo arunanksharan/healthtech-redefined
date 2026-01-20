@@ -2,16 +2,16 @@
 Appointments Router
 API endpoints for appointment booking and management
 """
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from typing import List, Optional
 from uuid import UUID, uuid4
 from loguru import logger
 
 from shared.database.connection import get_db
-from shared.database.models import Appointment, TimeSlot, Patient, Practitioner, Location
+from shared.database.models import Appointment, TimeSlot, Patient, Practitioner, Location, Tenant, ProviderSchedule
 
 from modules.appointments.schemas import (
     AppointmentBookingRequest,
@@ -25,6 +25,7 @@ from modules.appointments.schemas import (
     AppointmentStats,
     AppointmentListResponse,
     AppointmentDirectCreate,
+    AppointmentQuickCreate,
     AppointmentDetailResponse
 )
 from modules.appointments.service import AppointmentService
@@ -55,7 +56,12 @@ async def list_appointments_paginated(
     - Status (booked, checked_in, completed, cancelled, no_show)
     - Date range (using time slot dates)
     """
-    query = db.query(Appointment).join(TimeSlot)
+    query = db.query(Appointment).outerjoin(TimeSlot).options(
+        joinedload(Appointment.time_slot),
+        joinedload(Appointment.patient),
+        joinedload(Appointment.practitioner),
+        joinedload(Appointment.location)
+    )
 
     # Apply filters
     if patient_id:
@@ -83,15 +89,108 @@ async def list_appointments_paginated(
 
     # Apply pagination and ordering
     offset = (page - 1) * page_size
-    appointments = query.order_by(TimeSlot.start_datetime.desc()).offset(offset).limit(page_size).all()
+    appointments = query.order_by(Appointment.created_at.desc()).offset(offset).limit(page_size).all()
+
+    # Build response items with enriched data
+    items = []
+    for apt in appointments:
+        # Get scheduled time from time_slot if available
+        scheduled_at = None
+        if apt.time_slot:
+            scheduled_at = apt.time_slot.start_datetime.isoformat() if apt.time_slot.start_datetime else None
+        
+        items.append(AppointmentResponse(
+            id=apt.id,
+            tenant_id=apt.tenant_id,
+            patient_id=apt.patient_id,
+            practitioner_id=apt.practitioner_id,
+            location_id=apt.location_id,
+            time_slot_id=apt.time_slot_id,
+            appointment_type=apt.appointment_type,
+            status=apt.status,
+            reason_text=apt.reason_text,
+            source_channel=apt.source_channel,
+            encounter_id=apt.encounter_id,
+            meta_data=apt.meta_data,
+            created_at=apt.created_at,
+            updated_at=apt.updated_at,
+            # Frontend-expected fields
+            scheduled_at=scheduled_at,
+            start_time=scheduled_at,
+            end_time=apt.time_slot.end_datetime.isoformat() if apt.time_slot and apt.time_slot.end_datetime else None,
+            patient_name=f"{apt.patient.first_name or ''} {apt.patient.last_name or ''}".strip() if apt.patient else None,
+            practitioner_name=f"{apt.practitioner.first_name or ''} {apt.practitioner.last_name or ''}".strip() if apt.practitioner else None,
+            location_name=apt.location.name if apt.location else None,
+        ))
 
     return AppointmentListResponse(
-        items=[AppointmentResponse.model_validate(a) for a in appointments],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
-        has_next=offset + len(appointments) < total,
+        has_next=offset + page_size < total,
         has_previous=page > 1
+    )
+
+
+@router.get("/stats", response_model=AppointmentStats)
+async def get_stats(
+    db: Session = Depends(get_db)
+):
+    """Get appointment statistics"""
+    total = db.query(Appointment).count()
+
+    # Time-based stats
+    today_start = datetime.combine(date.today(), datetime.min.time())
+    today_end = datetime.combine(date.today(), datetime.max.time())
+    now = datetime.utcnow()
+
+    today_count = db.query(Appointment).join(TimeSlot).filter(
+        and_(
+            TimeSlot.start_datetime >= today_start,
+            TimeSlot.start_datetime <= today_end,
+            Appointment.status != 'cancelled',
+            Appointment.status != 'canceled'
+        )
+    ).count()
+
+    upcoming_count = db.query(Appointment).join(TimeSlot).filter(
+        and_(
+            TimeSlot.start_datetime >= now,
+            Appointment.status != 'cancelled',
+            Appointment.status != 'canceled',
+            Appointment.status != 'completed'
+        )
+    ).count()
+    
+    # Helper to count by status
+    def count_status(status):
+        return db.query(Appointment).filter(Appointment.status == status).count()
+    
+    # Handle potential spelling variations for cancelled
+    cancelled_count = db.query(Appointment).filter(
+        or_(
+            Appointment.status == 'cancelled',
+            Appointment.status == 'canceled'
+        )
+    ).count()
+
+    booked_count = db.query(Appointment).filter(
+        Appointment.status == 'booked'
+    ).count()
+
+    return AppointmentStats(
+        total=total,
+        today=today_count,
+        upcoming=upcoming_count,
+        requested=count_status('requested'),
+        pending_confirm=count_status('pending_confirm'),
+        booked=booked_count,
+        confirmed=count_status('confirmed'), # Explicit confirmed
+        checked_in=count_status('checked_in'),
+        completed=count_status('completed'),
+        cancelled=cancelled_count,
+        no_show=count_status('no_show')
     )
 
 
@@ -432,6 +531,181 @@ async def create_appointment_direct(
         scheduled_end=time_slot.end_datetime,
         patient_name=patient_name,
         practitioner_name=practitioner.name,
+        location_name=location.name,
+        meta_data=appointment.meta_data,
+        created_at=appointment.created_at,
+        updated_at=appointment.updated_at
+    )
+
+
+@router.post("/quick", response_model=AppointmentDetailResponse, status_code=201)
+async def create_appointment_quick(
+    appointment_data: AppointmentQuickCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Quick appointment creation from web form
+    
+    Automatically:
+    - Uses default tenant
+    - Uses first available location
+    - Creates a time slot for the specified date/time
+    """
+    # Get default tenant
+    tenant = db.query(Tenant).first()
+    if not tenant:
+        raise HTTPException(status_code=500, detail="No tenant configured")
+    
+    # Verify patient exists
+    patient = db.query(Patient).filter(
+        Patient.id == appointment_data.patient_id
+    ).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    # Verify practitioner exists
+    practitioner = db.query(Practitioner).filter(
+        Practitioner.id == appointment_data.practitioner_id
+    ).first()
+    if not practitioner:
+        raise HTTPException(status_code=404, detail="Practitioner not found")
+    
+    # Get first available location
+    location = db.query(Location).filter(
+        Location.tenant_id == tenant.id
+    ).first()
+    if not location:
+        # Create a default location if none exists
+        location = Location(
+            id=uuid4(),
+            tenant_id=tenant.id,
+            name="Main Clinic",
+            is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(location)
+        db.flush()
+    
+    # Parse date and time
+    try:
+        start_datetime = datetime.strptime(
+            f"{appointment_data.appointment_date} {appointment_data.appointment_time}",
+            "%Y-%m-%d %H:%M"
+        )
+        end_datetime = start_datetime + timedelta(minutes=30)  # Default 30-min slot
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date or time format")
+    
+    # Create or find appropriate time slot
+    # First, ensure we have a valid schedule ID (required by FK)
+    today_date = start_datetime.date()
+    
+    schedule = db.query(ProviderSchedule).filter(
+        ProviderSchedule.practitioner_id == practitioner.id,
+        ProviderSchedule.location_id == location.id,
+        ProviderSchedule.is_active == True,
+        ProviderSchedule.valid_from <= today_date,
+        or_(ProviderSchedule.valid_to >= today_date, ProviderSchedule.valid_to.is_(None))
+    ).first()
+    
+    if not schedule:
+        # Create a default schedule container if none exists
+        logger.info(f"Creating default schedule for practitioner {practitioner.id}")
+        schedule = ProviderSchedule(
+            id=uuid4(),
+            tenant_id=tenant.id,
+            practitioner_id=practitioner.id,
+            location_id=location.id,
+            specialty_code="general",
+            valid_from=today_date,
+            day_of_week=start_datetime.weekday() + 1, # 1=Mon, 7=Sun
+            start_time=time(9, 0),
+            end_time=time(17, 0),
+            slot_duration_minutes=30,
+            max_patients_per_slot=1,
+            is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(schedule)
+        db.flush()
+
+    time_slot = db.query(TimeSlot).filter(
+        TimeSlot.practitioner_id == practitioner.id,
+        TimeSlot.start_datetime == start_datetime
+    ).first()
+    
+    if not time_slot:
+        # Create a new time slot
+        time_slot = TimeSlot(
+            id=uuid4(),
+            tenant_id=tenant.id,
+            practitioner_id=practitioner.id,
+            location_id=location.id,
+            schedule_id=schedule.id,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            capacity=5,  # Allow multiple appointments per slot
+            booked_count=0,
+            status="available",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(time_slot)
+        db.flush()
+    elif time_slot.booked_count >= time_slot.capacity:
+        # Increase capacity to allow more bookings
+        time_slot.capacity += 1
+        time_slot.status = "available"
+    
+    # Create appointment
+    appointment = Appointment(
+        id=uuid4(),
+        tenant_id=tenant.id,
+        patient_id=appointment_data.patient_id,
+        practitioner_id=appointment_data.practitioner_id,
+        location_id=location.id,
+        time_slot_id=time_slot.id,
+        appointment_type=appointment_data.appointment_type,
+        status="booked",
+        reason_text=appointment_data.reason_text,
+        source_channel=appointment_data.source_channel or "web",
+        meta_data={},
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    
+    # Update time slot booked count
+    time_slot.booked_count += 1
+    if time_slot.booked_count >= time_slot.capacity:
+        time_slot.status = "full"
+    
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+    
+    logger.info(f"Quick created appointment: {appointment.id} for patient {patient.id}")
+    
+    # Build response
+    patient_name = f"{patient.first_name or ''} {patient.last_name or ''}".strip()
+    practitioner_name = f"{practitioner.first_name or ''} {practitioner.last_name or ''}".strip()
+    
+    return AppointmentDetailResponse(
+        id=appointment.id,
+        tenant_id=appointment.tenant_id,
+        patient_id=appointment.patient_id,
+        practitioner_id=appointment.practitioner_id,
+        location_id=appointment.location_id,
+        time_slot_id=appointment.time_slot_id,
+        appointment_type=appointment.appointment_type,
+        status=appointment.status,
+        reason_text=appointment.reason_text,
+        source_channel=appointment.source_channel,
+        scheduled_date=time_slot.start_datetime,
+        scheduled_end=time_slot.end_datetime,
+        patient_name=patient_name,
+        practitioner_name=practitioner_name,
         location_name=location.name,
         meta_data=appointment.meta_data,
         created_at=appointment.created_at,

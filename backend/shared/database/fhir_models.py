@@ -31,60 +31,41 @@ def generate_uuid() -> uuid.UUID:
 
 
 class FHIRResource(Base):
-    """
-    Generic FHIR resource storage
-    Stores all FHIR resources in a single table using JSONB for flexibility
-    """
+    """Generic FHIR R4 resource storage with versioning"""
+
     __tablename__ = "fhir_resources"
 
-    # Primary key
     id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    
-    # Tenant for multi-tenancy
     tenant_id = Column(UUID(as_uuid=True), nullable=False)
-    
-    # Resource type (Patient, Practitioner, Observation, etc.)
-    resource_type = Column(String(50), nullable=False)
-    
-    # FHIR resource ID (unique within resource_type and tenant)
-    fhir_id = Column(String(64), nullable=False)
-    
-    # Version control
-    version_id = Column(Integer, nullable=False, default=1)
-    last_updated = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    
-    # JSONB storage for the complete FHIR resource
-    resource_data = Column(JSONB, nullable=False)
-    
-    # Search optimization - extracted tokens for common search parameters
-    # Format: {"identifier": ["MRN12345", ...], "name": ["John", "Smith"], ...}
-    search_tokens = Column(JSONB, default=dict)
-    
-    # Full-text search - extracted searchable strings
-    search_strings = Column(TSVECTOR)
-    
+
+    # Resource Identification
+    resource_type = Column(
+        String(50), nullable=False
+    )
+    resource_id = Column(String(100), nullable=False)  # FHIR logical ID
+    version = Column(Integer, nullable=False, default=1)
+    is_current = Column(Boolean, nullable=False, default=True)
+
+    # The actual FHIR resource (complete JSON)
+    resource = Column(JSONB, nullable=False)
+
     # Metadata
-    deleted = Column(Boolean, default=False, nullable=False)
+    meta_data = Column(JSONB, default=dict)
+
+    # Timestamps
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
     # Indexes
     __table_args__ = (
-        # Unique constraint on tenant, resource_type, fhir_id (for current version)
-        Index("idx_fhir_resources_unique", "tenant_id", "resource_type", "fhir_id", unique=True, postgresql_where=(deleted == False)),
-        
-        # Search indexes
         Index("idx_fhir_resources_tenant_type", "tenant_id", "resource_type"),
-        Index("idx_fhir_resources_fhir_id", "fhir_id"),
-        Index("idx_fhir_resources_type", "resource_type"),
-        Index("idx_fhir_resources_deleted", "deleted"),
-        Index("idx_fhir_resources_last_updated", "last_updated"),
-        
-        # GIN index for JSONB search optimization
-        Index("idx_fhir_resources_data", "resource_data", postgresql_using="gin"),
-        Index("idx_fhir_resources_search_tokens", "search_tokens", postgresql_using="gin"),
-        
-        # Full-text search index
-        Index("idx_fhir_resources_search_strings", "search_strings", postgresql_using="gin"),
+        Index("idx_fhir_resources_id_type", "resource_type", "resource_id", "is_current"),
+        Index("idx_fhir_resources_current", "is_current"),
     )
 
 

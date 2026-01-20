@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from backend.shared.database.session import get_db
+from shared.database.connection import get_db
 from .schemas import (
     TimePeriod,
     AppointmentAnalyticsRequest,

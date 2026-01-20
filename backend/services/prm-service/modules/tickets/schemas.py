@@ -80,3 +80,12 @@ class TicketListResponse(BaseModel):
     page_size: int
     has_next: bool
     has_previous: bool
+
+class TicketStats(BaseModel):
+    """Response for ticket statistics"""
+    total: int
+    open: int
+    in_progress: int
+    resolved: int
+    closed: int
+    urgent: int

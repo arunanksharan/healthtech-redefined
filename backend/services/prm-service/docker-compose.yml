@@ -10,7 +10,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://prm_user:${DB_PASSWORD}@postgres:5432/prm_db
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
@@ -40,25 +40,23 @@ services:
       retries: 3
       start_period: 40s
 
-  # PostgreSQL Database
+  # PostgreSQL Database (Consolidated healthtech-postgres)
   postgres:
     image: postgres:15-alpine
-    container_name: prm-postgres
+    container_name: healthtech-postgres
     environment:
-      - POSTGRES_DB=prm_db
-      - POSTGRES_USER=prm_user
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - "5435:5432"
+      - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - healthtech_data:/var/lib/postgresql/data
     networks:
       - prm-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U prm_user -d prm_db" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -115,8 +113,9 @@ services:
       - prometheus
 
 volumes:
-  postgres_data:
-    driver: local
+  healthtech_data:
+    external: true
+    name: c5ccbc3d52ac6b41379174533765afaa124dead9a8581f74cef97110e0e8ba1a
   redis_data:
     driver: local
   prometheus_data:

@@ -22,7 +22,11 @@ export interface Patient {
   id: string;
   mrn: string;
   name: string;
+  /** Backend uses legal_name instead of name */
+  legal_name?: string;
   phone: string;
+  /** Backend uses primary_phone instead of phone */
+  primary_phone?: string;
   email?: string;
   date_of_birth: string;
   gender: 'male' | 'female' | 'other';

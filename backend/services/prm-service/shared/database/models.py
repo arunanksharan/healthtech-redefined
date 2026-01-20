@@ -329,6 +329,22 @@ class Location(Base):
     )
 
 
+
+class Department(Base):
+    """
+    Healthcare departments (Cardiology, Radiology, etc.)
+    """
+    __tablename__ = "departments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    code = Column(String(100))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # ============================================================================
 # CONSENT & PRIVACY
 # ============================================================================
@@ -855,7 +871,7 @@ class Appointment(Base):
     practitioner = relationship("Practitioner")
     location = relationship("Location")
     time_slot = relationship("TimeSlot", back_populates="appointments")
-    encounter = relationship("Encounter", back_populates="appointment", uselist=False)
+    encounter = relationship("Encounter", back_populates="appointment", uselist=False, foreign_keys="[Encounter.appointment_id]")
 
     # Indexes
     __table_args__ = (
@@ -893,7 +909,7 @@ class Encounter(Base):
     # Relationships
     patient = relationship("Patient", back_populates="encounters")
     practitioner = relationship("Practitioner")
-    appointment = relationship("Appointment", back_populates="encounter")
+    appointment = relationship("Appointment", back_populates="encounter", foreign_keys="[Encounter.appointment_id]")
 
     # Indexes
     __table_args__ = (

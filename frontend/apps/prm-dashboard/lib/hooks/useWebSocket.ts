@@ -139,6 +139,7 @@ export function useTypingIndicator(conversationId: string): {
     if (!context?.client) return;
 
     const handleTypingStart = context.client.on('typing_start', (message) => {
+      console.log('[useTypingIndicator] Received typing_start:', message.payload, 'Current conversationId:', conversationId);
       if (message.payload.conversationId === conversationId) {
         const userId = message.payload.userId as string;
         setTypingUsers(prev => prev.includes(userId) ? prev : [...prev, userId]);
@@ -214,12 +215,17 @@ export function useRoomMessages(roomId: string): {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!context?.client || !roomId) return;
+    // Wait for client to be ready and connected
+    if (!context?.client || !roomId || !context.isConnected) return;
 
     setIsLoading(true);
+    console.log('[useRoomMessages] Joining room:', roomId);
     joinRoom(roomId)
       .then(() => setIsLoading(false))
-      .catch(() => setIsLoading(false));
+      .catch((err) => {
+        console.error('[useRoomMessages] Join failed:', err);
+        setIsLoading(false)
+      });
 
     const cleanup = context.client.on('message', (message) => {
       if (message.payload.conversationId === roomId) {
@@ -231,7 +237,7 @@ export function useRoomMessages(roomId: string): {
       cleanup();
       leaveRoom(roomId);
     };
-  }, [context?.client, roomId, joinRoom, leaveRoom]);
+  }, [context?.client, roomId, joinRoom, leaveRoom, context?.isConnected]);
 
   const sendMessage = useCallback(async (content: string) => {
     await wsSendMessage(roomId, content);

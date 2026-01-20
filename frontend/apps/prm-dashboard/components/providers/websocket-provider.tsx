@@ -31,7 +31,7 @@ interface WebSocketProviderProps {
 
 export function WebSocketProvider({
   children,
-  url = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/connect",
+  url = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000/ws/connect",
   token,
   enabled = true,
   onConnect,
@@ -49,9 +49,46 @@ export function WebSocketProvider({
       return;
     }
 
+    // 1. Force 127.0.0.1 for local dev to avoid IPv6/CORS issues
+    let effectiveUrl = url.includes('localhost') ? url.replace('localhost', '127.0.0.1') : url;
+
+    // 2. Normalize path: Ensure it ends with /ws/connect
+    // If the user provided a path like '/ws', we want to strip it and use the correct one.
+    // Simplest reliable way: generic origin + correct path.
+    try {
+      // Use URL constructor to handle parsing safely
+      // Note: 'ws://' might throw if not treated as standard URL, so we handle it carefully
+      const urlObj = new URL(effectiveUrl);
+
+      // If we are pointing to the backend, enforce the correct path
+      if ((effectiveUrl.includes('127.0.0.1') || effectiveUrl.includes('localhost')) &&
+        urlObj.port === '8000') {
+        urlObj.pathname = '/ws/connect'; // Overwrite whatever path was there (e.g. /ws)
+        effectiveUrl = urlObj.toString();
+      } else if (!effectiveUrl.includes('/ws/connect')) {
+        // Fallback for custom domains/ports: append if missing
+        effectiveUrl = effectiveUrl.replace(/\/$/, '') + '/ws/connect';
+      }
+    } catch (e) {
+      // Fallback for strings that URL() might reject in some environments (though ws:// is usually fine)
+      if (!effectiveUrl.includes('/ws/connect')) {
+        if (effectiveUrl.endsWith('/ws')) {
+          effectiveUrl = effectiveUrl.replace(/\/ws$/, '/ws/connect');
+        } else {
+          effectiveUrl = effectiveUrl.replace(/\/$/, '') + '/ws/connect';
+        }
+      }
+    }
+
+    // Remove trailing slash if present (URL.toString() might add it)
+    if (effectiveUrl.endsWith('/') && effectiveUrl.endsWith('connect/')) {
+      effectiveUrl = effectiveUrl.slice(0, -1);
+    }
+
+    /*
     const wsClient = createWebSocketClient({
-      url,
-      token,
+      url: effectiveUrl,
+      token: token || (effectiveUrl.includes('127.0.0.1') ? 'dev-token-123' : undefined),
       reconnectAttempts: 5,
       reconnectDelay: 1000,
       heartbeatInterval: 30000,
@@ -76,10 +113,16 @@ export function WebSocketProvider({
 
     setClient(wsClient);
     wsClient.connect();
+    */
+
+    /*
+    setClient(wsClient);
+    wsClient.connect();
 
     return () => {
       wsClient.disconnect();
     };
+    */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, token, enabled]);
 

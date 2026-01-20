@@ -2,7 +2,11 @@
 
 import * as React from "react";
 import { X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
+
+// Spring config for smooth, natural animations
+const springConfig = { type: "spring", stiffness: 400, damping: 30 };
 
 interface DialogProps {
   open?: boolean;
@@ -36,7 +40,7 @@ const DialogContext = React.createContext<{
   onOpenChange: (open: boolean) => void;
 }>({
   open: false,
-  onOpenChange: () => {},
+  onOpenChange: () => { },
 });
 
 const DialogTrigger = React.forwardRef<
@@ -61,12 +65,14 @@ DialogTrigger.displayName = "DialogTrigger";
 const DialogPortal = ({ children }: { children: React.ReactNode }) => {
   const { open } = React.useContext(DialogContext);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50">
-      {children}
-    </div>
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50">
+          {children}
+        </div>
+      )}
+    </AnimatePresence>
   );
 };
 
@@ -77,10 +83,14 @@ const DialogOverlay = React.forwardRef<
   const { onOpenChange } = React.useContext(DialogContext);
 
   return (
-    <div
+    <motion.div
       ref={ref}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
       className={cn(
-        "fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200",
+        "fixed inset-0 bg-black/50 backdrop-blur-sm",
         className
       )}
       onClick={() => onOpenChange(false)}
@@ -100,10 +110,14 @@ const DialogContent = React.forwardRef<
     <DialogPortal>
       <DialogOverlay />
       <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg">
-        <div
+        <motion.div
           ref={ref}
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          transition={springConfig}
           className={cn(
-            "bg-white rounded-lg shadow-lg border border-gray-200 p-6 animate-in zoom-in-95 duration-200",
+            "bg-background rounded-lg shadow-lg border border-border p-6",
             className
           )}
           onClick={(e) => e.stopPropagation()}
@@ -112,12 +126,12 @@ const DialogContent = React.forwardRef<
           {children}
           <button
             onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-foreground"
           >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </button>
-        </div>
+        </motion.div>
       </div>
     </DialogPortal>
   );
@@ -155,7 +169,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h2
     ref={ref}
-    className={cn("text-lg font-semibold text-gray-900", className)}
+    className={cn("text-lg font-semibold text-foreground", className)}
     {...props}
   />
 ));
@@ -167,7 +181,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-gray-500", className)}
+    className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
 ));

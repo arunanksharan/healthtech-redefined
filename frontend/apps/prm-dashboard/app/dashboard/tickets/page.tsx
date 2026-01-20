@@ -26,7 +26,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatSmartDate } from '@/lib/utils/date';
 import { cn } from '@/lib/utils/cn';
-import toast from 'react-hot-toast';
+import { Skeleton, ListSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 import { MagicCard } from '@/components/ui/magic-card';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import {
@@ -35,16 +37,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+
+import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
+import { TicketDetailSheet } from '@/components/tickets/ticket-detail-sheet';
 
 export default function TicketsPage() {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch all tickets
-  const { data: ticketsData, isLoading, error } = useQuery({
+  const { data: ticketsData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tickets', categoryFilter, statusFilter, priorityFilter],
     queryFn: async () => {
       const [data, error] = await ticketsAPI.getAll({
@@ -57,6 +72,17 @@ export default function TicketsPage() {
     },
   });
 
+  // Fetch ticket stats
+  const { data: statsData } = useQuery({
+    queryKey: ['tickets-stats'],
+    queryFn: async () => {
+      const [data, error] = await ticketsAPI.getStats();
+      if (error) return null;
+      return data;
+    },
+    refetchInterval: 30000,
+  });
+
   const resolveMutation = useMutation({
     mutationFn: async (ticketId: string) => {
       const [data, error] = await ticketsAPI.resolve(ticketId);
@@ -65,9 +91,9 @@ export default function TicketsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      toast.success('Ticket resolved successfully');
+      toast({ title: 'Success', description: 'Ticket resolved successfully', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(`Failed: ${error.message}`),
+    onError: (error: Error) => toast({ title: 'Error', description: `Failed: ${error.message}`, variant: 'destructive' }),
   });
 
   const closeMutation = useMutation({
@@ -78,9 +104,9 @@ export default function TicketsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      toast.success('Ticket closed');
+      toast({ title: 'Success', description: 'Ticket closed', variant: 'default' });
     },
-    onError: (error: Error) => toast.error(`Failed: ${error.message}`),
+    onError: (error: Error) => toast({ title: 'Error', description: `Failed: ${error.message}`, variant: 'destructive' }),
   });
 
   const tickets = ticketsData?.tickets || [];
@@ -92,92 +118,87 @@ export default function TicketsPage() {
   );
 
   const stats = {
-    total: tickets.length,
-    open: tickets.filter(t => t.status === 'open').length,
-    inProgress: tickets.filter(t => t.status === 'in_progress').length,
-    resolved: tickets.filter(t => t.status === 'resolved').length,
-    urgent: tickets.filter(t => t.priority === 'urgent').length,
+    total: statsData?.total || 0,
+    open: statsData?.open || 0,
+    inProgress: statsData?.in_progress || 0,
+    resolved: statsData?.resolved || 0,
+    urgent: statsData?.urgent || 0,
   };
 
   const getPriorityInfo = (priority: string) => {
     switch (priority) {
-      case 'urgent': return { color: 'text-red-600 bg-red-50 border-red-200', icon: AlertTriangle, label: 'Urgent' };
-      case 'high': return { color: 'text-orange-600 bg-orange-50 border-orange-200', icon: TrendingUp, label: 'High' };
-      case 'medium': return { color: 'text-yellow-600 bg-yellow-50 border-yellow-200', icon: AlertCircle, label: 'Medium' };
-      default: return { color: 'text-gray-600 bg-gray-50 border-gray-200', icon: CheckCircle2, label: 'Low' };
+      case 'urgent': return { color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800', icon: AlertTriangle, label: 'Urgent' };
+      case 'high': return { color: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', icon: TrendingUp, label: 'High' };
+      case 'medium': return { color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800', icon: AlertCircle, label: 'Medium' };
+      default: return { color: 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700', icon: CheckCircle2, label: 'Low' };
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'open': return 'bg-blue-100 text-blue-700';
-      case 'in_progress': return 'bg-amber-100 text-amber-700';
-      case 'resolved': return 'bg-green-100 text-green-700';
-      case 'closed': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-gray-100 text-gray-600';
+      case 'open': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+      case 'in_progress': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300';
+      case 'resolved': return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
+      case 'closed': return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+      default: return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
     }
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
-      {/* Sticky Header */}
-      <header className="sticky top-16 z-20 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
+      {/* Flat Header */}
+      <header className="sticky top-0 z-30 flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Support Tickets</h1>
-          <p className="text-sm text-gray-500 mt-1">Track and resolve patient inquiries</p>
+          <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Support Tickets</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track and resolve patient inquiries</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="flat-btn-primary"
+        >
           <Plus className="w-4 h-4 mr-2" />
           New Ticket
         </Button>
       </header>
 
       <div className="p-6 space-y-6">
-        {/* Stats Grid */}
+        {/* Flat Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#eff6ff">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Total Tickets</span>
-              <Ticket className="w-4 h-4 text-blue-600" />
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tickets</span>
+              <Ticket className="w-5 h-5 text-blue-500" />
             </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.total} />
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+          </div>
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Urgent</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
             </div>
-          </MagicCard>
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#fef2f2">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Urgent</span>
-              <AlertTriangle className="w-4 h-4 text-red-500" />
+            <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.urgent}</div>
+            <p className="text-xs text-red-600 mt-1">Needs attention</p>
+          </div>
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</span>
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.urgent} />
+            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.resolved}</div>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</span>
+              <Clock className="w-5 h-5 text-amber-500" />
             </div>
-            <div className="mt-1 text-xs text-red-600 font-medium">Needs attention</div>
-          </MagicCard>
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#f0fdf4">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Resolved</span>
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.resolved} />
-            </div>
-          </MagicCard>
-          <MagicCard className="p-6 bg-card border border-border shadow-sm" gradientColor="#fffbeb">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-muted-foreground">In Progress</span>
-              <Clock className="w-4 h-4 text-amber-500" />
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              <NumberTicker value={stats.inProgress} />
-            </div>
-          </MagicCard>
+            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.inProgress}</div>
+          </div>
         </div>
 
         {/* Filters */}
         <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by title, ID or patient..."
               value={searchQuery}
@@ -211,9 +232,13 @@ export default function TicketsPage() {
 
         {/* Ticket List */}
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <ListSkeleton items={5} />
+        ) : isError ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error Loading Tickets</AlertTitle>
+            <AlertDescription>{(error as Error)?.message}</AlertDescription>
+          </Alert>
         ) : filteredTickets.length === 0 ? (
           <div className="text-center py-12 bg-card rounded-xl border border-border border-dashed">
             <Ticket className="w-12 h-12 mx-auto mb-3 text-muted" />
@@ -237,11 +262,9 @@ export default function TicketsPage() {
                       <h3 className="text-base font-semibold text-foreground truncate group-hover:text-blue-600 transition-colors">
                         {ticket.title}
                       </h3>
-                      <Badge variant="secondary" className={cn("capitalize text-xs font-normal", getStatusColor(ticket.status))}>
-                        {ticket.status.replace('_', ' ')}
-                      </Badge>
+
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-1 mb-2">{ticket.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{ticket.description}</p>
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
@@ -252,8 +275,8 @@ export default function TicketsPage() {
                         <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                         <span>{formatSmartDate(ticket.created_at)}</span>
                       </div>
-                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-muted-foreground border-border capitalize">
-                        {ticket.category}
+                      <Badge variant="secondary" className={cn("capitalize text-[10px] h-5 px-1.5 font-normal", getStatusColor(ticket.status))}>
+                        {ticket.status.replace('_', ' ')}
                       </Badge>
                     </div>
                   </div>
@@ -269,7 +292,15 @@ export default function TicketsPage() {
                         Resolve
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" className="h-8 px-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2"
+                      onClick={() => {
+                        setSelectedTicketId(ticket.id);
+                        setIsDetailSheetOpen(true);
+                      }}
+                    >
                       <MessageSquare className="w-4 h-4 text-muted-foreground" />
                     </Button>
                     <DropdownMenu>
@@ -279,7 +310,10 @@ export default function TicketsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedTicketId(ticket.id);
+                          setIsDetailSheetOpen(true);
+                        }}>View Details</DropdownMenuItem>
                         <DropdownMenuItem className="text-red-600" onClick={() => closeMutation.mutate(ticket.id)}>
                           Close Ticket
                         </DropdownMenuItem>
@@ -292,6 +326,18 @@ export default function TicketsPage() {
           </div>
         )}
       </div>
+
+      <CreateTicketDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={() => refetch()}
+      />
+
+      <TicketDetailSheet
+        ticketId={selectedTicketId}
+        open={isDetailSheetOpen}
+        onOpenChange={setIsDetailSheetOpen}
+      />
     </div>
   );
 }

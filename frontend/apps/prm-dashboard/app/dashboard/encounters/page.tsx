@@ -1,0 +1,544 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+    Plus,
+    Search,
+    Calendar,
+    User,
+    Stethoscope,
+    Clock,
+    CheckCircle2,
+    XCircle,
+    MoreHorizontal,
+    Pencil,
+    Activity,
+    Users,
+    AlertCircle
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { MagicCard } from '@/components/ui/magic-card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import {
+    getEncounters,
+    createEncounter,
+    updateEncounter
+} from '@/lib/api/encounters';
+import { patientsAPI } from '@/lib/api/patients';
+import { practitionersAPI } from '@/lib/api/practitioners';
+import { Encounter } from '@/lib/api/types';
+import { Patient } from '@/lib/types'; // Import from types as used in patientsAPI
+import { Practitioner } from '@/lib/api/practitioners';
+import { PatientCombobox } from '@/components/dashboard/patient-combobox';
+
+export default function EncountersPage() {
+    const { toast } = useToast();
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [encounters, setEncounters] = useState<Encounter[]>([]);
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Dialog State
+    const [open, setOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    // Edit State
+    const [editingEncounter, setEditingEncounter] = useState<Encounter | null>(null);
+
+    const [formData, setFormData] = useState({
+        patient_id: '',
+        practitioner_id: '',
+        status: 'planned',
+        class_code: 'AMB',
+        started_at: '',
+        ended_at: ''
+    });
+
+    const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [encountersRes, patientsRes, practitionersRes] = await Promise.all([
+                getEncounters({ page: 1, page_size: 100 }),
+                patientsAPI.getAll({ page_size: 100 }),
+                practitionersAPI.getAll({ page_size: 100 })
+            ]);
+
+            const [encData, encError] = encountersRes;
+            const [patData, patError] = patientsRes;
+            const [pracData, pracError] = practitionersRes;
+
+            if (encError) {
+                console.error('Failed to fetch encounters:', encError);
+                setError('Failed to load encounters');
+                toast({ title: 'Error', description: 'Failed to load encounters', variant: 'destructive' });
+            } else if (encData) {
+                setEncounters(encData.items);
+            }
+
+            if (patData) setPatients(patData.items);
+            if (pracData) setPractitioners(pracData.items);
+
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setError('Failed to load data');
+            toast({ title: 'Error', description: 'Failed to load data', variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    useEffect(() => {
+        if (!open) {
+            setEditingEncounter(null);
+            setFormData({
+                patient_id: '',
+                practitioner_id: '',
+                status: 'planned',
+                class_code: 'AMB',
+                started_at: '',
+                ended_at: ''
+            });
+        }
+    }, [open]);
+
+    const handleEdit = (enc: Encounter) => {
+        setEditingEncounter(enc);
+        setFormData({
+            patient_id: enc.patient_id,
+            practitioner_id: enc.practitioner_id,
+            status: enc.status,
+            class_code: enc.class_code,
+            started_at: enc.started_at ? enc.started_at.split('.')[0] : '', // Simple ISO handling
+            ended_at: enc.ended_at ? enc.ended_at.split('.')[0] : ''
+        });
+        setOpen(true);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.patient_id || !formData.practitioner_id) {
+            toast({ title: 'Validation Error', description: 'Patient and Practitioner are required', variant: 'destructive' });
+            return;
+        }
+
+        setSubmitting(true);
+
+        let error;
+        let result;
+
+        const payload = {
+            ...formData,
+            tenant_id: '00000000-0000-0000-0000-000000000001',
+            // Only send dates if they are present
+            started_at: formData.started_at || undefined,
+            ended_at: formData.ended_at || undefined
+        };
+
+        if (editingEncounter) {
+            [result, error] = await updateEncounter(editingEncounter.id, payload);
+        } else {
+            [result, error] = await createEncounter(payload);
+        }
+
+        if (error) {
+            console.error(`Failed to ${editingEncounter ? 'update' : 'create'} encounter:`, error);
+            toast({ title: 'Error', description: error.message || `Failed to ${editingEncounter ? 'update' : 'create'} encounter`, variant: 'destructive' });
+        } else if (result) {
+            toast({ title: 'Success', description: `Encounter ${editingEncounter ? 'updated' : 'created'} successfully`, variant: 'default' });
+            setOpen(false);
+            fetchData();
+        }
+        setSubmitting(false);
+    };
+
+    // Helper to look up names
+    const getPatientName = (id: string) => {
+        const p = patients.find(p => p.id === id);
+        return p ? `${p.first_name} ${p.last_name}` : 'Unknown Patient';
+    };
+
+    const getPractitionerName = (id: string) => {
+        const p = practitioners.find(p => p.id === id);
+        return p ? `Dr. ${p.first_name} ${p.last_name}` : 'Unknown Practitioner';
+    };
+
+    const filteredEncounters = encounters.filter(enc =>
+        getPatientName(enc.patient_id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        enc.status.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const stats = {
+        total: encounters.length,
+        planned: encounters.filter(e => e.status === 'planned').length,
+        inProgress: encounters.filter(e => e.status === 'in-progress').length,
+        completed: encounters.filter(e => e.status === 'completed').length,
+        cancelled: encounters.filter(e => e.status === 'cancelled').length
+    };
+
+    return (
+        <div className="space-y-8 pb-10">
+            {/* Flat Header */}
+            <div className="flex items-center justify-between sticky top-[4rem] z-20 bg-white dark:bg-gray-900 py-4 -mx-6 px-6 border-b-2 border-gray-100 dark:border-gray-800">
+                <div>
+                    <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Encounters</h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">Patient visits and interactions</p>
+                </div>
+                <Button
+                    onClick={() => setOpen(true)}
+                    className="flat-btn-primary"
+                >
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Encounter
+                </Button>
+            </div>
+
+            {/* Flat Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total</span>
+                        <Activity className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+                    <p className="text-xs text-gray-500 mt-1">All Visits</p>
+                </div>
+
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Planned</span>
+                        <Calendar className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats.planned}</div>
+                    <p className="text-xs text-indigo-600 mt-1">Scheduled</p>
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</span>
+                        <Clock className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.inProgress}</div>
+                    <p className="text-xs text-amber-600 mt-1">Ongoing</p>
+                </div>
+
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed</span>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.completed}</div>
+                    <p className="text-xs text-emerald-600 mt-1">Finished</p>
+                </div>
+
+                <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-5 transition-all hover:scale-[1.02]">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Cancelled</span>
+                        <XCircle className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.cancelled}</div>
+                    <p className="text-xs text-red-500 mt-1">Did Not Occur</p>
+                </div>
+            </div>
+
+            {/* List */}
+            <Card className="border-border shadow-sm">
+                <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <CardTitle>Encounter History</CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                Detailed log of patient interactions and visits.
+                            </p>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="mb-6 flex flex-col sm:flex-row items-center gap-4">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by patient name or status..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 h-10 rounded-xl bg-muted/30 border-border md:w-[350px]"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border overflow-hidden">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="font-semibold">Patient</TableHead>
+                                    <TableHead className="font-semibold">Practitioner</TableHead>
+                                    <TableHead className="font-semibold">Type</TableHead>
+                                    <TableHead className="font-semibold">Status</TableHead>
+                                    <TableHead className="font-semibold">Date</TableHead>
+                                    <TableHead className="w-[80px]">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            {Array.from({ length: 6 }).map((_, j) => (
+                                                <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                                            ))}
+                                        </TableRow>
+                                    ))
+                                ) : error ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6}>
+                                            <Alert variant="destructive" className="m-4">
+                                                <AlertCircle className="h-4 w-4" />
+                                                <AlertTitle>Error</AlertTitle>
+                                                <AlertDescription>{error}</AlertDescription>
+                                            </Alert>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredEncounters.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                                            No encounters found matching your search.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredEncounters.map((enc) => (
+                                        <TableRow key={enc.id} className="group hover:bg-muted/50 transition-colors">
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                                                        <User className="h-4 w-4" />
+                                                    </div>
+                                                    {getPatientName(enc.patient_id)}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Stethoscope className="h-3.5 w-3.5" />
+                                                    {getPractitionerName(enc.practitioner_id)}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">{enc.class_code}</Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant="secondary"
+                                                    className={
+                                                        enc.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                            enc.status === 'in-progress' ? 'bg-yellow-100 text-yellow-700' :
+                                                                enc.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                                                    'bg-blue-100 text-blue-700'
+                                                    }
+                                                >
+                                                    {enc.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground text-sm">
+                                                {enc.started_at ? format(new Date(enc.started_at), 'PP p') : '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <span className="sr-only">Open menu</span>
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleEdit(enc)}>
+                                                            <Pencil className="mr-2 h-4 w-4" />
+                                                            Edit Details
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Dialog */}
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                    <div className="bg-blue-600 px-6 py-5 text-white border-b-2 border-blue-700">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white/20 rounded-lg border-2 border-white/30">
+                                <Activity className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-lg font-heading text-white">
+                                    {editingEncounter ? 'Edit Encounter' : 'New Encounter'}
+                                </DialogTitle>
+                                <DialogDescription className="text-blue-100 text-sm mt-0.5">
+                                    {editingEncounter ? 'Update encounter status and details' : 'Log a new patient visit or interaction'}
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="px-6 py-5">
+                        <div className="grid grid-cols-2 gap-5">
+                            {/* Patient */}
+                            <div className="space-y-2 col-span-2">
+                                <Label htmlFor="patient" className="text-sm font-medium flex items-center gap-2">
+                                    Patient <span className="text-red-500">*</span>
+                                </Label>
+                                <PatientCombobox
+                                    value={formData.patient_id}
+                                    onChange={(value) => setFormData({ ...formData, patient_id: value })}
+                                    patients={patients}
+                                    error={!formData.patient_id && submitting}
+                                />
+                            </div>
+
+                            {/* Practitioner */}
+                            <div className="space-y-2 col-span-2">
+                                <Label htmlFor="practitioner" className="text-sm font-medium flex items-center gap-2">
+                                    Practitioner <span className="text-red-500">*</span>
+                                </Label>
+                                <Select
+                                    value={formData.practitioner_id}
+                                    onValueChange={(value) => setFormData({ ...formData, practitioner_id: value })}
+                                >
+                                    <SelectTrigger className="h-11 rounded-xl">
+                                        <SelectValue placeholder="Select Practitioner" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {practitioners.map(p => (
+                                            <SelectItem key={p.id} value={p.id}>Dr. {p.first_name} {p.last_name} - {p.speciality}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Status */}
+                            <div className="space-y-2">
+                                <Label htmlFor="status" className="text-sm font-medium">Status <span className="text-red-500">*</span></Label>
+                                <Select
+                                    value={formData.status}
+                                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                                >
+                                    <SelectTrigger className="h-11 rounded-xl">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="planned">Planned</SelectItem>
+                                        <SelectItem value="in-progress">In Progress</SelectItem>
+                                        <SelectItem value="completed">Completed</SelectItem>
+                                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Type */}
+                            <div className="space-y-2">
+                                <Label htmlFor="class_code" className="text-sm font-medium">Class (Type) <span className="text-red-500">*</span></Label>
+                                <Select
+                                    value={formData.class_code}
+                                    onValueChange={(value) => setFormData({ ...formData, class_code: value })}
+                                >
+                                    <SelectTrigger className="h-11 rounded-xl">
+                                        <SelectValue placeholder="Class Code" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="AMB">Ambulatory (Outpatient)</SelectItem>
+                                        <SelectItem value="IMP">Inpatient</SelectItem>
+                                        <SelectItem value="EMER">Emergency</SelectItem>
+                                        <SelectItem value="HH">Home Health</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-border">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                                className="rounded-full px-5 border-border hover:bg-muted"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={submitting}
+                                className="rounded-full px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all"
+                            >
+                                {submitting ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                                        {editingEncounter ? 'Updating...' : 'Saving...'}
+                                    </>
+                                ) : (
+                                    <>
+                                        {editingEncounter ? <Pencil className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                                        {editingEncounter ? 'Update Encounter' : 'Save Encounter'}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}

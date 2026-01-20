@@ -115,13 +115,13 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
-      {/* Sticky Header */}
-      <header className="sticky top-16 z-20 flex items-center justify-between p-6 bg-background/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
+      {/* Flat Header */}
+      <header className="sticky top-16 z-20 flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-b-2 border-gray-100 dark:border-gray-800">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your account preferences and application settings</p>
+          <h1 className="text-2xl font-heading text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your account preferences and application settings</p>
         </div>
-        <Button onClick={handleSave} disabled={mutation.isPending} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+        <Button onClick={handleSave} disabled={mutation.isPending} className="flat-btn-primary">
           {mutation.isPending ? (
             <>Saving...</>
           ) : (
@@ -145,8 +145,8 @@ export default function SettingsPage() {
                   className={cn(
                     "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
                     activeTab === item.id
-                      ? "bg-card text-blue-600 shadow-sm ring-1 ring-border"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-2 border-blue-200 dark:border-blue-800"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white border-2 border-transparent"
                   )}
                 >
                   <item.icon className={cn("w-4 h-4", activeTab === item.id ? "text-blue-600" : "text-muted-foreground")} />
