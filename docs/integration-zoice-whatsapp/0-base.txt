@@ -1,0 +1,35 @@
+Consider the following set of requirements:
+
+1. We have a Patient Relationship Management (PRM). This manages all the touchpoints between a hospital/clinic and patients.
+- appointment booking through telephony, whatsapp
+- You can find out more about the capabilities through the routes in "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/backend/services/prm-service/api/router.py" and API docs.
+- There are multiple journeys in the PRM which you can track deeper.
+- Read through the docs in "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/docs" to get to know everything apart from the code itself.
+
+The products for PRM are:
+- The frontend dashboard with which the user can interact with the PRM is at "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/frontend/apps/prm-dashboard"
+- The backend service for PRM is at "/Users/paruljuniwal/kuzushi_labs/healthcare/healthtech-redefined/backend/services/prm-service"
+
+The products for Zoice are:
+- The frontend dashboard with which the user can interact with the Zoice is at "/Users/paruljuniwal/kuzushi_labs/zucol/zoice-web"
+- The backend service for Zoice is at "/Users/paruljuniwal/kuzushi_labs/zucol/zoice"
+
+- Zoice is an AI call center product -> telephony based specific to India
+- supports outgoing and incoming calling
+- supports AI agents creation
+
+Here is the following task. Analyse and proceed very very carefully
+- In the prm-dashboard -> we want to add the following:
+a. 'admin-mode' through a slider
+b. this admin mode opens the following:
+    i. a set of new tabs in the left side which essentailly resembles the left sidebar eleents of zoice-web -> "/Users/paruljuniwal/kuzushi_labs/zucol/zoice-web/src/app/(main)/dashboard"
+    -- this means - basically copying the components and state from "/Users/paruljuniwal/kuzushi_labs/zucol/zoice-web/src/components/features" - especially pipelines
+    ii. this can call and connect to the zoice backend via its own backend -> basically - it should proxy the requests to the zoice backend via prm-service/api/router.py to -> "/Users/paruljuniwal/kuzushi_labs/zucol/zoice" via api-key in header -> currently - zoice-backend only supports jwt based authentication.
+    -- here, I want your recommendation - if it is possible to generate a jwt in some way - or this interaction or should we go with apikey setup
+    -- will we need to copy all the apis from zoice backend to prm-service/api/router.py or have a proxy mechanism to simply reroute the api? what is the world class approach for this sort of integration?
+    iii. we will also need a mechanism to configure webhooks so that all the data after the call comes back into prm-service from zoice
+
+c. Make sure to modify the ui elements style to match the css and styling for PRM
+d. Plan and make the changes in zoice backend as well to support api-key based authentication
+
+plan rigorously and carefully before starting to implement this.

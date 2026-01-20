@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     S3_ENDPOINT_URL: Optional[str] = None  # For MinIO/compatible services
 
+    # Zoice Integration Configuration
+    ZOICE_BASE_URL: Optional[str] = None  # e.g., "http://localhost:8000"
+    ZOICE_API_KEY: Optional[str] = None  # API key for Zoice authentication
+    ZOICE_WEBHOOK_SECRET: Optional[str] = None  # Secret for validating incoming Zoice webhooks
+
     class Config:
         env_file = ".env"
         case_sensitive = True

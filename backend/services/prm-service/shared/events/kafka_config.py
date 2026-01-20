@@ -255,6 +255,14 @@ HEALTHCARE_TOPICS: List[TopicConfig] = [
         retention_ms=604800000,  # 7 days
         min_insync_replicas=2,
     ),
+    # Zoice voice agent events
+    TopicConfig(
+        name="healthtech.zoice.events",
+        partitions=12,
+        replication_factor=3,
+        retention_ms=2592000000,  # 30 days
+        min_insync_replicas=2,
+    ),
     # Consent events - critical, long retention
     TopicConfig(
         name="healthtech.consent.events",

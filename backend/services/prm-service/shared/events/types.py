@@ -138,6 +138,17 @@ class EventType(str, Enum):
     COLLAB_MESSAGE_POSTED = "Collab.MessagePosted"
     NOTE_REVISION_CREATED = "Note.RevisionCreated"
 
+    # Zoice Voice Agent Events (Zoice Integration)
+    ZOICE_CALL_RECEIVED = "Zoice.CallReceived"
+    ZOICE_CALL_COMPLETED = "Zoice.CallCompleted"
+    ZOICE_TRANSCRIPT_READY = "Zoice.TranscriptReady"
+    ZOICE_EXTRACTION_COMPLETED = "Zoice.ExtractionCompleted"
+    ZOICE_APPOINTMENT_BOOKED = "Zoice.AppointmentBooked"
+    ZOICE_PATIENT_IDENTIFIED = "Zoice.PatientIdentified"
+    ZOICE_PATIENT_CREATED = "Zoice.PatientCreated"
+    ZOICE_TOOL_CALLED = "Zoice.ToolCalled"
+    ZOICE_WEBHOOK_ERROR = "Zoice.WebhookError"
+
     # LLM & Governance Events (Phase 4)
     LLM_SESSION_STARTED = "LLM.SessionStarted"
     LLM_SESSION_ENDED = "LLM.SessionEnded"

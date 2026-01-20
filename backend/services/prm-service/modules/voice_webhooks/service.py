@@ -2,6 +2,7 @@
 Voice Agent Webhook Service
 Business logic for processing voice agent webhooks and tool calls
 """
+import asyncio
 from datetime import datetime, timedelta, time
 from typing import Optional, List, Tuple
 from uuid import UUID, uuid4
@@ -18,6 +19,8 @@ from backend.shared.database.conversation_voice_models import (
     VoiceCallExtraction,
     Conversation,
 )
+from shared.events.publisher import publish_event
+from shared.events.types import EventType
 from .schemas import (
     VoiceAgentWebhookRequest,
     VoiceCallWebhookResponse,
@@ -77,8 +80,8 @@ class VoiceWebhookService:
                 agent_phone=webhook.agent_phone,
                 call_type=webhook.call_type,
                 call_status="completed",
-                started_at=webhook.call_started_at,
-                ended_at=webhook.call_ended_at,
+                started_at=webhook.started_at,
+                ended_at=webhook.ended_at,
                 duration_seconds=webhook.duration_seconds,
                 pipeline_id=webhook.pipeline_id,
                 agent_name=webhook.agent_name,
@@ -105,7 +108,7 @@ class VoiceWebhookService:
                     tenant_id=tenant_id,
                     call_id=voice_call.id,
                     full_transcript=webhook.transcript,
-                    turns=webhook.transcript_turns or [],
+                    turns=webhook.turns or [],
                     provider=webhook.transcription_provider or "zoice",
                     language=webhook.language,
                     confidence_score=webhook.transcription_confidence,
@@ -166,9 +169,9 @@ class VoiceWebhookService:
                 state_data={},
                 extracted_data=webhook.extracted_data or {},
                 is_intake_complete=True,
-                first_message_at=webhook.call_started_at,
-                last_message_at=webhook.call_ended_at,
-                closed_at=webhook.call_ended_at,
+                first_message_at=webhook.started_at,
+                last_message_at=webhook.ended_at,
+                closed_at=webhook.ended_at,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
@@ -207,6 +210,17 @@ class VoiceWebhookService:
                 f"appointment_id={appointment_id}"
             )
 
+            # Publish Kafka events asynchronously
+            self._publish_zoice_events(
+                tenant_id=tenant_id,
+                call_record_id=call_record_id,
+                patient_id=patient_id,
+                appointment_id=appointment_id,
+                conversation_id=conversation_id,
+                webhook=webhook,
+                patient_created=patient_created,
+            )
+
             return VoiceCallWebhookResponse(
                 success=True,
                 message="Voice call processed successfully",
@@ -233,6 +247,136 @@ class VoiceWebhookService:
                 actions_taken=actions_taken,
                 errors=errors,
             )
+
+    def _publish_zoice_events(
+        self,
+        tenant_id: UUID,
+        call_record_id: UUID,
+        patient_id: UUID,
+        appointment_id: Optional[UUID],
+        conversation_id: UUID,
+        webhook: VoiceAgentWebhookRequest,
+        patient_created: bool,
+    ):
+        """
+        Publish Kafka events for Zoice voice call processing.
+
+        Events published:
+        - ZOICE_CALL_COMPLETED: Always published when call is processed
+        - ZOICE_TRANSCRIPT_READY: If transcript is available
+        - ZOICE_EXTRACTION_COMPLETED: If data extraction was performed
+        - ZOICE_PATIENT_CREATED: If a new patient was created
+        - ZOICE_PATIENT_IDENTIFIED: If an existing patient was identified
+        - ZOICE_APPOINTMENT_BOOKED: If appointment was booked
+        """
+        try:
+            # Run async event publishing in background
+            loop = asyncio.new_event_loop()
+
+            # Event 1: Call Completed
+            loop.run_until_complete(publish_event(
+                event_type=EventType.ZOICE_CALL_COMPLETED,
+                tenant_id=str(tenant_id),
+                payload={
+                    "call_record_id": str(call_record_id),
+                    "zoice_call_id": str(webhook.call_id),
+                    "patient_id": str(patient_id),
+                    "patient_phone": webhook.patient_phone,
+                    "call_type": webhook.call_type,
+                    "duration_seconds": webhook.duration_seconds,
+                    "detected_intent": webhook.detected_intent.value if webhook.detected_intent else None,
+                    "call_outcome": webhook.call_outcome.value if webhook.call_outcome else None,
+                    "confidence_score": webhook.confidence_score,
+                    "pipeline_id": str(webhook.pipeline_id) if webhook.pipeline_id else None,
+                    "agent_name": webhook.agent_name,
+                    "conversation_id": str(conversation_id),
+                },
+                source_service="prm-service",
+                metadata={
+                    "language": webhook.language,
+                    "sentiment": webhook.sentiment,
+                },
+            ))
+
+            # Event 2: Transcript Ready (if transcript available)
+            if webhook.transcript:
+                loop.run_until_complete(publish_event(
+                    event_type=EventType.ZOICE_TRANSCRIPT_READY,
+                    tenant_id=str(tenant_id),
+                    payload={
+                        "call_record_id": str(call_record_id),
+                        "zoice_call_id": str(webhook.call_id),
+                        "patient_id": str(patient_id),
+                        "transcript_length": len(webhook.transcript),
+                        "word_count": len(webhook.transcript.split()) if webhook.transcript else 0,
+                        "language": webhook.language,
+                        "has_turns": bool(webhook.turns),
+                    },
+                    source_service="prm-service",
+                ))
+
+            # Event 3: Extraction Completed (if data was extracted)
+            if webhook.extracted_data:
+                loop.run_until_complete(publish_event(
+                    event_type=EventType.ZOICE_EXTRACTION_COMPLETED,
+                    tenant_id=str(tenant_id),
+                    payload={
+                        "call_record_id": str(call_record_id),
+                        "zoice_call_id": str(webhook.call_id),
+                        "patient_id": str(patient_id),
+                        "extraction_type": webhook.detected_intent.value if webhook.detected_intent else "general",
+                        "extracted_fields": list(webhook.extracted_data.keys()),
+                        "confidence_score": webhook.confidence_score,
+                    },
+                    source_service="prm-service",
+                ))
+
+            # Event 4: Patient Created or Identified
+            if patient_created:
+                loop.run_until_complete(publish_event(
+                    event_type=EventType.ZOICE_PATIENT_CREATED,
+                    tenant_id=str(tenant_id),
+                    payload={
+                        "call_record_id": str(call_record_id),
+                        "patient_id": str(patient_id),
+                        "patient_phone": webhook.patient_phone,
+                        "source": "voice_agent",
+                    },
+                    source_service="prm-service",
+                ))
+            else:
+                loop.run_until_complete(publish_event(
+                    event_type=EventType.ZOICE_PATIENT_IDENTIFIED,
+                    tenant_id=str(tenant_id),
+                    payload={
+                        "call_record_id": str(call_record_id),
+                        "patient_id": str(patient_id),
+                        "patient_phone": webhook.patient_phone,
+                    },
+                    source_service="prm-service",
+                ))
+
+            # Event 5: Appointment Booked (if booked)
+            if appointment_id:
+                loop.run_until_complete(publish_event(
+                    event_type=EventType.ZOICE_APPOINTMENT_BOOKED,
+                    tenant_id=str(tenant_id),
+                    payload={
+                        "call_record_id": str(call_record_id),
+                        "appointment_id": str(appointment_id),
+                        "patient_id": str(patient_id),
+                        "booked_via": "voice_agent",
+                        "detected_intent": webhook.detected_intent.value if webhook.detected_intent else None,
+                    },
+                    source_service="prm-service",
+                ))
+
+            loop.close()
+            logger.info(f"Published Zoice events for call {webhook.call_id}")
+
+        except Exception as e:
+            # Don't fail the webhook response if event publishing fails
+            logger.error(f"Error publishing Zoice events: {e}", exc_info=True)
 
     def _identify_or_create_patient(
         self, phone: str, extracted_data: dict, tenant_id: UUID

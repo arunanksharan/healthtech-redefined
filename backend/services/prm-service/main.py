@@ -99,6 +99,11 @@ from modules.diagnostic_reports.router import router as diagnostic_reports_route
 # Phase 3 Routers
 from modules.analytics.router import router as analytics_router
 
+# Zoice Integration
+from modules.zoice_integration.router import router as zoice_router
+from modules.zoice_integration.client import init_zoice_client, close_zoice_client
+from core.config import settings
+
 # Include New Domain Routers
 app.include_router(organizations_router, prefix="/api/v1/prm/organizations", tags=["Organizations"])
 app.include_router(locations_router, prefix="/api/v1/prm/locations", tags=["Locations"])
@@ -112,6 +117,9 @@ app.include_router(diagnostic_reports_router, prefix="/api/v1/prm/diagnostic-rep
 app.include_router(analytics_router, prefix="/api/v1/prm", tags=["Analytics"])
 # app.include_router(telehealth_router, prefix="/api/v1/prm", tags=["Telehealth"])  # Coming Soon
 # app.include_router(billing_router, prefix="/api/v1/prm", tags=["Billing & Insurance"])  # Coming Soon
+
+# Zoice Integration Router (Admin Mode)
+app.include_router(zoice_router, prefix="/api/v1/prm", tags=["Zoice Integration"])
 
 
 # ==================== Health Check ====================
@@ -1613,6 +1621,19 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Error initializing real-time services: {e}")
 
+    # Initialize Zoice client (if configured)
+    try:
+        if settings.ZOICE_BASE_URL and settings.ZOICE_API_KEY:
+            init_zoice_client(
+                base_url=settings.ZOICE_BASE_URL,
+                api_key=settings.ZOICE_API_KEY
+            )
+            logger.info(f"Zoice client initialized with URL: {settings.ZOICE_BASE_URL}")
+        else:
+            logger.warning("Zoice integration not configured (ZOICE_BASE_URL and ZOICE_API_KEY not set)")
+    except Exception as e:
+        logger.error(f"Error initializing Zoice client: {e}")
+
     logger.info("PRM Service ready!")
 
 
@@ -1626,6 +1647,13 @@ async def shutdown_event():
         logger.info("Real-time services stopped")
     except Exception as e:
         logger.error(f"Error stopping real-time services: {e}")
+
+    # Close Zoice client
+    try:
+        await close_zoice_client()
+        logger.info("Zoice client closed")
+    except Exception as e:
+        logger.error(f"Error closing Zoice client: {e}")
 
     logger.info("PRM Service shutdown complete")
 
