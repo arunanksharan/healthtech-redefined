@@ -158,3 +158,4 @@ static_root/
 staticfiles/
 migrations/versions/__pycache__/
 .trees/
+.turbo/
