@@ -4,7 +4,8 @@
   "description": "AI-Native Healthcare Platform - Revolutionary health tech stack",
   "private": true,
   "workspaces": [
-    "frontend/apps/*"
+    "frontend/apps/*",
+    "frontend/packages/*"
   ],
   "scripts": {
     "dev": "turbo run dev",
