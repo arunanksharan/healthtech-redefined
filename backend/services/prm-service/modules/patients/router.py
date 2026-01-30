@@ -313,7 +313,8 @@ async def create_patient(
 
     patient = await service.create_patient(patient_data)
 
-    return PatientResponse.from_orm(patient)
+    # Use service helper to convert database model to response schema
+    return service._patient_to_response(patient)
 
 
 @router.get("/{patient_id}", response_model=PatientDetailResponse)

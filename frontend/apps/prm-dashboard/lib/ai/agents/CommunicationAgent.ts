@@ -56,6 +56,10 @@ Available tools:
   - category: 'appointment' | 'reminder' | 'follow_up' | 'notification' | 'marketing'
 - communication.get_history: Get history (params: patient_id, channel?, limit?)
 - patient.search: Search for patient (params: query, search_type?)
+  - search_type: 'phone' | 'name' | 'mrn' (MUST be specified based on query type)
+  - For phone numbers (digits only), use search_type: 'phone'
+  - For names (text), use search_type: 'name'
+  - For MRN codes, use search_type: 'mrn'
 
 User intent: ${intentDescription}
 Extracted entities: ${JSON.stringify(entities, null, 2)}

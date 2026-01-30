@@ -24,7 +24,13 @@ from modules.patients.schemas import (
     PatientMergeRequest,
     PatientMergeResult,
     PatientStatistics,
-    PatientStatus
+    PatientStatus,
+    Address,
+    EmergencyContact,
+    InsuranceInfo,
+    ContactMethod,
+    Gender,
+    MaritalStatus
 )
 
 
@@ -35,6 +41,9 @@ class PatientService:
         self.db = db
 
     # ==================== CRUD Operations ====================
+
+    # Default tenant ID (created for single-tenant operation)
+    DEFAULT_TENANT_ID = UUID("00000000-0000-0000-0000-000000000001")
 
     async def create_patient(
         self,
@@ -51,6 +60,9 @@ class PatientService:
         - Publish event
         """
         try:
+            # Use default tenant if org_id not provided
+            tenant_id = org_id or self.DEFAULT_TENANT_ID
+
             # Generate MRN
             mrn = await self._generate_mrn()
 
@@ -67,65 +79,70 @@ class PatientService:
                     f"{patient_data.legal_name} (DOB: {patient_data.date_of_birth})"
                 )
 
-            # Create patient
+            # Parse legal_name into first_name and last_name
+            name_parts = patient_data.legal_name.split() if patient_data.legal_name else []
+            first_name = name_parts[0] if name_parts else ""
+            last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+
+            # Create patient - map schema fields to actual database model columns
             patient = Patient(
                 id=uuid4(),
-                org_id=org_id,
-                mrn=mrn,
-                legal_name=patient_data.legal_name,
-                preferred_name=patient_data.preferred_name,
+                tenant_id=tenant_id,  # Use tenant_id with default fallback
+                first_name=first_name,
+                last_name=last_name,
                 date_of_birth=patient_data.date_of_birth,
                 gender=patient_data.gender.value,
-                ssn_encrypted=patient_data.ssn,  # TODO: Encrypt before storage
-                primary_phone=patient_data.primary_phone,
-                secondary_phone=patient_data.secondary_phone,
-                email=patient_data.email,
-                preferred_contact_method=patient_data.preferred_contact_method.value,
-                race=patient_data.race,
-                ethnicity=patient_data.ethnicity,
-                preferred_language=patient_data.preferred_language,
+                phone_primary=patient_data.primary_phone,  # Map primary_phone to phone_primary
+                phone_secondary=patient_data.secondary_phone,
+                email_primary=patient_data.email,  # Map email to email_primary
+                language_preferred=patient_data.preferred_language,
                 marital_status=patient_data.marital_status.value if patient_data.marital_status else None,
-                primary_care_provider_id=patient_data.primary_care_provider_id,
-                status=PatientStatus.ACTIVE.value,
+                meta_data={"mrn": mrn, "preferred_name": patient_data.preferred_name},  # Store MRN in meta_data
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
 
-            # Handle address (store as JSON or in separate table)
+            # Handle address - store in separate address columns
             if patient_data.address:
-                patient.address_json = patient_data.address.dict()
+                patient.address_line1 = patient_data.address.line1
+                patient.address_line2 = patient_data.address.line2
+                patient.city = patient_data.address.city
+                patient.state = patient_data.address.state
+                patient.postal_code = patient_data.address.postal_code
+                patient.country = patient_data.address.country
 
-            # Handle emergency contact
+            # Handle emergency contact and insurance in meta_data
+            if patient.meta_data is None:
+                patient.meta_data = {}
             if patient_data.emergency_contact:
-                patient.emergency_contact_json = patient_data.emergency_contact.dict()
-
-            # Handle insurance
+                patient.meta_data["emergency_contact"] = patient_data.emergency_contact.dict()
             if patient_data.insurance:
-                patient.insurance_json = patient_data.insurance.dict()
+                patient.meta_data["insurance"] = patient_data.insurance.dict()
 
             self.db.add(patient)
             self.db.commit()
             self.db.refresh(patient)
 
+            full_name = f"{patient.first_name or ''} {patient.last_name or ''}".strip()
             logger.info(f"Created patient: {patient.id} (MRN: {mrn})")
 
             # Publish event
             await publish_event(
                 event_type=EventType.PATIENT_CREATED,
-                entity_id=patient.id,
-                entity_type="patient",
-                data={
+                tenant_id=str(tenant_id),
+                payload={
                     "patient_id": str(patient.id),
                     "mrn": mrn,
-                    "name": patient.legal_name,
-                    "phone": patient.primary_phone
-                }
+                    "name": full_name,
+                    "phone": patient.phone_primary
+                },
+                source_service="prm-service"
             )
 
             return patient
 
         except Exception as e:
-            logger.error(f"Error creating patient: {e}", exc_info=True)
+            logger.error("Error creating patient: %s", str(e), exc_info=True)
             self.db.rollback()
             raise
 
@@ -144,9 +161,10 @@ class PatientService:
             random_digits = random.randint(100000, 999999)
             mrn = f"MRN-{year}{random_digits}"
 
-            # Check if MRN already exists
+            # Check if MRN already exists in meta_data
+            from sqlalchemy import cast, String
             existing = self.db.query(Patient).filter(
-                Patient.mrn == mrn
+                Patient.meta_data['mrn'].astext == mrn
             ).first()
 
             if not existing:
@@ -164,9 +182,9 @@ class PatientService:
         ).first()
 
     async def get_patient_by_mrn(self, mrn: str) -> Optional[Patient]:
-        """Get patient by Medical Record Number"""
+        """Get patient by Medical Record Number (stored in meta_data)"""
         return self.db.query(Patient).filter(
-            Patient.mrn == mrn
+            Patient.meta_data['mrn'].astext == mrn
         ).first()
 
     async def update_patient(
@@ -255,30 +273,34 @@ class PatientService:
             search_term = f"%{search_params.query}%"
             query = query.filter(
                 or_(
-                    Patient.legal_name.ilike(search_term),
-                    Patient.preferred_name.ilike(search_term),
-                    Patient.mrn.ilike(search_term),
-                    Patient.primary_phone.contains(search_params.query),
-                    Patient.email.ilike(search_term)
+                    Patient.first_name.ilike(search_term),
+                    Patient.last_name.ilike(search_term),
+                    Patient.meta_data['mrn'].astext.ilike(search_term),
+                    Patient.phone_primary.contains(search_params.query),
+                    Patient.email_primary.ilike(search_term)
                 )
             )
 
         # Specific filters
         if search_params.name:
+            name_term = f"%{search_params.name}%"
             query = query.filter(
-                Patient.legal_name.ilike(f"%{search_params.name}%")
+                or_(
+                    Patient.first_name.ilike(name_term),
+                    Patient.last_name.ilike(name_term)
+                )
             )
 
         if search_params.phone:
             # Normalize phone for search
             phone_digits = ''.join(c for c in search_params.phone if c.isdigit())
             query = query.filter(
-                Patient.primary_phone.contains(phone_digits)
+                Patient.phone_primary.contains(phone_digits)
             )
 
         if search_params.email:
             query = query.filter(
-                Patient.email.ilike(f"%{search_params.email}%")
+                Patient.email_primary.ilike(f"%{search_params.email}%")
             )
 
         if search_params.date_of_birth:
@@ -347,6 +369,76 @@ class PatientService:
 
         return duplicates
 
+    def _patient_to_response(self, patient: Patient) -> PatientResponse:
+        """
+        Convert database Patient model to PatientResponse schema.
+        Maps database column names to schema field names.
+        """
+        # Get MRN from meta_data
+        mrn = patient.meta_data.get("mrn", "") if patient.meta_data else ""
+        preferred_name = patient.meta_data.get("preferred_name") if patient.meta_data else None
+
+        # Calculate age
+        age = None
+        if patient.date_of_birth:
+            today = date.today()
+            age = today.year - patient.date_of_birth.year - (
+                (today.month, today.day) < (patient.date_of_birth.month, patient.date_of_birth.day)
+            )
+
+        # Build legal name from first_name and last_name
+        legal_name = f"{patient.first_name or ''} {patient.last_name or ''}".strip()
+
+        # Build address if available
+        address = None
+        if patient.address_line1:
+            address = Address(
+                line1=patient.address_line1,
+                line2=patient.address_line2,
+                city=patient.city or "",
+                state=patient.state or "",
+                postal_code=patient.postal_code or "",
+                country=patient.country or "India"
+            )
+
+        # Get emergency contact and insurance from meta_data
+        emergency_contact = None
+        insurance = None
+        if patient.meta_data:
+            if "emergency_contact" in patient.meta_data:
+                emergency_contact = EmergencyContact(**patient.meta_data["emergency_contact"])
+            if "insurance" in patient.meta_data:
+                insurance = InsuranceInfo(**patient.meta_data["insurance"])
+
+        # Determine status
+        status = PatientStatus.DECEASED if patient.is_deceased else PatientStatus.ACTIVE
+
+        return PatientResponse(
+            id=patient.id,
+            org_id=patient.tenant_id,
+            mrn=mrn,
+            legal_name=legal_name or "Unknown",
+            preferred_name=preferred_name,
+            date_of_birth=patient.date_of_birth,
+            gender=Gender(patient.gender) if patient.gender else Gender.UNKNOWN,
+            age=age,
+            primary_phone=patient.phone_primary or "",
+            secondary_phone=patient.phone_secondary,
+            email=patient.email_primary,
+            address=address,
+            preferred_contact_method=ContactMethod.PHONE,  # Default
+            race=None,
+            ethnicity=None,
+            preferred_language=patient.language_preferred or "en",
+            marital_status=MaritalStatus(patient.marital_status) if patient.marital_status else None,
+            primary_care_provider_id=None,
+            emergency_contact=emergency_contact,
+            insurance=insurance,
+            status=status,
+            created_at=patient.created_at,
+            updated_at=patient.updated_at
+        )
+
     async def _find_potential_duplicates(
         self,
         name: str,
@@ -361,9 +453,9 @@ class PatientService:
         """
         potential_duplicates = []
 
-        # Search criteria
+        # Search criteria - filter out deceased patients
         query = self.db.query(Patient).filter(
-            Patient.state == PatientStatus.ACTIVE.value
+            Patient.is_deceased == False
         )
 
         if exclude_id:
@@ -383,8 +475,9 @@ class PatientService:
         ).all()
 
         for match in exact_matches:
+            patient_response = self._patient_to_response(match)
             potential_duplicates.append(DuplicatePatient(
-                patient=PatientResponse.from_orm(match),
+                patient=patient_response,
                 match_score=0.95,
                 match_reasons=["Exact name and date of birth match"]
             ))
@@ -397,8 +490,9 @@ class PatientService:
 
         for match in phone_matches:
             if match not in exact_matches:
+                patient_response = self._patient_to_response(match)
                 potential_duplicates.append(DuplicatePatient(
-                    patient=PatientResponse.from_orm(match),
+                    patient=patient_response,
                     match_score=0.85,
                     match_reasons=["Same phone number"]
                 ))

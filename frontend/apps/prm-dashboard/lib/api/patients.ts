@@ -48,10 +48,42 @@ export const patientsAPI = {
 
   /**
    * Create a new patient
+   * Transforms frontend form fields to match backend PatientCreate schema
    */
-  async create(data: Partial<Patient>) {
+  async create(data: Partial<Patient> & {
+    first_name?: string;
+    last_name?: string;
+    phone_primary?: string;
+    email_primary?: string;
+    name?: string;  // AI tools may pass 'name'
+    phone?: string; // AI tools may pass 'phone'
+  }) {
+    // Transform frontend form fields to backend schema
+    const backendData: Record<string, any> = {
+      // Combine first_name and last_name into legal_name, or use name from AI tools
+      legal_name: data.legal_name ||
+        data.name ||
+        [data.first_name, data.last_name].filter(Boolean).join(' ').trim() ||
+        undefined,
+      // Map phone_primary/phone to primary_phone
+      primary_phone: data.primary_phone || data.phone_primary || data.phone,
+      // Map email_primary to email
+      email: data.email || data.email_primary,
+      // Pass through other fields
+      date_of_birth: data.date_of_birth,
+      gender: data.gender || 'unknown', // Default gender if not provided
+      preferred_name: data.preferred_name,
+    };
+
+    // Remove undefined values
+    Object.keys(backendData).forEach(key => {
+      if (backendData[key] === undefined) {
+        delete backendData[key];
+      }
+    });
+
     return apiCall<Patient>(
-      apiClient.post('/api/v1/prm/patients', data)
+      apiClient.post('/api/v1/prm/patients', backendData)
     );
   },
 

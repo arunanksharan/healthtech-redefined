@@ -57,6 +57,10 @@ Available tools:
 - ticket.close: Close ticket (params: ticket_id)
 - ticket.add_comment: Add comment (params: ticket_id, comment, is_internal?)
 - patient.search: Search for patient (params: query, search_type?)
+  - search_type: 'phone' | 'name' | 'mrn' (MUST be specified based on query type)
+  - For phone numbers (digits only), use search_type: 'phone'
+  - For names (text), use search_type: 'name'
+  - For MRN codes, use search_type: 'mrn'
 
 User intent: ${intentDescription}
 Extracted entities: ${JSON.stringify(entities, null, 2)}
