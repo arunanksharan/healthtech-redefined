@@ -1,14 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AnimatePresence, motion, MotionProps } from "motion/react"
+import { AnimatePresence, motion, type HTMLMotionProps } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
 interface WordRotateProps {
   words: string[]
   duration?: number
-  motionProps?: MotionProps
+  motionProps?: HTMLMotionProps<"h1">
   className?: string
 }
 

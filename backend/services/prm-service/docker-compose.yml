@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: prm-service
     ports:
-      - "8001:8000"
+      - "8002:8000"
     environment:
       # Database
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}

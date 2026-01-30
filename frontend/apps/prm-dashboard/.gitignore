@@ -28,6 +28,10 @@ yarn-error.log*
 .env*.local
 .env
 
+# Docker
+nginx/ssl/
+monitoring/data/
+
 # vercel
 .vercel
 

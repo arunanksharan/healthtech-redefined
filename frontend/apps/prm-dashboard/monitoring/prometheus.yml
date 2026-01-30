@@ -1,0 +1,70 @@
+# Prometheus Configuration for PRM Application
+# Scrapes metrics from frontend and backend services
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+    monitor: 'prm-monitor'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+# rule_files:
+#   - "first_rules.yml"
+#   - "second_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # PRM Backend Service (FastAPI)
+  - job_name: 'prm-service'
+    static_configs:
+      - targets: ['prm-service:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # PRM Dashboard (Next.js) - if metrics are exposed
+  - job_name: 'prm-dashboard'
+    static_configs:
+      - targets: ['prm-dashboard:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s
+    # Don't fail if metrics endpoint doesn't exist
+    honor_labels: true
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    # Requires redis_exporter sidecar
+
+  # PostgreSQL
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    # Requires postgres_exporter sidecar
+
+  # Node Exporter (system metrics) - optional
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+
+  # Nginx (if using with-nginx profile)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: '/nginx-health'
+    scrape_interval: 30s

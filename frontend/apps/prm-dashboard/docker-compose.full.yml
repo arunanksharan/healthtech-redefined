@@ -1,0 +1,224 @@
+# PRM Full Stack - Docker Compose
+# Runs both PRM Dashboard (frontend) and PRM Service (backend)
+# This is the recommended way to run the complete PRM application
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # PRM Dashboard (Next.js Frontend)
+  # ==========================================================================
+  prm-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://prm-service:8000
+        NEXT_PUBLIC_WS_URL: ws://prm-service:8000/ws/connect
+        NEXT_PUBLIC_CONVERSATION_API_URL: ${NEXT_PUBLIC_CONVERSATION_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_CONVERSATION_WS_URL: ${NEXT_PUBLIC_CONVERSATION_WS_URL:-ws://localhost:3001}
+        NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL:-}
+        NEXT_PUBLIC_ORG_ID: ${NEXT_PUBLIC_ORG_ID:-default}
+        NEXT_PUBLIC_TENANT_ID: ${NEXT_PUBLIC_TENANT_ID:-default}
+        NEXT_PUBLIC_ENABLE_VOICE: ${NEXT_PUBLIC_ENABLE_VOICE:-true}
+        NEXT_PUBLIC_ENABLE_AI_ASSISTANT: ${NEXT_PUBLIC_ENABLE_AI_ASSISTANT:-true}
+        NEXT_PUBLIC_ENABLE_AI: ${NEXT_PUBLIC_ENABLE_AI:-true}
+        NEXT_PUBLIC_ENABLE_WHATSAPP: ${NEXT_PUBLIC_ENABLE_WHATSAPP:-true}
+        NEXT_PUBLIC_ENABLE_SMS: ${NEXT_PUBLIC_ENABLE_SMS:-true}
+        NEXT_PUBLIC_ZOICE_API_URL: ${NEXT_PUBLIC_ZOICE_API_URL:-https://api2.zoice.ai}
+    container_name: prm-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-}
+      - NEXT_PUBLIC_API_URL=http://prm-service:8000
+      - NEXT_PUBLIC_WS_URL=ws://prm-service:8000/ws/connect
+      - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL:-}
+      - NEXT_PUBLIC_ZOICE_API_URL=${NEXT_PUBLIC_ZOICE_API_URL:-https://api2.zoice.ai}
+    depends_on:
+      prm-service:
+        condition: service_healthy
+    networks:
+      - prm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================================================
+  # PRM Service (FastAPI Backend)
+  # ==========================================================================
+  prm-service:
+    build:
+      context: ../../../backend/services/prm-service
+      dockerfile: Dockerfile
+    container_name: prm-service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-prm_db}
+      - REDIS_URL=redis://redis:6379/0
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Zoice Voice AI Integration
+      - ZOICE_API_URL=${ZOICE_API_URL:-https://api2.zoice.ai}
+      - ZOICE_API_KEY=${ZOICE_API_KEY:-}
+      - ZOICE_WEBHOOK_SECRET=${ZOICE_WEBHOOK_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - prm-logs:/app/logs
+    networks:
+      - prm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: prm-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-prm_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - prm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-prm_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Redis Cache
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: prm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - prm-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Nginx Reverse Proxy (Optional)
+  # ==========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: prm-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - prm-dashboard
+      - prm-service
+    networks:
+      - prm-network
+    restart: unless-stopped
+    profiles:
+      - with-nginx
+
+  # ==========================================================================
+  # Prometheus (Monitoring) - Optional
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prm-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - prm-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    profiles:
+      - with-monitoring
+
+  # ==========================================================================
+  # Grafana (Visualization) - Optional
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: prm-grafana
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - prm-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    profiles:
+      - with-monitoring
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  prm-logs:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  prm-network:
+    driver: bridge
