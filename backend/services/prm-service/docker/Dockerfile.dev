@@ -1,0 +1,65 @@
+# =============================================================================
+# Development Dockerfile for PRM Service
+# Optimized for hot reload and debugging
+# =============================================================================
+
+FROM python:3.11-slim
+
+LABEL maintainer="Kuzushi Labs <dev@kuzushilabs.com>"
+LABEL description="PRM Service - Development Environment"
+
+WORKDIR /app
+
+# Install development dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    librdkafka-dev \
+    curl \
+    git \
+    vim \
+    htop \
+    postgresql-client \
+    redis-tools \
+    iputils-ping \
+    net-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies (including dev tools)
+RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
+        debugpy \
+        watchfiles \
+        ipython \
+        ipdb \
+        httpie
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Environment for development
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=0 \
+    PYTHONPATH=/app \
+    APP_ENV=development \
+    DEBUG=true
+
+# Expose ports: 8000 for app, 5678 for debugger
+EXPOSE 8000 5678
+
+# Health check
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run with hot reload
+CMD ["uvicorn", "main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--reload", \
+     "--reload-dir", "/app", \
+     "--log-level", "debug"]

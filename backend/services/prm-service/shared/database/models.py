@@ -573,47 +573,8 @@ class RolePermission(Base):
 
 
 # ============================================================================
-# FHIR RESOURCES
+# FHIR RESOURCES - Defined in shared/database/fhir_models.py
 # ============================================================================
-
-
-class FHIRResource(Base):
-    """Generic FHIR R4 resource storage with versioning"""
-
-    __tablename__ = "fhir_resources"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-
-    # Resource Identification
-    resource_type = Column(
-        String(50), nullable=False
-    )  # Patient, Encounter, Observation, etc.
-    resource_id = Column(String(100), nullable=False)  # FHIR logical ID
-    version = Column(Integer, nullable=False, default=1)
-    is_current = Column(Boolean, nullable=False, default=True)
-
-    # The actual FHIR resource (complete JSON)
-    resource = Column(JSONB, nullable=False)
-
-    # Metadata
-    meta_data = Column(JSONB, default=dict)
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
-
-    # Indexes
-    __table_args__ = (
-        Index("idx_fhir_resources_tenant_type", "tenant_id", "resource_type"),
-        Index("idx_fhir_resources_id_type", "resource_type", "resource_id", "is_current"),
-        Index("idx_fhir_resources_current", "is_current"),
-    )
 
 
 # ============================================================================
@@ -1086,9 +1047,33 @@ class Ticket(Base):
     patient = relationship("Patient", back_populates="tickets")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
+    comments = relationship("TicketComment", back_populates="ticket", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (Index("idx_tickets_patient", "patient_id", "status"),)
+
+
+class TicketComment(Base):
+    """Comments on support tickets"""
+
+    __tablename__ = "ticket_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
+    ticket_id = Column(UUID(as_uuid=True), ForeignKey("tickets.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    content = Column(Text, nullable=False)
+    is_internal = Column(Boolean, default=False)  # Internal notes not visible to patient
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    ticket = relationship("Ticket", back_populates="comments")
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (Index("idx_ticket_comments_ticket", "ticket_id", "created_at"),)
 
 
 # ====================================================================================

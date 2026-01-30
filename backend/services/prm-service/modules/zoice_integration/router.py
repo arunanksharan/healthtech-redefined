@@ -485,17 +485,89 @@ async def list_stts(client: ZoiceClient = Depends(get_client)):
     return response.json()
 
 
+# --- User Endpoints ---
+
+@router.get("/users/me", summary="Get current Zoice user")
+async def get_current_user(client: ZoiceClient = Depends(get_client)):
+    """Get the current authenticated user profile from Zoice."""
+    return await client.get_current_user()
+
+
+@router.get("/users/usage", summary="Get user usage statistics")
+async def get_user_usage(client: ZoiceClient = Depends(get_client)):
+    """Get current user's usage statistics from Zoice."""
+    return await client.get_user_usage()
+
+
+# --- Telephony V1 (Public API) ---
+
+@router.post("/telephony/call/start", summary="Start an outbound call (V1 API)")
+async def start_call_v1(
+    request: Request,
+    client: ZoiceClient = Depends(get_client)
+):
+    """
+    Start an outbound call using the Zoice V1 public API.
+
+    This endpoint is webhook-enabled and uses API key authentication.
+
+    Required fields:
+    - agent_id: The Zoice agent/pipeline ID to use for the call
+    - to_number: The phone number to call (E.164 format, e.g., +1234567890)
+
+    Optional fields:
+    - webhook_url: URL to receive call completion webhook
+    - metadata: Custom metadata to include in webhook payload
+    """
+    data = await request.json()
+    result = await client.start_call_v1(data)
+
+    # If Zoice returned an error status, raise appropriate HTTP exception
+    if "_status_code" in result:
+        status_code = result.pop("_status_code")
+        if status_code == 422:
+            raise HTTPException(status_code=422, detail=result)
+        elif status_code == 401:
+            raise HTTPException(status_code=401, detail="Invalid Zoice API key")
+        elif status_code == 403:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        else:
+            raise HTTPException(status_code=status_code, detail=result)
+
+    return result
+
+
 # --- Health Check ---
 
 @router.get("/health", summary="Zoice connection health check")
 async def health_check(client: ZoiceClient = Depends(get_client)):
-    """Check if the Zoice backend is reachable."""
+    """
+    Check if the Zoice backend is reachable using the public call endpoint.
+
+    Note: The Zoice API uses different authentication:
+    - Public endpoints (like /telephony/v1/public/call/start): Use x-api-key header
+    - Other endpoints: Require JWT Bearer token from auth flow
+
+    This health check tests the public API connectivity.
+    """
     try:
-        response = await client.proxy_request("GET", "/health")
+        # Test connectivity by making a minimal request to the public call endpoint
+        # It will fail validation (missing fields) but should return 422, not 500
+        response = await client.proxy_request(
+            "POST",
+            "/telephony/v1/public/call/start",
+            json_body={}
+        )
+        # 422 = validation error (API key works, just missing fields)
+        # 401/403 = auth error
+        # 500 = server error
+        is_healthy = response.status_code in [200, 422]
         return {
             "status": "connected",
             "zoice_status": response.status_code,
-            "zoice_healthy": response.status_code == 200
+            "zoice_healthy": is_healthy,
+            "auth_valid": response.status_code != 401 and response.status_code != 403,
+            "note": "API key authentication valid for public endpoints" if is_healthy else "Check Zoice server status"
         }
     except Exception as e:
         return {

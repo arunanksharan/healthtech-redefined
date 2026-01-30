@@ -1,0 +1,235 @@
+# =============================================================================
+# Docker Compose - Development Configuration
+# Usage: docker compose -f docker/docker-compose.dev.yml up
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PRM Service - Development with Hot Reload
+  # ---------------------------------------------------------------------------
+  prm-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: prm-service-dev
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port for debugpy
+    environment:
+      - DATABASE_URL=postgresql://prm:prm_dev@postgres:5432/prm_dev
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - SECRET_KEY=dev-secret-key-not-for-production
+      - CORS_ORIGINS=*
+      # Zoice Voice AI Integration
+      - ZOICE_BASE_URL=${ZOICE_BASE_URL:-https://api2.zoice.ai}
+      - ZOICE_API_KEY=${ZOICE_API_KEY:-}
+      - ZOICE_WEBHOOK_SECRET=${ZOICE_WEBHOOK_SECRET:-dev-webhook-secret}
+      # S3/MinIO for local storage
+      - S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - S3_BUCKET_NAME=prm-media
+      # Optional external services
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount source code for hot reload
+      - ..:/app:cached
+      - /app/__pycache__
+      - /app/.pytest_cache
+      - dev_logs:/app/logs
+    networks:
+      - prm-dev-network
+    stdin_open: true
+    tty: true
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database - Development
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: prm-postgres-dev
+    environment:
+      POSTGRES_DB: prm_dev
+      POSTGRES_USER: prm
+      POSTGRES_PASSWORD: prm_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./init-scripts/postgres:/docker-entrypoint-initdb.d:ro
+    networks:
+      - prm-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prm -d prm_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Redis - Development
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: prm-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - prm-dev-network
+    command: redis-server --appendonly yes --loglevel verbose
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # MinIO - S3-Compatible Object Storage (Local)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: prm-minio-dev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - prm-dev-network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # MinIO Client - Create default bucket on startup
+  # ---------------------------------------------------------------------------
+  minio-setup:
+    image: minio/mc:latest
+    container_name: prm-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - prm-dev-network
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/prm-media --ignore-existing;
+      mc anonymous set download myminio/prm-media;
+      echo 'MinIO bucket prm-media created successfully';
+      exit 0;
+      "
+
+  # ---------------------------------------------------------------------------
+  # pgAdmin - Database Management UI
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: prm-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@prm.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - prm-dev-network
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+  # ---------------------------------------------------------------------------
+  # Redis Commander - Redis Management UI
+  # ---------------------------------------------------------------------------
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: prm-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - prm-dev-network
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+  # ---------------------------------------------------------------------------
+  # MailHog - Email Testing (catches all outgoing emails)
+  # ---------------------------------------------------------------------------
+  mailhog:
+    image: mailhog/mailhog
+    container_name: prm-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - prm-dev-network
+    profiles:
+      - tools
+
+  # ---------------------------------------------------------------------------
+  # ngrok - Tunnel for Webhook Testing (Zoice callbacks)
+  # ---------------------------------------------------------------------------
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: prm-ngrok
+    restart: unless-stopped
+    command:
+      - "http"
+      - "prm-service:8000"
+      - "--log=stdout"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"
+    networks:
+      - prm-dev-network
+    depends_on:
+      - prm-service
+    profiles:
+      - webhooks
+
+# -----------------------------------------------------------------------------
+# Networks
+# -----------------------------------------------------------------------------
+networks:
+  prm-dev-network:
+    driver: bridge
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  minio_dev_data:
+    driver: local
+  dev_logs:
+    driver: local
+  pgadmin_data:
+    driver: local

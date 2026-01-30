@@ -1,0 +1,85 @@
+[
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/pipelines/list"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "pipelines": [
+          {
+            "id": "test-pipeline-1",
+            "name": "Test Appointment Pipeline",
+            "type": "appointment",
+            "status": "active"
+          },
+          {
+            "id": "test-pipeline-2",
+            "name": "Test Reminder Pipeline",
+            "type": "reminder",
+            "status": "active"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/agents/list"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "agents": [
+          {
+            "id": "test-agent-1",
+            "name": "Appointment Scheduler",
+            "status": "available"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/calls/list"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "calls": [],
+        "total": 0,
+        "page": 1,
+        "limit": 10
+      }
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/plivo/webhook/.*"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "status": "received",
+        "message": "Webhook processed successfully"
+      }
+    }
+  }
+]

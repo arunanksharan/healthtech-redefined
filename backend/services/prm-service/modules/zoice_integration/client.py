@@ -36,9 +36,9 @@ class ZoiceClient:
 
     @property
     def headers(self) -> Dict[str, str]:
-        """Default headers for all requests."""
+        """Default headers for all requests using API key authentication."""
         return {
-            "X-API-Key": self.api_key,
+            "x-api-key": self.api_key,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -104,9 +104,9 @@ class ZoiceClient:
                 kwargs["data"] = data
             if files:
                 kwargs["files"] = files
-                # Remove content-type header for multipart
-                if "json" not in kwargs:
-                    del kwargs.get("headers", {}).get("Content-Type", None)
+                # Remove content-type header for multipart (let httpx set it)
+                if "json" not in kwargs and "headers" in kwargs:
+                    kwargs["headers"].pop("Content-Type", None)
 
             response = await client.request(method, path, **kwargs)
 
@@ -201,6 +201,138 @@ class ZoiceClient:
         response = await self.proxy_request("GET", "/telephony-configs/phone-numbers/available")
         response.raise_for_status()
         return response.json()
+
+    async def get_current_user(self) -> Dict[str, Any]:
+        """Get current authenticated user profile."""
+        response = await self.proxy_request("GET", "/users/me")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_user_usage(self) -> Dict[str, Any]:
+        """Get current user's usage statistics."""
+        response = await self.proxy_request("GET", "/users/useage")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_llms(self) -> Dict[str, Any]:
+        """Get list of available LLM configurations (public endpoint)."""
+        response = await self.proxy_request("GET", "/agents/v1/llm/list")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_stts(self) -> Dict[str, Any]:
+        """Get list of available STT configurations (public endpoint)."""
+        response = await self.proxy_request("GET", "/agents/v1/stt/list")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_industries(self) -> Dict[str, Any]:
+        """Get list of industries."""
+        response = await self.proxy_request("GET", "/agents/v1/industry/list")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_use_cases(self, industry_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get list of use cases, optionally filtered by industry."""
+        params = {"industry_id": industry_id} if industry_id else None
+        response = await self.proxy_request("GET", "/agents/v1/use-case/list", params=params)
+        response.raise_for_status()
+        return response.json()
+
+    async def get_languages(self) -> Dict[str, Any]:
+        """Get list of supported languages."""
+        response = await self.proxy_request("GET", "/agents/v1/language/list")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_voices(self, language_ids: Optional[str] = None) -> Dict[str, Any]:
+        """Get list of available voices, optionally filtered by language IDs."""
+        params = {"language_ids": language_ids} if language_ids else None
+        response = await self.proxy_request("GET", "/agents/v1/voice/list", params=params)
+        response.raise_for_status()
+        return response.json()
+
+    async def create_call(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Schedule an outbound call."""
+        response = await self.proxy_request("POST", "/calls/create", json_body=data)
+        response.raise_for_status()
+        return response.json()
+
+    async def start_call_v1(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Start a call using the V1 public API (webhook enabled)."""
+        response = await self.proxy_request("POST", "/telephony/v1/public/call/start", json_body=data)
+        # Handle both JSON and non-JSON responses
+        try:
+            result = response.json()
+        except Exception:
+            result = {"message": response.text or "Empty response", "raw_status": response.status_code}
+
+        if response.status_code >= 400:
+            result["_status_code"] = response.status_code
+        return result
+
+    async def get_call(self, call_id: str) -> Dict[str, Any]:
+        """Get a specific call by ID."""
+        response = await self.proxy_request("GET", f"/calls/get/{call_id}")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_call_aggregate(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Get call statistics over a time period."""
+        response = await self.proxy_request("POST", "/calls/aggregate", json_body=data)
+        response.raise_for_status()
+        return response.json()
+
+    async def get_agent(self, agent_id: str) -> Dict[str, Any]:
+        """Get a specific agent by ID."""
+        response = await self.proxy_request("GET", f"/agents/get/{agent_id}")
+        response.raise_for_status()
+        return response.json()
+
+    async def create_agent(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new agent."""
+        response = await self.proxy_request("POST", "/agents/create", json_body=data)
+        response.raise_for_status()
+        return response.json()
+
+    async def update_agent(self, agent_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an agent."""
+        response = await self.proxy_request("PUT", f"/agents/update/{agent_id}", json_body=data)
+        response.raise_for_status()
+        return response.json()
+
+    async def delete_agent(self, agent_id: str) -> Dict[str, Any]:
+        """Delete an agent."""
+        response = await self.proxy_request("DELETE", f"/agents/delete/{agent_id}")
+        response.raise_for_status()
+        return response.json()
+
+    async def get_webhooks(self) -> Dict[str, Any]:
+        """Get all configured webhooks."""
+        response = await self.proxy_request("GET", "/webhooks/list")
+        response.raise_for_status()
+        return response.json()
+
+    async def create_webhook(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new webhook configuration."""
+        response = await self.proxy_request("POST", "/webhooks/create", json_body=data)
+        response.raise_for_status()
+        return response.json()
+
+    async def check_health(self) -> Dict[str, Any]:
+        """Check connectivity using a public endpoint."""
+        try:
+            response = await self.proxy_request("GET", "/agents/v1/llm/list")
+            return {
+                "status": "connected",
+                "zoice_status": response.status_code,
+                "zoice_healthy": response.status_code == 200
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e)
+            }
 
 
 # Global client instance (initialized on startup)

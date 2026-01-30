@@ -1,0 +1,60 @@
+# =============================================================================
+# Test Dockerfile for PRM Service
+# Optimized for running tests in CI/CD
+# =============================================================================
+
+FROM python:3.11-slim
+
+LABEL maintainer="Kuzushi Labs <dev@kuzushilabs.com>"
+LABEL description="PRM Service - Test Environment"
+
+WORKDIR /app
+
+# Install dependencies for testing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    librdkafka-dev \
+    curl \
+    git \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies including test tools
+RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
+        pytest-xdist \
+        pytest-timeout \
+        pytest-sugar \
+        coverage \
+        pytest-html \
+        allure-pytest
+
+# Copy application code
+COPY . .
+
+# Create directories for test artifacts
+RUN mkdir -p /app/logs /app/test-results /app/coverage
+
+# Environment for testing
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    APP_ENV=testing \
+    TESTING=true
+
+# Default command runs all tests with coverage
+CMD ["pytest", \
+     "--verbose", \
+     "--tb=short", \
+     "--cov=.", \
+     "--cov-report=term-missing", \
+     "--cov-report=html:/app/coverage", \
+     "--junitxml=/app/test-results/junit.xml", \
+     "-n", "auto", \
+     "tests/"]
