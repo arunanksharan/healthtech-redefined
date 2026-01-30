@@ -225,7 +225,7 @@ export default function HomePage() {
         </div>
 
         {/* Footer - Dark gray block */}
-        <div className="mt-0 -mx-4 md:-mx-8 lg:-mx-16">
+        <div className="mt-16 -mx-4 md:-mx-8 lg:-mx-16">
           <div className="bg-gray-900 py-12 px-4">
             <div className="max-w-6xl mx-auto text-center">
               <p className="text-gray-400 text-sm">
